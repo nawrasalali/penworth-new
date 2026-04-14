@@ -43,3 +43,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 COMMENT ON COLUMN profiles.plan IS 'v2 pricing tier: free, pro, or max';
 COMMENT ON COLUMN profiles.credits_balance IS 'Current monthly credits remaining';
 COMMENT ON COLUMN profiles.credits_purchased IS 'Purchased credits that never expire';
+
+-- Payment status tracking for grace periods
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'active' CHECK (payment_status IN ('active', 'past_due', 'canceled'));
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS payment_grace_ends TIMESTAMPTZ;

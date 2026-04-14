@@ -39,6 +39,7 @@ export const PLAN_LIMITS = {
     industryPrompts: 'all_plus_custom',
     marketplaceSell: true,
     marketplaceCommission: 0.15,
+    creditRollover: 2_500,
     creditRolloverMax: 2_500,
     canBuyCredits: true,
     supportLevel: 'priority_email',
@@ -50,9 +51,9 @@ export const CREDIT_COSTS = {
 } as const;
 
 export const CREDIT_PACKS = [
-  { id: 'v2_credits_1000', credits: 1_000, priceInCents: 3_900 },
-  { id: 'v2_credits_3000', credits: 3_000, priceInCents: 9_900 },
-  { id: 'v2_credits_10000', credits: 10_000, priceInCents: 29_000 },
+  { id: 'v2_credits_1000', name: 'Single', credits: 1_000, price: 39, priceInCents: 3_900 },
+  { id: 'v2_credits_3000', name: 'Triple', credits: 3_000, price: 99, priceInCents: 9_900 },
+  { id: 'v2_credits_10000', name: 'Bulk', credits: 10_000, price: 290, priceInCents: 29_000 },
 ] as const;
 
 export const STRIPE_PRODUCTS = {
