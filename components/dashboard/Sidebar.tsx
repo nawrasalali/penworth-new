@@ -15,6 +15,7 @@ import {
   Building2,
   ChevronDown,
   CreditCard,
+  Gift,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
@@ -47,6 +48,7 @@ const orgNav = [
 ];
 
 const bottomNav = [
+  { href: '/referrals', icon: Gift, label: 'Referrals' },
   { href: '/billing', icon: CreditCard, label: 'Billing' },
   { href: '/settings', icon: Settings, label: 'Settings' },
   { href: '/help', icon: HelpCircle, label: 'Help & Support' },
