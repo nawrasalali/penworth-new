@@ -13,6 +13,8 @@ import {
   FileSpreadsheet,
   GraduationCap,
   Briefcase,
+  Coins,
+  Crown,
 } from 'lucide-react';
 import { formatRelativeTime, formatWordCount, CONTENT_TYPE_LABELS, STATUS_COLORS } from '@/lib/utils';
 
@@ -23,10 +25,37 @@ const quickStartTemplates = [
   { icon: GraduationCap, label: 'Educational Content', type: 'educational', description: 'Curriculum-aligned materials' },
 ];
 
+const PLAN_DISPLAY = {
+  free: { name: 'Free', color: 'bg-gray-100 text-gray-800' },
+  pro: { name: 'Pro', color: 'bg-blue-100 text-blue-800' },
+  max: { name: 'Max', color: 'bg-purple-100 text-purple-800' },
+};
+
+const PLAN_LIMITS = {
+  free: { credits: 1000, docs: 1 },
+  pro: { credits: 2000, docs: 2 },
+  max: { credits: 5000, docs: 5 },
+};
+
 export default async function DashboardPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
+
+  // Fetch profile with plan and credits
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('plan, credits_balance, credits_purchased, documents_this_month')
+    .eq('id', user?.id)
+    .single();
+
+  const plan = (profile?.plan || 'free') as keyof typeof PLAN_DISPLAY;
+  const planInfo = PLAN_DISPLAY[plan];
+  const planLimits = PLAN_LIMITS[plan];
+  const creditsBalance = profile?.credits_balance || 0;
+  const creditsPurchased = profile?.credits_purchased || 0;
+  const totalCredits = creditsBalance + creditsPurchased;
+  const documentsThisMonth = profile?.documents_this_month || 0;
 
   // Fetch recent projects
   const { data: recentProjects } = await supabase
@@ -48,7 +77,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-8">
-      {/* Header */}
+      {/* Plan Badge */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
@@ -56,25 +85,57 @@ export default async function DashboardPage() {
             Welcome back! Here's an overview of your knowledge creation.
           </p>
         </div>
-        <Link href="/projects/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Project
-          </Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/billing">
+            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${planInfo.color}`}>
+              <Crown className="h-4 w-4" />
+              {planInfo.name} Plan
+            </div>
+          </Link>
+          <Link href="/projects/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New Project
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Credits Available</CardTitle>
+            <Coins className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalCredits.toLocaleString()}</div>
+            <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary transition-all"
+                style={{ width: `${Math.min(100, (creditsBalance / planLimits.credits) * 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {creditsBalance.toLocaleString()} monthly + {creditsPurchased.toLocaleString()} purchased
+            </p>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
+            <CardTitle className="text-sm font-medium">Documents This Month</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{projectCount}</div>
-            <p className="text-xs text-muted-foreground">
-              Across all content types
+            <div className="text-2xl font-bold">{documentsThisMonth} / {planLimits.docs}</div>
+            <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary transition-all"
+                style={{ width: `${(documentsThisMonth / planLimits.docs) * 100}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {planLimits.docs - documentsThisMonth} remaining
             </p>
           </CardContent>
         </Card>
@@ -92,27 +153,13 @@ export default async function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">AI Sessions</CardTitle>
-            <Zap className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{usageStats?.length || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Last 30 days
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Drafts</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {recentProjects?.filter(p => p.status === 'draft' || p.status === 'in_progress').length || 0}
-            </div>
+            <div className="text-2xl font-bold">{projectCount}</div>
             <p className="text-xs text-muted-foreground">
-              In progress
+              {recentProjects?.filter(p => p.status === 'draft' || p.status === 'in_progress').length || 0} in progress
             </p>
           </CardContent>
         </Card>
