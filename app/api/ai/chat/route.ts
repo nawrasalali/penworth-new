@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Get final result
-          result = await generator.return(undefined as unknown as OrchestrationResult);
+          result = await generator.return(undefined as any);
           
           if (result.value) {
             // Log usage
