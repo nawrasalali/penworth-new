@@ -152,17 +152,105 @@ export const writeBook = inngest.createFunction(
         })
         .eq('id', projectId);
 
+      // Check if this is user's first completed book
+      const { count: completedBooksCount } = await supabase
+        .from('projects')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('status', 'complete');
+
+      // If this is the first book, trigger referral credits
+      if (completedBooksCount === 1) {
+        await triggerReferralCredits(userId, projectId, title);
+      }
+
       return {
         success: true,
         totalChapters: outline.chapters.length,
         totalWordCount,
         chapters: writtenChapters,
+        isFirstBook: completedBooksCount === 1,
       };
     });
 
     return finalResult;
   }
 );
+
+/**
+ * Give referral credits when a referred user completes their first book
+ * Per PLG spec: 500 credits to the referrer
+ */
+async function triggerReferralCredits(userId: string, projectId: string, bookTitle: string) {
+  const REFERRAL_CREDITS = 500;
+
+  try {
+    // Check if user was referred by someone
+    const { data: referral } = await supabase
+      .from('referrals')
+      .select('referrer_id, status')
+      .eq('referee_id', userId)
+      .eq('status', 'pending')
+      .single();
+
+    if (!referral) {
+      // User wasn't referred or already credited
+      return;
+    }
+
+    // Update referral status to completed
+    await supabase
+      .from('referrals')
+      .update({ 
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        first_book_id: projectId,
+      })
+      .eq('referee_id', userId);
+
+    // Get referrer's current credits
+    const { data: referrerProfile } = await supabase
+      .from('profiles')
+      .select('credits_balance, credits_purchased')
+      .eq('id', referral.referrer_id)
+      .single();
+
+    if (!referrerProfile) return;
+
+    // Add credits to purchased (they never expire)
+    const newCreditsPurchased = (referrerProfile.credits_purchased || 0) + REFERRAL_CREDITS;
+
+    await supabase
+      .from('profiles')
+      .update({ credits_purchased: newCreditsPurchased })
+      .eq('id', referral.referrer_id);
+
+    // Log the credit transaction
+    await supabase.from('credit_transactions').insert({
+      user_id: referral.referrer_id,
+      amount: REFERRAL_CREDITS,
+      type: 'referral_bonus',
+      description: `Referral bonus: Friend completed their first book "${bookTitle}"`,
+      metadata: { 
+        refereeId: userId, 
+        projectId,
+        bookTitle,
+      },
+    });
+
+    // Get referrer email to send notification
+    const { data: referrerData } = await supabase.auth.admin.getUserById(referral.referrer_id);
+    
+    if (referrerData?.user?.email) {
+      // TODO: Send email notification via Resend
+      console.log(`Referral credits notification to send to: ${referrerData.user.email}`);
+    }
+
+  } catch (error) {
+    console.error('Error triggering referral credits:', error);
+    // Don't throw - book completion should succeed even if referral fails
+  }
+}
 
 // Helper: Build chapter writing prompt
 function buildChapterPrompt(params: {
