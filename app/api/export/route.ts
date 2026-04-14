@@ -48,16 +48,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Check subscription tier for export access
-    const { data: orgMember } = await supabase
-      .from('org_members')
-      .select('organizations(subscription_tier)')
-      .eq('user_id', user.id)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('plan')
+      .eq('id', user.id)
       .single();
 
-    const tier = (orgMember?.organizations as any)?.subscription_tier || 'free';
+    const plan = profile?.plan || 'free';
 
-    // Free tier can export with branding, Pro+ without branding
-    const includeBranding = tier === 'free';
+    // v2 spec: Free tier exports have "Created with Penworth.ai" branding
+    // Pro and Max have no branding
+    const includeBranding = plan === 'free';
 
     // Sort chapters by order
     const chapters = (project.chapters || []).sort(
@@ -150,7 +151,7 @@ async function generateDOCX(project: Project, chapters: Chapter[], includeBrandi
       <w:pPr><w:jc w:val="center"/></w:pPr>
       <w:r>
         <w:rPr><w:sz w:val="20"/><w:color w:val="666666"/></w:rPr>
-        <w:t>Written with Penworth.ai</w:t>
+        <w:t>Created with Penworth.ai</w:t>
       </w:r>
     </w:p>
     <w:p>
@@ -223,7 +224,7 @@ async function generatePDF(project: Project, chapters: Chapter[], includeBrandin
 0.4 0.4 0.4 rg
 (-------------------------------------------) Tj
 0 -15 Td
-(Written with Penworth.ai) Tj
+(Created with Penworth.ai) Tj
 0 -15 Td
 (Transform your ideas into published books) Tj
 0 -15 Td

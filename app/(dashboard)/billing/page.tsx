@@ -1,102 +1,108 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Check, CreditCard, Zap } from 'lucide-react';
 
 interface Subscription {
-  tier: 'free' | 'pro' | 'team' | 'enterprise';
+  plan: 'free' | 'pro' | 'max';
   status: 'active' | 'past_due' | 'canceled' | 'trialing';
   current_period_end: string;
   cancel_at_period_end: boolean;
 }
 
 interface UsageData {
-  words_used: number;
-  words_limit: number;
-  projects_used: number;
-  projects_limit: number;
-  ai_tokens_used: number;
-  ai_tokens_limit: number;
+  credits_used: number;
+  credits_limit: number;
+  credits_purchased: number;
+  documents_this_month: number;
+  documents_limit: number;
 }
 
 const PLANS = [
   {
     id: 'free',
     name: 'Free',
-    price: 0,
+    monthlyPrice: 0,
+    annualPrice: 0,
     features: [
-      '3 projects',
-      '10,000 words/month',
-      'Basic AI (Haiku)',
+      '1 document per month',
+      '1,000 credits/month',
+      'AI writing assistance',
+      'PDF export',
+      'Publish to Amazon KDP',
       'Community support',
     ],
     limitations: [
-      'No export to PDF/DOCX',
-      'No team collaboration',
-      'Watermarked exports',
+      '"Created with Penworth.ai" branding',
+      'Cannot purchase credit packs',
     ],
   },
   {
     id: 'pro',
     name: 'Pro',
-    price: 29,
+    monthlyPrice: 19,
+    annualPrice: 190,
     popular: true,
     features: [
-      'Unlimited projects',
-      '100,000 words/month',
-      'Advanced AI (Sonnet)',
-      'Export to PDF & DOCX',
-      'Priority support',
-      'No watermarks',
-      'Version history',
+      '2 documents per month',
+      '2,000 credits/month',
+      'Enhanced AI writing',
+      'PDF & DOCX export',
+      'No Penworth branding',
+      'All 8 industry prompts',
+      'Sell on Marketplace',
+      'Purchase credit add-ons',
+      'Email support (48hr)',
     ],
   },
   {
-    id: 'team',
-    name: 'Team',
-    price: 49,
-    perUser: true,
+    id: 'max',
+    name: 'Max',
+    monthlyPrice: 49,
+    annualPrice: 490,
     features: [
-      'Everything in Pro',
-      'Team workspaces',
-      'Up to 10 members',
-      'Collaboration tools',
-      'Admin controls',
-      'Usage analytics',
-      'Priority support',
-    ],
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: null,
-    features: [
-      'Everything in Team',
-      'Unlimited members',
-      'SSO/SAML',
-      'Custom integrations',
-      'Dedicated support',
-      'SLA guarantee',
-      'On-premise option',
-      'Custom AI training',
+      '5 documents per month',
+      '5,000 credits/month',
+      'Premium AI writing',
+      'PDF, DOCX & EPUB export',
+      'All publishing platforms',
+      'All prompts + custom',
+      'Credit rollover (2,500 max)',
+      'Priority support (24hr)',
     ],
   },
 ];
 
+const CREDIT_PACKS = [
+  { id: 'v2_credits_1000', name: 'Single', credits: 1000, price: 39, perDoc: '39.00' },
+  { id: 'v2_credits_3000', name: 'Triple', credits: 3000, price: 99, perDoc: '33.00', savings: '15%' },
+  { id: 'v2_credits_10000', name: 'Bulk', credits: 10000, price: 290, perDoc: '29.00', savings: '26%' },
+];
+
 export default function BillingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('annual');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const supabase = createClient();
 
   useEffect(() => {
+    // Check for success messages from Stripe redirect
+    if (searchParams.get('success') === 'true') {
+      setSuccessMessage('Subscription activated! Welcome to your new plan.');
+    } else if (searchParams.get('credits') === 'success') {
+      setSuccessMessage('Credits added to your account!');
+    }
     loadBillingData();
-  }, []);
+  }, [searchParams]);
 
   const loadBillingData = async () => {
     setIsLoading(true);
@@ -107,54 +113,89 @@ export default function BillingPage() {
       return;
     }
 
-    // Load subscription from organizations (user might have personal or org subscription)
-    const { data: orgData } = await supabase
-      .from('organizations')
-      .select('subscription_tier, stripe_subscription_id')
-      .limit(1)
+    // Load profile with plan info
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('plan, credits_balance, credits_purchased')
+      .eq('id', user.id)
       .single();
 
-    if (orgData) {
-      setSubscription({
-        tier: orgData.subscription_tier as any || 'free',
-        status: 'active',
-        current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        cancel_at_period_end: false,
-      });
-    } else {
-      setSubscription({
-        tier: 'free',
-        status: 'active',
-        current_period_end: '',
-        cancel_at_period_end: false,
-      });
-    }
+    const plan = (profile?.plan as 'free' | 'pro' | 'max') || 'free';
 
-    // Calculate usage
-    const { data: projects } = await supabase
+    // Get subscription status from org
+    const { data: orgMember } = await supabase
+      .from('org_members')
+      .select('organizations(subscription_tier, stripe_subscription_id)')
+      .eq('user_id', user.id)
+      .single();
+
+    const orgPlan = (orgMember?.organizations as any)?.subscription_tier;
+
+    setSubscription({
+      plan: orgPlan || plan,
+      status: 'active',
+      current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      cancel_at_period_end: false,
+    });
+
+    // Get documents this month
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const { count: docsThisMonth } = await supabase
       .from('projects')
-      .select('id, chapters(word_count)')
-      .eq('user_id', user.id);
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', startOfMonth.toISOString());
 
-    const totalWords = projects?.reduce((sum, p) => 
-      sum + (p.chapters?.reduce((s: number, c: any) => s + (c.word_count || 0), 0) || 0), 0
-    ) || 0;
+    // Get plan limits
+    const planLimits = {
+      free: { credits: 1000, docs: 1 },
+      pro: { credits: 2000, docs: 2 },
+      max: { credits: 5000, docs: 5 },
+    };
+
+    const limits = planLimits[plan] || planLimits.free;
 
     setUsage({
-      words_used: totalWords,
-      words_limit: subscription?.tier === 'pro' ? 100000 : subscription?.tier === 'team' ? 500000 : 10000,
-      projects_used: projects?.length || 0,
-      projects_limit: subscription?.tier === 'free' ? 3 : -1,
-      ai_tokens_used: 0,
-      ai_tokens_limit: subscription?.tier === 'free' ? 50000 : -1,
+      credits_used: limits.credits - (profile?.credits_balance || 0),
+      credits_limit: limits.credits,
+      credits_purchased: profile?.credits_purchased || 0,
+      documents_this_month: docsThisMonth || 0,
+      documents_limit: limits.docs,
     });
 
     setIsLoading(false);
   };
 
   const handleUpgrade = async (planId: string) => {
-    if (planId === 'enterprise') {
-      window.open('mailto:sales@penworth.ai?subject=Enterprise%20Inquiry', '_blank');
+    if (planId === 'free') return;
+
+    setIsProcessing(true);
+    try {
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          planId,
+          billingPeriod,
+        }),
+      });
+
+      const { url, error } = await response.json();
+      if (error) throw new Error(error);
+      if (url) window.location.href = url;
+    } catch (error) {
+      alert('Failed to start checkout. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleBuyCreditPack = async (packId: string) => {
+    if (subscription?.plan === 'free') {
+      alert('Credit packs are only available for Pro and Max subscribers. Please upgrade first.');
       return;
     }
 
@@ -163,7 +204,7 @@ export default function BillingPage() {
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ creditPackId: packId }),
       });
 
       const { url, error } = await response.json();
@@ -201,11 +242,19 @@ export default function BillingPage() {
     );
   }
 
-  const currentPlan = PLANS.find(p => p.id === subscription?.tier) || PLANS[0];
+  const currentPlan = PLANS.find(p => p.id === subscription?.plan) || PLANS[0];
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-8">Billing & Subscription</h1>
+
+      {/* Success Message */}
+      {successMessage && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
+          <Check className="inline w-5 h-5 mr-2" />
+          {successMessage}
+        </div>
+      )}
 
       {/* Current Plan */}
       <div className="border rounded-lg p-6 mb-8 bg-card">
@@ -213,12 +262,12 @@ export default function BillingPage() {
           <div>
             <h2 className="text-xl font-semibold mb-1">Current Plan: {currentPlan.name}</h2>
             <p className="text-muted-foreground">
-              {subscription?.tier === 'free' 
+              {subscription?.plan === 'free' 
                 ? 'Free forever' 
-                : `$${currentPlan.price}${currentPlan.perUser ? '/user' : ''}/month`
+                : `$${currentPlan.monthlyPrice}/month or $${currentPlan.annualPrice}/year`
               }
             </p>
-            {subscription?.current_period_end && subscription.tier !== 'free' && (
+            {subscription?.current_period_end && subscription.plan !== 'free' && (
               <p className="text-sm text-muted-foreground mt-2">
                 {subscription.cancel_at_period_end 
                   ? `Cancels on ${new Date(subscription.current_period_end).toLocaleDateString()}`
@@ -227,8 +276,9 @@ export default function BillingPage() {
               </p>
             )}
           </div>
-          {subscription?.tier !== 'free' && (
+          {subscription?.plan !== 'free' && (
             <Button variant="outline" onClick={handleManageBilling} disabled={isProcessing}>
+              <CreditCard className="w-4 h-4 mr-2" />
               Manage Billing
             </Button>
           )}
@@ -237,61 +287,73 @@ export default function BillingPage() {
 
       {/* Usage */}
       {usage && (
-        <div className="grid gap-4 md:grid-cols-3 mb-8">
+        <div className="grid gap-4 md:grid-cols-2 mb-8">
           <div className="border rounded-lg p-4 bg-card">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">Words This Month</h3>
-            <p className="text-2xl font-bold">{usage.words_used.toLocaleString()}</p>
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">Credits This Month</h3>
+            <p className="text-2xl font-bold">{(usage.credits_limit - usage.credits_used).toLocaleString()}</p>
             <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
               <div 
                 className="h-full bg-primary transition-all"
-                style={{ width: `${Math.min(100, (usage.words_used / usage.words_limit) * 100)}%` }}
+                style={{ width: `${Math.min(100, (usage.credits_used / usage.credits_limit) * 100)}%` }}
               />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              of {usage.words_limit === -1 ? 'unlimited' : usage.words_limit.toLocaleString()}
+              {usage.credits_used.toLocaleString()} used of {usage.credits_limit.toLocaleString()}
             </p>
-          </div>
-
-          <div className="border rounded-lg p-4 bg-card">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">Projects</h3>
-            <p className="text-2xl font-bold">{usage.projects_used}</p>
-            {usage.projects_limit !== -1 && (
-              <>
-                <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-primary transition-all"
-                    style={{ width: `${(usage.projects_used / usage.projects_limit) * 100}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  of {usage.projects_limit} max
-                </p>
-              </>
-            )}
-            {usage.projects_limit === -1 && (
-              <p className="text-xs text-muted-foreground mt-2">Unlimited</p>
+            {usage.credits_purchased > 0 && (
+              <p className="text-xs text-green-600 mt-1">
+                + {usage.credits_purchased.toLocaleString()} purchased credits available
+              </p>
             )}
           </div>
 
           <div className="border rounded-lg p-4 bg-card">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">AI Tokens</h3>
-            <p className="text-2xl font-bold">{usage.ai_tokens_used.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground mt-2">
-              {usage.ai_tokens_limit === -1 ? 'Unlimited' : `of ${usage.ai_tokens_limit.toLocaleString()}`}
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">Documents This Month</h3>
+            <p className="text-2xl font-bold">{usage.documents_this_month}</p>
+            <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary transition-all"
+                style={{ width: `${(usage.documents_this_month / usage.documents_limit) * 100}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              of {usage.documents_limit} max
             </p>
           </div>
         </div>
       )}
 
       {/* Plans */}
-      <h2 className="text-xl font-semibold mb-4">Available Plans</h2>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold">Available Plans</h2>
+        <div className="inline-flex items-center gap-2 p-1 bg-muted rounded-lg">
+          <button
+            onClick={() => setBillingPeriod('monthly')}
+            className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+              billingPeriod === 'monthly' ? 'bg-background shadow' : ''
+            }`}
+          >
+            Monthly
+          </button>
+          <button
+            onClick={() => setBillingPeriod('annual')}
+            className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+              billingPeriod === 'annual' ? 'bg-background shadow' : ''
+            }`}
+          >
+            Annual
+            <span className="ml-1 text-xs text-green-600">Save 17%</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3 mb-12">
         {PLANS.map((plan) => (
           <div 
             key={plan.id}
             className={`border rounded-lg p-6 relative ${
               plan.popular ? 'border-primary ring-2 ring-primary/20' : ''
-            } ${subscription?.tier === plan.id ? 'bg-primary/5' : 'bg-card'}`}
+            } ${subscription?.plan === plan.id ? 'bg-primary/5' : 'bg-card'}`}
           >
             {plan.popular && (
               <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-medium">
@@ -301,14 +363,16 @@ export default function BillingPage() {
 
             <h3 className="text-lg font-semibold mb-2">{plan.name}</h3>
             <div className="mb-4">
-              {plan.price === null ? (
-                <span className="text-2xl font-bold">Custom</span>
-              ) : plan.price === 0 ? (
+              {plan.monthlyPrice === 0 ? (
                 <span className="text-2xl font-bold">Free</span>
               ) : (
                 <>
-                  <span className="text-3xl font-bold">${plan.price}</span>
-                  <span className="text-muted-foreground">/{plan.perUser ? 'user/' : ''}mo</span>
+                  <span className="text-3xl font-bold">
+                    ${billingPeriod === 'annual' ? plan.annualPrice : plan.monthlyPrice}
+                  </span>
+                  <span className="text-muted-foreground">
+                    /{billingPeriod === 'annual' ? 'year' : 'mo'}
+                  </span>
                 </>
               )}
             </div>
@@ -316,7 +380,7 @@ export default function BillingPage() {
             <ul className="space-y-2 mb-6">
               {plan.features.map((feature, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm">
-                  <span className="text-green-500 mt-0.5">✓</span>
+                  <Check className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
                   {feature}
                 </li>
               ))}
@@ -328,7 +392,7 @@ export default function BillingPage() {
               ))}
             </ul>
 
-            {subscription?.tier === plan.id ? (
+            {subscription?.plan === plan.id ? (
               <Button variant="outline" className="w-full" disabled>
                 Current Plan
               </Button>
@@ -337,44 +401,64 @@ export default function BillingPage() {
                 className="w-full"
                 variant={plan.popular ? 'default' : 'outline'}
                 onClick={() => handleUpgrade(plan.id)}
-                disabled={isProcessing}
+                disabled={isProcessing || plan.monthlyPrice === 0}
               >
-                {plan.price === null ? 'Contact Sales' : plan.price === 0 ? 'Downgrade' : 'Upgrade'}
+                {plan.monthlyPrice === 0 ? 'Downgrade' : 'Upgrade'}
               </Button>
             )}
           </div>
         ))}
       </div>
 
-      {/* FAQ */}
-      <div className="mt-12">
-        <h2 className="text-xl font-semibold mb-4">Frequently Asked Questions</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="border rounded-lg p-4 bg-card">
-            <h3 className="font-medium mb-2">Can I change plans anytime?</h3>
-            <p className="text-sm text-muted-foreground">
-              Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate your billing accordingly.
-            </p>
-          </div>
-          <div className="border rounded-lg p-4 bg-card">
-            <h3 className="font-medium mb-2">What payment methods do you accept?</h3>
-            <p className="text-sm text-muted-foreground">
-              We accept all major credit cards (Visa, MasterCard, Amex), PayPal, and USDT (ERC-20) for annual plans.
-            </p>
-          </div>
-          <div className="border rounded-lg p-4 bg-card">
-            <h3 className="font-medium mb-2">Is there a free trial?</h3>
-            <p className="text-sm text-muted-foreground">
-              Yes! Pro and Team plans include a 14-day free trial. No credit card required to start.
-            </p>
-          </div>
-          <div className="border rounded-lg p-4 bg-card">
-            <h3 className="font-medium mb-2">What happens if I exceed my limits?</h3>
-            <p className="text-sm text-muted-foreground">
-              We'll notify you before you hit your limits. You can upgrade anytime or purchase additional capacity as needed.
-            </p>
-          </div>
+      {/* Credit Packs */}
+      <div className="mb-12">
+        <div className="flex items-center gap-2 mb-4">
+          <Zap className="w-5 h-5 text-yellow-500" />
+          <h2 className="text-xl font-semibold">Credit Add-On Packs</h2>
         </div>
+        <p className="text-muted-foreground mb-6">
+          Need more credits? Purchase add-on packs. Available for Pro and Max subscribers only.
+        </p>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {CREDIT_PACKS.map((pack) => (
+            <div key={pack.id} className="border rounded-lg p-6 bg-card">
+              <h3 className="font-semibold mb-1">{pack.name}</h3>
+              <p className="text-3xl font-bold mb-1">${pack.price}</p>
+              <p className="text-sm text-muted-foreground mb-3">
+                {pack.credits.toLocaleString()} credits
+              </p>
+              <p className="text-sm mb-4">
+                ${pack.perDoc}/document
+                {pack.savings && (
+                  <span className="ml-2 text-green-600 font-medium">({pack.savings} off)</span>
+                )}
+              </p>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => handleBuyCreditPack(pack.id)}
+                disabled={isProcessing || subscription?.plan === 'free'}
+              >
+                {subscription?.plan === 'free' ? 'Upgrade to Buy' : 'Buy Credits'}
+              </Button>
+            </div>
+          ))}
+        </div>
+        <p className="text-sm text-muted-foreground mt-4">
+          Purchased credits never expire • Used after monthly credits are exhausted
+        </p>
+      </div>
+
+      {/* Enterprise CTA */}
+      <div className="border rounded-lg p-6 bg-muted/30 text-center">
+        <h3 className="font-semibold mb-2">Publishing 50+ documents a month?</h3>
+        <p className="text-muted-foreground mb-4">
+          Get volume pricing, SSO, API access, and dedicated support.
+        </p>
+        <Button variant="outline" asChild>
+          <a href="mailto:enterprise@penworth.ai">Contact Sales</a>
+        </Button>
       </div>
     </div>
   );
