@@ -82,29 +82,11 @@ export async function POST(request: NextRequest) {
             controller.enqueue(encoder.encode(`data: ${data}\n\n`));
           }
 
-          // Get final result
-          result = await generator.return(undefined as any);
-          
-          if (result.value) {
-            // Log usage
-            await supabase.from('usage').insert({
-              user_id: user.id,
-              org_id: project.org_id,
-              action_type: `ai_${agentType}`,
-              tokens_input: result.value.tokensUsed.input,
-              tokens_output: result.value.tokensUsed.output,
-              model: result.value.model,
-              metadata: { project_id: projectId },
-            });
-
-            // Send completion event
-            const completeData = JSON.stringify({
-              type: 'complete',
-              tokensUsed: result.value.tokensUsed,
-              model: result.value.model,
-            });
-            controller.enqueue(encoder.encode(`data: ${completeData}\n\n`));
-          }
+          // Send completion event
+          const completeData = JSON.stringify({
+            type: 'complete',
+          });
+          controller.enqueue(encoder.encode(`data: ${completeData}\n\n`));
 
           controller.close();
         } catch (error) {
