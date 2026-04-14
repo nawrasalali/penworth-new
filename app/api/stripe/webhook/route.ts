@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-import { PLAN_LIMITS, STRIPE_PRODUCTS, CREDIT_PACKS } from '@/lib/plans';
+import { PLAN_LIMITS, CREDIT_PACKS } from '@/lib/plans';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2024-12-18.acacia',
@@ -63,6 +63,41 @@ export async function POST(request: NextRequest) {
 }
 
 /**
+ * Helper: Find user ID from Stripe customer ID via org_members
+ */
+async function findUserByCustomerId(customerId: string): Promise<string | null> {
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (!org) return null;
+
+  const { data: ownerMember } = await supabase
+    .from('org_members')
+    .select('user_id')
+    .eq('org_id', org.id)
+    .eq('role', 'owner')
+    .single();
+
+  return ownerMember?.user_id || null;
+}
+
+/**
+ * Helper: Find org ID from Stripe customer ID
+ */
+async function findOrgByCustomerId(customerId: string): Promise<string | null> {
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  return org?.id || null;
+}
+
+/**
  * Handle successful checkout - activate subscription or add credits
  */
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
@@ -104,15 +139,24 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     })
     .eq('id', userId);
 
-  // Update organization if exists
-  await supabase
-    .from('organizations')
-    .update({
-      subscription_tier: plan,
-      stripe_subscription_id: subscriptionId,
-      stripe_customer_id: session.customer as string,
-    })
-    .eq('owner_id', userId);
+  // Update organization if exists - find by user's org membership
+  const { data: orgMember } = await supabase
+    .from('org_members')
+    .select('org_id')
+    .eq('user_id', userId)
+    .eq('role', 'owner')
+    .single();
+
+  if (orgMember?.org_id) {
+    await supabase
+      .from('organizations')
+      .update({
+        subscription_tier: plan,
+        stripe_subscription_id: subscriptionId,
+        stripe_customer_id: session.customer as string,
+      })
+      .eq('id', orgMember.org_id);
+  }
 
   // Log transaction
   await supabase.from('credit_transactions').insert({
@@ -175,19 +219,12 @@ async function handleCreditPackPurchase(userId: string, session: Stripe.Checkout
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const customerId = subscription.customer as string;
   
-  // Find user by Stripe customer ID
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('owner_id')
-    .eq('stripe_customer_id', customerId)
-    .single();
-
-  if (!org?.owner_id) {
-    console.error('No organization found for customer:', customerId);
+  const userId = await findUserByCustomerId(customerId);
+  if (!userId) {
+    console.error('No user found for customer:', customerId);
     return;
   }
 
-  const userId = org.owner_id;
   const priceId = subscription.items.data[0]?.price.id;
   const plan = getPlanFromPriceId(priceId);
 
@@ -208,7 +245,6 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const isUpgrade = getPlanRank(plan) > getPlanRank(profile?.plan || 'free');
 
   // On upgrade, immediately give new credit allowance
-  // On downgrade, keep current credits until reset
   const updates: any = { plan };
   
   if (isUpgrade) {
@@ -219,10 +255,13 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   await supabase.from('profiles').update(updates).eq('id', userId);
 
   // Update organization
-  await supabase
-    .from('organizations')
-    .update({ subscription_tier: plan })
-    .eq('owner_id', userId);
+  const orgId = await findOrgByCustomerId(customerId);
+  if (orgId) {
+    await supabase
+      .from('organizations')
+      .update({ subscription_tier: plan })
+      .eq('id', orgId);
+  }
 
   console.log(`Subscription ${isUpgrade ? 'upgraded' : 'changed'}: ${userId} -> ${plan}`);
 }
@@ -233,15 +272,9 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const customerId = subscription.customer as string;
   
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('owner_id')
-    .eq('stripe_customer_id', customerId)
-    .single();
+  const userId = await findUserByCustomerId(customerId);
+  if (!userId) return;
 
-  if (!org?.owner_id) return;
-
-  const userId = org.owner_id;
   const freeLimits = PLAN_LIMITS.free;
 
   // Revert to free tier
@@ -249,17 +282,21 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     .from('profiles')
     .update({
       plan: 'free',
-      credits_balance: Math.min(freeLimits.monthlyCredits, 1000), // Cap at free tier limit
+      credits_balance: Math.min(freeLimits.monthlyCredits, 1000),
     })
     .eq('id', userId);
 
-  await supabase
-    .from('organizations')
-    .update({
-      subscription_tier: 'free',
-      stripe_subscription_id: null,
-    })
-    .eq('owner_id', userId);
+  // Update organization
+  const orgId = await findOrgByCustomerId(customerId);
+  if (orgId) {
+    await supabase
+      .from('organizations')
+      .update({
+        subscription_tier: 'free',
+        stripe_subscription_id: null,
+      })
+      .eq('id', orgId);
+  }
 
   // Log
   await supabase.from('credit_transactions').insert({
@@ -282,15 +319,8 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 
   const customerId = invoice.customer as string;
   
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('owner_id')
-    .eq('stripe_customer_id', customerId)
-    .single();
-
-  if (!org?.owner_id) return;
-
-  const userId = org.owner_id;
+  const userId = await findUserByCustomerId(customerId);
+  if (!userId) return;
 
   // Get current plan
   const { data: profile } = await supabase
@@ -338,15 +368,8 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
   const customerId = invoice.customer as string;
   
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('owner_id')
-    .eq('stripe_customer_id', customerId)
-    .single();
-
-  if (!org?.owner_id) return;
-
-  const userId = org.owner_id;
+  const userId = await findUserByCustomerId(customerId);
+  if (!userId) return;
 
   // Mark profile as past_due (7-day grace period)
   await supabase
@@ -357,7 +380,6 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
     })
     .eq('id', userId);
 
-  // TODO: Send payment failed email via Resend
   console.log(`Payment failed for user ${userId} - starting 7-day grace period`);
 }
 
