@@ -9,77 +9,89 @@ const PLANS = [
     id: 'free',
     name: 'Free',
     price: { monthly: 0, annual: 0 },
-    description: 'Perfect for getting started',
+    description: 'Try AI book writing',
     features: [
-      '3 projects',
-      '10,000 words/month',
-      'Basic AI assistant (Haiku)',
+      '1 book project',
+      'AI-powered writing',
+      'Basic formatting',
       'Community support',
-      'Web-based editor',
     ],
     limitations: [
+      '"Written with Penworth" branding',
       'No PDF/DOCX export',
-      'Watermarked output',
-      'No team collaboration',
+      'No publishing connectors',
     ],
     cta: 'Start Free',
     ctaLink: '/signup',
   },
   {
+    id: 'starter',
+    name: 'Starter',
+    price: { monthly: 29, annual: 232 },
+    description: 'For first-time authors',
+    features: [
+      '1 book per month',
+      'AI-powered writing (Sonnet)',
+      'PDF & DOCX export',
+      'No watermarks',
+      'Email support',
+      'Basic cover design',
+    ],
+    cta: 'Start Free Trial',
+    ctaLink: '/signup?plan=starter',
+  },
+  {
     id: 'pro',
     name: 'Pro',
-    price: { monthly: 29, annual: 290 },
-    description: 'For serious writers and researchers',
+    price: { monthly: 59, annual: 472 },
+    description: 'For serious authors',
     popular: true,
     features: [
-      'Unlimited projects',
-      '100,000 words/month',
-      'Advanced AI (Sonnet)',
-      'Export to PDF & DOCX',
-      'No watermarks',
+      '3 books per month',
+      'Everything in Starter',
+      'Priority AI processing',
+      '8 industry-specific agents',
+      'Advanced cover design',
+      'Amazon KDP connector',
       'Priority support',
       'Version history',
-      '8 industry-specific agents',
-      'Citation management',
     ],
     cta: 'Start Free Trial',
     ctaLink: '/signup?plan=pro',
   },
   {
-    id: 'team',
-    name: 'Team',
-    price: { monthly: 49, annual: 490 },
-    perUser: true,
-    description: 'Collaborate with your team',
+    id: 'publisher',
+    name: 'Publisher',
+    price: { monthly: 149, annual: 1192 },
+    description: 'For power publishers',
     features: [
+      '10 books per month',
       'Everything in Pro',
-      'Up to 10 team members',
-      'Team workspace',
-      'Real-time collaboration',
-      'Admin controls',
-      'Usage analytics',
-      'Shared templates',
-      'Comment & review workflow',
+      'All 16 publishing connectors',
+      'White-label exports',
+      'Bulk publishing tools',
+      'Analytics dashboard',
+      'Team collaboration (3 seats)',
+      'Dedicated support',
     ],
     cta: 'Start Free Trial',
-    ctaLink: '/signup?plan=team',
+    ctaLink: '/signup?plan=publisher',
   },
   {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: { monthly: null, annual: null },
-    description: 'For large organizations',
+    id: 'agency',
+    name: 'Agency',
+    price: { monthly: 349, annual: 2792 },
+    description: 'For agencies & enterprises',
     features: [
-      'Everything in Team',
-      'Unlimited team members',
+      'Unlimited books',
+      'Everything in Publisher',
+      'Unlimited team seats',
+      'API access',
+      'Custom branding',
       'SSO/SAML authentication',
-      'Custom AI model training',
       'Dedicated account manager',
       'SLA guarantee (99.9%)',
-      'On-premise deployment option',
       'Custom integrations',
-      'Compliance (SOC 2, HIPAA)',
-      'Priority 24/7 support',
     ],
     cta: 'Contact Sales',
     ctaLink: 'mailto:sales@penworth.ai',
@@ -87,17 +99,17 @@ const PLANS = [
 ];
 
 const FEATURE_COMPARISON = [
-  { feature: 'Projects', free: '3', pro: 'Unlimited', team: 'Unlimited', enterprise: 'Unlimited' },
-  { feature: 'Words/month', free: '10K', pro: '100K', team: '500K', enterprise: 'Unlimited' },
-  { feature: 'AI Model', free: 'Haiku', pro: 'Sonnet', team: 'Sonnet', enterprise: 'Opus + Custom' },
-  { feature: 'Export formats', free: 'None', pro: 'PDF, DOCX', team: 'PDF, DOCX, EPUB', enterprise: 'All + Custom' },
-  { feature: 'Team members', free: '1', pro: '1', team: '10', enterprise: 'Unlimited' },
-  { feature: 'Version history', free: '—', pro: '30 days', team: '90 days', enterprise: 'Unlimited' },
-  { feature: 'Support', free: 'Community', pro: 'Priority', team: 'Priority', enterprise: 'Dedicated' },
-  { feature: 'SSO/SAML', free: '—', pro: '—', team: '—', enterprise: '✓' },
-  { feature: 'Analytics', free: '—', pro: 'Basic', team: 'Advanced', enterprise: 'Custom' },
-  { feature: 'API access', free: '—', pro: '—', team: '✓', enterprise: '✓' },
-  { feature: 'Custom branding', free: '—', pro: '—', team: '✓', enterprise: '✓' },
+  { feature: 'Books/month', free: '1', starter: '1', pro: '3', publisher: '10', agency: 'Unlimited' },
+  { feature: 'AI Model', free: 'Haiku', starter: 'Sonnet', pro: 'Sonnet', publisher: 'Sonnet', agency: 'Opus' },
+  { feature: 'Export formats', free: 'None', starter: 'PDF, DOCX', pro: 'PDF, DOCX', publisher: 'All', agency: 'All + Custom' },
+  { feature: 'Publishing connectors', free: '—', starter: '—', pro: 'KDP', publisher: 'All 16', agency: 'All 16 + API' },
+  { feature: 'Team seats', free: '1', starter: '1', pro: '1', publisher: '3', agency: 'Unlimited' },
+  { feature: 'Cover design', free: '—', starter: 'Basic', pro: 'Advanced', publisher: 'Advanced', agency: 'Custom' },
+  { feature: 'Support', free: 'Community', starter: 'Email', pro: 'Priority', publisher: 'Dedicated', agency: 'Account Manager' },
+  { feature: 'Branding', free: 'Penworth', starter: 'Clean', pro: 'Clean', publisher: 'White-label', agency: 'Custom' },
+  { feature: 'Analytics', free: '—', starter: '—', pro: 'Basic', publisher: 'Advanced', agency: 'Custom' },
+  { feature: 'API access', free: '—', starter: '—', pro: '—', publisher: '—', agency: '✓' },
+  { feature: 'SSO/SAML', free: '—', starter: '—', pro: '—', publisher: '—', agency: '✓' },
 ];
 
 export default function PricingPage() {
@@ -171,7 +183,7 @@ export default function PricingPage() {
 
       {/* Pricing Cards */}
       <section className="max-w-7xl mx-auto px-6 pb-16">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {PLANS.map((plan) => (
             <div
               key={plan.id}
@@ -244,21 +256,23 @@ export default function PricingPage() {
             <table className="w-full">
               <thead>
                 <tr className="bg-muted/50">
-                  <th className="text-left px-6 py-4 font-semibold">Feature</th>
-                  <th className="text-center px-6 py-4 font-semibold">Free</th>
-                  <th className="text-center px-6 py-4 font-semibold">Pro</th>
-                  <th className="text-center px-6 py-4 font-semibold">Team</th>
-                  <th className="text-center px-6 py-4 font-semibold">Enterprise</th>
+                  <th className="text-left px-4 py-4 font-semibold">Feature</th>
+                  <th className="text-center px-4 py-4 font-semibold">Free</th>
+                  <th className="text-center px-4 py-4 font-semibold">Starter</th>
+                  <th className="text-center px-4 py-4 font-semibold">Pro</th>
+                  <th className="text-center px-4 py-4 font-semibold">Publisher</th>
+                  <th className="text-center px-4 py-4 font-semibold">Agency</th>
                 </tr>
               </thead>
               <tbody>
                 {FEATURE_COMPARISON.map((row, i) => (
                   <tr key={i} className={i % 2 === 0 ? 'bg-muted/20' : ''}>
-                    <td className="px-6 py-3 font-medium">{row.feature}</td>
-                    <td className="text-center px-6 py-3">{row.free}</td>
-                    <td className="text-center px-6 py-3">{row.pro}</td>
-                    <td className="text-center px-6 py-3">{row.team}</td>
-                    <td className="text-center px-6 py-3">{row.enterprise}</td>
+                    <td className="px-4 py-3 font-medium">{row.feature}</td>
+                    <td className="text-center px-4 py-3">{row.free}</td>
+                    <td className="text-center px-4 py-3">{row.starter}</td>
+                    <td className="text-center px-4 py-3">{row.pro}</td>
+                    <td className="text-center px-4 py-3">{row.publisher}</td>
+                    <td className="text-center px-4 py-3">{row.agency}</td>
                   </tr>
                 ))}
               </tbody>

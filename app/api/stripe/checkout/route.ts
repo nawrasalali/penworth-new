@@ -7,13 +7,21 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 const PRICE_IDS: Record<string, { monthly: string; annual: string }> = {
-  pro: {
-    monthly: process.env.STRIPE_PRICE_PRO_MONTHLY || 'price_pro_monthly',
-    annual: process.env.STRIPE_PRICE_PRO_ANNUAL || 'price_pro_annual',
+  starter: {
+    monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY || '',
+    annual: process.env.STRIPE_PRICE_STARTER_ANNUAL || '',
   },
-  team: {
-    monthly: process.env.STRIPE_PRICE_TEAM_MONTHLY || 'price_team_monthly',
-    annual: process.env.STRIPE_PRICE_TEAM_ANNUAL || 'price_team_annual',
+  pro: {
+    monthly: process.env.STRIPE_PRICE_PRO_MONTHLY || '',
+    annual: process.env.STRIPE_PRICE_PRO_ANNUAL || '',
+  },
+  publisher: {
+    monthly: process.env.STRIPE_PRICE_PUBLISHER_MONTHLY || '',
+    annual: process.env.STRIPE_PRICE_PUBLISHER_ANNUAL || '',
+  },
+  agency: {
+    monthly: process.env.STRIPE_PRICE_AGENCY_MONTHLY || '',
+    annual: process.env.STRIPE_PRICE_AGENCY_ANNUAL || '',
   },
 };
 
