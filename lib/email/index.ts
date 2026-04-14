@@ -20,7 +20,7 @@ async function sendEmail({ to, subject, html, replyTo = REPLY_TO }: SendEmailOpt
       to: Array.isArray(to) ? to : [to],
       subject,
       html,
-      reply_to: replyTo,
+      replyTo: replyTo,
     });
 
     if (error) {
