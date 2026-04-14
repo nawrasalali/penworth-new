@@ -158,41 +158,26 @@ export async function GET(request: NextRequest) {
     if (shouldUnlock) {
       const unlockCredits = 100;
       
+      // Get current balance and update
+      const { data: profileData } = await serviceClient
+        .from('profiles')
+        .select('credits_balance')
+        .eq('id', shareTrack.user_id)
+        .single();
+      
+      const currentBalance = profileData?.credits_balance || 0;
+      
       await serviceClient
         .from('profiles')
-        .update({ 
-          credits_balance: serviceClient.rpc('increment_credits', { 
-            user_id: shareTrack.user_id, 
-            amount: unlockCredits 
-          })
-        })
+        .update({ credits_balance: currentBalance + unlockCredits })
         .eq('id', shareTrack.user_id);
-
-      // Actually just increment directly
-      await serviceClient.rpc('increment_credits_balance', {
-        p_user_id: shareTrack.user_id,
-        p_amount: unlockCredits
-      }).catch(() => {
-        // If RPC doesn't exist, do it manually
-        return serviceClient
-          .from('profiles')
-          .select('credits_balance')
-          .eq('id', shareTrack.user_id)
-          .single()
-          .then(({ data }) => {
-            return serviceClient
-              .from('profiles')
-              .update({ credits_balance: (data?.credits_balance || 0) + unlockCredits })
-              .eq('id', shareTrack.user_id);
-          });
-      });
 
       await serviceClient.from('credit_transactions').insert({
         user_id: shareTrack.user_id,
         amount: unlockCredits,
         transaction_type: 'share_unlock',
         reference_id: shareTrack.id,
-        notes: `Unlock bonus: ${shareTrack.projects?.title || 'Shared project'} reached 5 unique clicks`,
+        notes: `Unlock bonus: ${(shareTrack.projects as any)?.title || 'Shared project'} reached 5 unique clicks`,
       });
     }
 
