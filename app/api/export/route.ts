@@ -56,9 +56,24 @@ export async function POST(request: NextRequest) {
 
     const plan = profile?.plan || 'free';
 
+    // Check if user has unlocked branding-free export via sharing
+    let unlockedBySharing = false;
+    if (plan === 'free') {
+      const { data: shareTrack } = await supabase
+        .from('share_tracks')
+        .select('unlocked')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+        .eq('unlocked', true)
+        .single();
+      
+      unlockedBySharing = !!shareTrack?.unlocked;
+    }
+
     // v2 spec: Free tier exports have "Created with Penworth.ai" branding
+    // UNLESS they've unlocked via sharing (5 unique clicks)
     // Pro and Max have no branding
-    const includeBranding = plan === 'free';
+    const includeBranding = plan === 'free' && !unlockedBySharing;
 
     // Sort chapters by order
     const chapters = (project.chapters || []).sort(

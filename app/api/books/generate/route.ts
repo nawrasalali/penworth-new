@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { inngest } from '@/inngest/client';
+import { PLAN_LIMITS, CREDIT_COSTS } from '@/lib/plans';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch project to verify ownership and get details
+    // Fetch project to verify ownership
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select(`
@@ -44,29 +45,118 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check user's credits/subscription (simple check)
-    const { data: profile } = await supabase
+    // Get user profile with plan and credits
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('*')
+      .select('plan, credits_balance, credits_purchased, documents_this_month, documents_reset_at')
       .eq('id', user.id)
       .single();
 
-    // Get organization subscription tier
-    const { data: orgMember } = await supabase
-      .from('org_members')
-      .select('organizations(subscription_tier)')
-      .eq('user_id', user.id)
-      .single();
+    if (profileError || !profile) {
+      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    }
 
-    const tier = (orgMember?.organizations as any)?.subscription_tier || 'free';
+    const plan = (profile.plan as keyof typeof PLAN_LIMITS) || 'free';
+    const limits = PLAN_LIMITS[plan];
+    const creditCost = CREDIT_COSTS.standardDocument; // 1000 credits
 
-    // Free tier cannot generate books
-    if (tier === 'free') {
+    // Check if monthly reset is needed
+    const resetDate = new Date(profile.documents_reset_at || 0);
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    let documentsThisMonth = profile.documents_this_month || 0;
+    let creditsBalance = profile.credits_balance || 0;
+
+    if (resetDate < startOfMonth) {
+      // Reset monthly counters
+      documentsThisMonth = 0;
+      creditsBalance = limits.monthlyCredits;
+      
+      await supabase
+        .from('profiles')
+        .update({
+          documents_this_month: 0,
+          credits_balance: limits.monthlyCredits,
+          documents_reset_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+    }
+
+    // Check document limit
+    if (documentsThisMonth >= limits.maxDocuments) {
       return NextResponse.json(
-        { error: 'Book generation requires Pro plan or higher' },
+        { 
+          error: `You've reached your ${limits.maxDocuments} document${limits.maxDocuments > 1 ? 's' : ''}/month limit. Upgrade for more.`,
+          code: 'DOCUMENT_LIMIT_REACHED'
+        },
         { status: 403 }
       );
     }
+
+    // Calculate total available credits (monthly + purchased)
+    const totalCredits = creditsBalance + (profile.credits_purchased || 0);
+
+    // Check credit balance
+    if (totalCredits < creditCost) {
+      const upgradeMessage = plan === 'free' 
+        ? 'Upgrade to Pro to purchase credit packs.'
+        : 'Purchase a credit pack to continue.';
+      
+      return NextResponse.json(
+        { 
+          error: `Insufficient credits. You have ${totalCredits} credits, need ${creditCost}.`,
+          code: 'INSUFFICIENT_CREDITS',
+          creditsAvailable: totalCredits,
+          creditsNeeded: creditCost,
+          canBuyCredits: limits.canBuyCredits,
+          upgradeMessage
+        },
+        { status: 403 }
+      );
+    }
+
+    // Deduct credits (monthly first, then purchased)
+    let newCreditsBalance = creditsBalance;
+    let newCreditsPurchased = profile.credits_purchased || 0;
+
+    if (creditsBalance >= creditCost) {
+      // Use monthly credits
+      newCreditsBalance = creditsBalance - creditCost;
+    } else {
+      // Use remaining monthly + purchased
+      const fromPurchased = creditCost - creditsBalance;
+      newCreditsBalance = 0;
+      newCreditsPurchased = (profile.credits_purchased || 0) - fromPurchased;
+    }
+
+    // Update profile with new credits and document count
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        credits_balance: newCreditsBalance,
+        credits_purchased: newCreditsPurchased,
+        documents_this_month: documentsThisMonth + 1,
+      })
+      .eq('id', user.id);
+
+    if (updateError) {
+      console.error('Failed to deduct credits:', updateError);
+      return NextResponse.json(
+        { error: 'Failed to process credits' },
+        { status: 500 }
+      );
+    }
+
+    // Log the credit transaction
+    await supabase.from('credit_transactions').insert({
+      user_id: user.id,
+      amount: -creditCost,
+      type: 'document_generation',
+      description: `Generated document: ${project.title}`,
+      metadata: { projectId, plan },
+    });
 
     // Trigger Inngest function for durable book writing
     const { ids } = await inngest.send({
@@ -79,6 +169,7 @@ export async function POST(request: NextRequest) {
         outline,
         industry: project.organizations?.industry || 'general',
         voiceProfile,
+        plan, // Include plan for model selection
       },
     });
 
@@ -91,6 +182,7 @@ export async function POST(request: NextRequest) {
           inngestEventId: ids[0],
           startedAt: new Date().toISOString(),
           totalChapters: outline.chapters.length,
+          creditsUsed: creditCost,
         },
       })
       .eq('id', projectId);
@@ -100,6 +192,8 @@ export async function POST(request: NextRequest) {
       eventId: ids[0],
       message: 'Book generation started',
       totalChapters: outline.chapters.length,
+      creditsUsed: creditCost,
+      creditsRemaining: newCreditsBalance + newCreditsPurchased,
     });
 
   } catch (error) {
