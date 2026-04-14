@@ -1,6 +1,7 @@
 import { inngest, BookWriteEvent } from '../client';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
+import { buildSystemPrompt, getPromptById } from '@/lib/industry-prompts';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -300,24 +301,39 @@ Write the complete chapter content now:`;
 }
 
 // Helper: Get system prompt based on industry
-function getSystemPrompt(industry: string, voiceProfile?: { tone: string; style: string; vocabulary: string }): string {
-  const basePrompt = `You are an expert author and content creator specializing in ${industry}. You write clear, engaging, and authoritative content that serves the reader's needs.
+function getSystemPrompt(industry: string, voiceProfile?: { tone: string; style: string; vocabulary: string }, customInstructions?: string): string {
+  // Get industry-specific prompt from library
+  const industryPrompt = getPromptById(industry);
+  
+  let basePrompt = industryPrompt?.systemPrompt || buildSystemPrompt('general');
 
-Your writing should be:
-- Professional yet accessible
-- Well-structured with clear headings and sections
-- Rich with practical examples and actionable insights
-- Free from filler content or unnecessary repetition
-- Properly formatted for publication`;
-
+  // Add voice profile if provided
   if (voiceProfile) {
-    return `${basePrompt}
+    basePrompt += `
 
-Specific voice guidelines:
+## Voice Guidelines
 - Tone: ${voiceProfile.tone}
 - Style: ${voiceProfile.style}
 - Vocabulary: ${voiceProfile.vocabulary}`;
   }
+
+  // Add custom instructions for Max users
+  if (customInstructions) {
+    basePrompt += `
+
+## Custom Instructions
+${customInstructions}`;
+  }
+
+  // Add standard formatting requirements
+  basePrompt += `
+
+## Formatting Requirements
+- Write clear, engaging, and authoritative content
+- Use well-structured paragraphs with clear headings and sections
+- Include practical examples and actionable insights
+- Avoid filler content or unnecessary repetition
+- Format properly for publication`;
 
   return basePrompt;
 }
