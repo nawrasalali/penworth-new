@@ -6,23 +6,23 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2024-06-20',
 });
 
+// v2 Pricing: Free / Pro / Max (no Starter, Publisher, Agency)
 const PRICE_IDS: Record<string, { monthly: string; annual: string }> = {
-  starter: {
-    monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY || '',
-    annual: process.env.STRIPE_PRICE_STARTER_ANNUAL || '',
-  },
   pro: {
     monthly: process.env.STRIPE_PRICE_PRO_MONTHLY || '',
     annual: process.env.STRIPE_PRICE_PRO_ANNUAL || '',
   },
-  publisher: {
-    monthly: process.env.STRIPE_PRICE_PUBLISHER_MONTHLY || '',
-    annual: process.env.STRIPE_PRICE_PUBLISHER_ANNUAL || '',
+  max: {
+    monthly: process.env.STRIPE_PRICE_MAX_MONTHLY || '',
+    annual: process.env.STRIPE_PRICE_MAX_ANNUAL || '',
   },
-  agency: {
-    monthly: process.env.STRIPE_PRICE_AGENCY_MONTHLY || '',
-    annual: process.env.STRIPE_PRICE_AGENCY_ANNUAL || '',
-  },
+};
+
+// Credit packs (one-time purchases, Pro/Max only)
+const CREDIT_PACK_PRICES: Record<string, string> = {
+  v2_credits_1000: process.env.STRIPE_PRICE_CREDITS_1000 || '',
+  v2_credits_3000: process.env.STRIPE_PRICE_CREDITS_3000 || '',
+  v2_credits_10000: process.env.STRIPE_PRICE_CREDITS_10000 || '',
 };
 
 export async function POST(request: NextRequest) {
@@ -35,10 +35,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { planId, billingPeriod = 'monthly' } = body;
+    const { planId, billingPeriod = 'annual', creditPackId } = body;
 
+    // Handle credit pack purchase
+    if (creditPackId) {
+      return handleCreditPackPurchase(user.id, creditPackId, supabase);
+    }
+
+    // Handle subscription
     if (!PRICE_IDS[planId]) {
-      return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid plan. Choose pro or max.' }, { status: 400 });
     }
 
     // Get or create Stripe customer
@@ -108,6 +114,14 @@ export async function POST(request: NextRequest) {
 
     // Create checkout session
     const priceId = PRICE_IDS[planId][billingPeriod as 'monthly' | 'annual'];
+    
+    if (!priceId) {
+      return NextResponse.json(
+        { error: 'Price not configured. Please contact support.' },
+        { status: 500 }
+      );
+    }
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
 
     const session = await stripe.checkout.sessions.create({
@@ -144,4 +158,64 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+async function handleCreditPackPurchase(
+  userId: string,
+  creditPackId: string,
+  supabase: any
+) {
+  // Check user is Pro or Max (free users cannot buy credits)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('plan')
+    .eq('id', userId)
+    .single();
+
+  if (!profile || profile.plan === 'free') {
+    return NextResponse.json(
+      { error: 'Credit packs are only available for Pro and Max subscribers. Please upgrade first.' },
+      { status: 403 }
+    );
+  }
+
+  const priceId = CREDIT_PACK_PRICES[creditPackId];
+  if (!priceId) {
+    return NextResponse.json({ error: 'Invalid credit pack' }, { status: 400 });
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
+
+  // Get customer ID
+  const { data: orgMember } = await supabase
+    .from('org_members')
+    .select('organizations(stripe_customer_id)')
+    .eq('user_id', userId)
+    .single();
+
+  const customerId = (orgMember?.organizations as any)?.stripe_customer_id;
+
+  if (!customerId) {
+    return NextResponse.json({ error: 'No billing account found' }, { status: 400 });
+  }
+
+  const session = await stripe.checkout.sessions.create({
+    customer: customerId,
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price: priceId,
+        quantity: 1,
+      },
+    ],
+    mode: 'payment',
+    success_url: `${appUrl}/billing?credits=success`,
+    cancel_url: `${appUrl}/billing?credits=canceled`,
+    metadata: {
+      user_id: userId,
+      credit_pack_id: creditPackId,
+    },
+  });
+
+  return NextResponse.json({ url: session.url });
 }

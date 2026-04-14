@@ -3,113 +3,94 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Check, X } from 'lucide-react';
 
 const PLANS = [
   {
     id: 'free',
     name: 'Free',
     price: { monthly: 0, annual: 0 },
-    description: 'Try AI book writing',
+    description: 'Start writing and publishing',
     features: [
-      '1 book project',
-      'AI-powered writing',
-      'Basic formatting',
-      'Community support',
+      { text: '1 document per month', included: true },
+      { text: '1,000 credits/month', included: true },
+      { text: 'AI writing assistance (Varies)', included: true },
+      { text: 'PDF export', included: true },
+      { text: 'Publish to Amazon KDP', included: true },
+      { text: 'General industry prompt', included: true },
+      { text: 'Community support', included: true },
     ],
     limitations: [
-      '"Written with Penworth" branding',
-      'No PDF/DOCX export',
-      'No publishing connectors',
+      '"Created with Penworth.ai" branding',
+      'Cannot purchase credit packs',
+      'Credits expire monthly',
     ],
-    cta: 'Start Free',
+    cta: 'Get Started',
     ctaLink: '/signup',
-  },
-  {
-    id: 'starter',
-    name: 'Starter',
-    price: { monthly: 29, annual: 232 },
-    description: 'For first-time authors',
-    features: [
-      '1 book per month',
-      'AI-powered writing (Sonnet)',
-      'PDF & DOCX export',
-      'No watermarks',
-      'Email support',
-      'Basic cover design',
-    ],
-    cta: 'Start Free Trial',
-    ctaLink: '/signup?plan=starter',
   },
   {
     id: 'pro',
     name: 'Pro',
-    price: { monthly: 59, annual: 472 },
-    description: 'For serious authors',
+    price: { monthly: 19, annual: 190 },
+    description: 'Better AI quality + more output',
     popular: true,
     features: [
-      '3 books per month',
-      'Everything in Starter',
-      'Priority AI processing',
-      '8 industry-specific agents',
-      'Advanced cover design',
-      'Amazon KDP connector',
-      'Priority support',
-      'Version history',
+      { text: '2 documents per month', included: true },
+      { text: '2,000 credits/month', included: true },
+      { text: 'Enhanced AI writing (Varies)', included: true },
+      { text: 'PDF & DOCX export', included: true },
+      { text: 'No Penworth branding', included: true },
+      { text: 'Publish to Amazon KDP', included: true },
+      { text: 'All 8 industry prompts', included: true },
+      { text: 'Sell on Marketplace (15% fee)', included: true },
+      { text: 'Purchase credit add-ons', included: true },
+      { text: 'Email support (48hr)', included: true },
     ],
-    cta: 'Start Free Trial',
+    cta: 'Upgrade to Pro',
     ctaLink: '/signup?plan=pro',
   },
   {
-    id: 'publisher',
-    name: 'Publisher',
-    price: { monthly: 149, annual: 1192 },
-    description: 'For power publishers',
+    id: 'max',
+    name: 'Max',
+    price: { monthly: 49, annual: 490 },
+    description: 'Full platform access',
     features: [
-      '10 books per month',
-      'Everything in Pro',
-      'All 16 publishing connectors',
-      'White-label exports',
-      'Bulk publishing tools',
-      'Analytics dashboard',
-      'Team collaboration (3 seats)',
-      'Dedicated support',
+      { text: '5 documents per month', included: true },
+      { text: '5,000 credits/month', included: true },
+      { text: 'Premium AI writing (Varies)', included: true },
+      { text: 'PDF, DOCX & EPUB export', included: true },
+      { text: 'No Penworth branding', included: true },
+      { text: 'All publishing platforms', included: true },
+      { text: 'All 8 industry prompts + custom', included: true },
+      { text: 'Sell on Marketplace (15% fee)', included: true },
+      { text: 'Purchase credit add-ons', included: true },
+      { text: 'Credit rollover (up to 2,500)', included: true },
+      { text: 'Priority email support (24hr)', included: true },
     ],
-    cta: 'Start Free Trial',
-    ctaLink: '/signup?plan=publisher',
-  },
-  {
-    id: 'agency',
-    name: 'Agency',
-    price: { monthly: 349, annual: 2792 },
-    description: 'For agencies & enterprises',
-    features: [
-      'Unlimited books',
-      'Everything in Publisher',
-      'Unlimited team seats',
-      'API access',
-      'Custom branding',
-      'SSO/SAML authentication',
-      'Dedicated account manager',
-      'SLA guarantee (99.9%)',
-      'Custom integrations',
-    ],
-    cta: 'Contact Sales',
-    ctaLink: 'mailto:sales@penworth.ai',
+    cta: 'Upgrade to Max',
+    ctaLink: '/signup?plan=max',
   },
 ];
 
 const FEATURE_COMPARISON = [
-  { feature: 'Books/month', free: '1', starter: '1', pro: '3', publisher: '10', agency: 'Unlimited' },
-  { feature: 'AI Model', free: 'Haiku', starter: 'Sonnet', pro: 'Sonnet', publisher: 'Sonnet', agency: 'Opus' },
-  { feature: 'Export formats', free: 'None', starter: 'PDF, DOCX', pro: 'PDF, DOCX', publisher: 'All', agency: 'All + Custom' },
-  { feature: 'Publishing connectors', free: '—', starter: '—', pro: 'KDP', publisher: 'All 16', agency: 'All 16 + API' },
-  { feature: 'Team seats', free: '1', starter: '1', pro: '1', publisher: '3', agency: 'Unlimited' },
-  { feature: 'Cover design', free: '—', starter: 'Basic', pro: 'Advanced', publisher: 'Advanced', agency: 'Custom' },
-  { feature: 'Support', free: 'Community', starter: 'Email', pro: 'Priority', publisher: 'Dedicated', agency: 'Account Manager' },
-  { feature: 'Branding', free: 'Penworth', starter: 'Clean', pro: 'Clean', publisher: 'White-label', agency: 'Custom' },
-  { feature: 'Analytics', free: '—', starter: '—', pro: 'Basic', publisher: 'Advanced', agency: 'Custom' },
-  { feature: 'API access', free: '—', starter: '—', pro: '—', publisher: '—', agency: '✓' },
-  { feature: 'SSO/SAML', free: '—', starter: '—', pro: '—', publisher: '—', agency: '✓' },
+  { feature: 'Documents per month', free: '1', pro: '2', max: '5' },
+  { feature: 'Monthly credits', free: '1,000', pro: '2,000', max: '5,000' },
+  { feature: 'AI writing quality', free: 'Varies', pro: 'Varies', max: 'Varies' },
+  { feature: 'Export formats', free: 'PDF', pro: 'PDF, DOCX', max: 'PDF, DOCX, EPUB' },
+  { feature: 'Penworth branding', free: 'Yes', pro: 'No', max: 'No' },
+  { feature: 'Amazon KDP publishing', free: '✓', pro: '✓', max: '✓' },
+  { feature: 'All publishing platforms', free: '—', pro: '—', max: '✓' },
+  { feature: 'Industry prompts', free: 'General', pro: 'All 8', max: 'All 8 + Custom' },
+  { feature: 'Marketplace selling', free: '—', pro: '✓ (15% fee)', max: '✓ (15% fee)' },
+  { feature: 'Credit add-on packs', free: '—', pro: '✓', max: '✓' },
+  { feature: 'Credit rollover', free: '—', pro: '—', max: 'Up to 2,500' },
+  { feature: 'Support', free: 'Community', pro: 'Email (48hr)', max: 'Priority (24hr)' },
+];
+
+const CREDIT_PACKS = [
+  { name: 'Single', credits: 1000, price: 39, perBook: '39.00', savings: null },
+  { name: 'Triple', credits: 3000, price: 99, perBook: '33.00', savings: '15%' },
+  { name: 'Bulk', credits: 10000, price: 290, perBook: '29.00', savings: '26%' },
 ];
 
 export default function PricingPage() {
@@ -117,18 +98,20 @@ export default function PricingPage() {
   const [showComparison, setShowComparison] = useState(false);
 
   const getPrice = (plan: typeof PLANS[0]) => {
-    if (plan.price.monthly === null) return 'Custom';
     if (plan.price.monthly === 0) return 'Free';
     const price = billingPeriod === 'annual' ? plan.price.annual : plan.price.monthly;
-    return `$${price}`;
+    return `\$${price}`;
   };
 
   const getSavings = (plan: typeof PLANS[0]) => {
-    if (plan.price.monthly === null || plan.price.monthly === 0) return null;
-    const monthlyTotal = plan.price.monthly * 12;
-    const annualTotal = plan.price.annual;
-    const savings = monthlyTotal - annualTotal;
-    return savings > 0 ? `Save $${savings}/year` : null;
+    if (plan.price.monthly === 0) return null;
+    if (billingPeriod === 'annual') {
+      const monthlyTotal = plan.price.monthly * 12;
+      const annualTotal = plan.price.annual;
+      const percent = Math.round(((monthlyTotal - annualTotal) / monthlyTotal) * 100);
+      return `Save ${percent}%`;
+    }
+    return null;
   };
 
   return (
@@ -156,7 +139,7 @@ export default function PricingPage() {
           Simple, transparent pricing
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-          Start free and scale as you grow. All plans include a 14-day free trial.
+          Start free. Upgrade when you need more.
         </p>
 
         {/* Billing Toggle */}
@@ -182,8 +165,8 @@ export default function PricingPage() {
       </section>
 
       {/* Pricing Cards */}
-      <section className="max-w-7xl mx-auto px-6 pb-16">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <section className="max-w-5xl mx-auto px-6 pb-8">
+        <div className="grid gap-6 md:grid-cols-3">
           {PLANS.map((plan) => (
             <div
               key={plan.id}
@@ -202,12 +185,12 @@ export default function PricingPage() {
 
               <div className="mb-6">
                 <span className="text-4xl font-bold">{getPrice(plan)}</span>
-                {plan.price.monthly !== null && plan.price.monthly > 0 && (
+                {plan.price.monthly > 0 && (
                   <span className="text-muted-foreground">
-                    /{plan.perUser ? 'user/' : ''}{billingPeriod === 'annual' ? 'year' : 'mo'}
+                    /{billingPeriod === 'annual' ? 'year' : 'mo'}
                   </span>
                 )}
-                {billingPeriod === 'annual' && getSavings(plan) && (
+                {getSavings(plan) && (
                   <p className="text-sm text-green-600 font-medium mt-1">{getSavings(plan)}</p>
                 )}
               </div>
@@ -224,13 +207,13 @@ export default function PricingPage() {
               <ul className="space-y-3">
                 {plan.features.map((feature, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    {feature}
+                    <Check className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                    {feature.text}
                   </li>
                 ))}
                 {plan.limitations?.map((limitation, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <span className="mt-0.5">✗</span>
+                    <X className="w-4 h-4 mt-0.5 shrink-0" />
                     {limitation}
                   </li>
                 ))}
@@ -240,8 +223,20 @@ export default function PricingPage() {
         </div>
       </section>
 
+      {/* Enterprise CTA */}
+      <section className="max-w-5xl mx-auto px-6 pb-16">
+        <div className="text-center py-4 border rounded-lg bg-muted/30">
+          <p className="text-muted-foreground">
+            Publishing 50+ documents a month?{' '}
+            <Link href="mailto:enterprise@penworth.ai" className="text-primary hover:underline font-medium">
+              Contact us →
+            </Link>
+          </p>
+        </div>
+      </section>
+
       {/* Feature Comparison */}
-      <section className="max-w-7xl mx-auto px-6 pb-16">
+      <section className="max-w-5xl mx-auto px-6 pb-16">
         <div className="text-center mb-8">
           <button
             onClick={() => setShowComparison(!showComparison)}
@@ -256,23 +251,19 @@ export default function PricingPage() {
             <table className="w-full">
               <thead>
                 <tr className="bg-muted/50">
-                  <th className="text-left px-4 py-4 font-semibold">Feature</th>
-                  <th className="text-center px-4 py-4 font-semibold">Free</th>
-                  <th className="text-center px-4 py-4 font-semibold">Starter</th>
-                  <th className="text-center px-4 py-4 font-semibold">Pro</th>
-                  <th className="text-center px-4 py-4 font-semibold">Publisher</th>
-                  <th className="text-center px-4 py-4 font-semibold">Agency</th>
+                  <th className="text-left px-6 py-4 font-semibold">Feature</th>
+                  <th className="text-center px-6 py-4 font-semibold">Free</th>
+                  <th className="text-center px-6 py-4 font-semibold">Pro</th>
+                  <th className="text-center px-6 py-4 font-semibold">Max</th>
                 </tr>
               </thead>
               <tbody>
                 {FEATURE_COMPARISON.map((row, i) => (
                   <tr key={i} className={i % 2 === 0 ? 'bg-muted/20' : ''}>
-                    <td className="px-4 py-3 font-medium">{row.feature}</td>
-                    <td className="text-center px-4 py-3">{row.free}</td>
-                    <td className="text-center px-4 py-3">{row.starter}</td>
-                    <td className="text-center px-4 py-3">{row.pro}</td>
-                    <td className="text-center px-4 py-3">{row.publisher}</td>
-                    <td className="text-center px-4 py-3">{row.agency}</td>
+                    <td className="px-6 py-3 font-medium">{row.feature}</td>
+                    <td className="text-center px-6 py-3">{row.free}</td>
+                    <td className="text-center px-6 py-3">{row.pro}</td>
+                    <td className="text-center px-6 py-3">{row.max}</td>
                   </tr>
                 ))}
               </tbody>
@@ -281,34 +272,64 @@ export default function PricingPage() {
         )}
       </section>
 
+      {/* Credit Add-On Packs */}
+      <section className="max-w-5xl mx-auto px-6 pb-16">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold mb-2">Need more? Add credits anytime.</h2>
+          <p className="text-muted-foreground">Available for Pro and Max subscribers</p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {CREDIT_PACKS.map((pack) => (
+            <div key={pack.name} className="border rounded-xl p-6 bg-card text-center">
+              <h3 className="font-semibold mb-1">{pack.name}</h3>
+              <p className="text-3xl font-bold mb-1">\${pack.price}</p>
+              <p className="text-sm text-muted-foreground mb-3">
+                {pack.credits.toLocaleString()} credits
+              </p>
+              <p className="text-sm">
+                \${pack.perBook}/document
+                {pack.savings && (
+                  <span className="ml-2 text-green-600 font-medium">({pack.savings} off)</span>
+                )}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-center text-sm text-muted-foreground mt-6">
+          Purchased credits never expire • Used after monthly credits
+        </p>
+      </section>
+
       {/* FAQ */}
       <section className="max-w-4xl mx-auto px-6 pb-20">
         <h2 className="text-3xl font-bold text-center mb-12">Frequently Asked Questions</h2>
         <div className="grid gap-6 md:grid-cols-2">
           {[
             {
-              q: 'Can I try before I buy?',
-              a: 'Yes! All paid plans include a 14-day free trial with full access to all features. No credit card required to start.',
+              q: 'Can free users really publish?',
+              a: 'Yes! Free users can publish to Amazon KDP. Your book will include "Created with Penworth.ai" branding, which helps us grow while you get a real published book.',
             },
             {
-              q: 'Can I change plans later?',
-              a: 'Absolutely. You can upgrade, downgrade, or cancel at any time. Changes take effect immediately and billing is prorated.',
+              q: 'What happens to unused credits?',
+              a: 'Monthly subscription credits expire at the end of each billing cycle. However, purchased credit packs never expire and are used after your monthly credits are exhausted.',
+            },
+            {
+              q: 'Can I upgrade or downgrade anytime?',
+              a: 'Absolutely. You can change plans at any time. Upgrades take effect immediately, and downgrades apply at the end of your billing cycle.',
             },
             {
               q: 'What payment methods do you accept?',
-              a: 'We accept all major credit cards (Visa, MasterCard, Amex), PayPal, and cryptocurrency (USDT) for annual plans.',
+              a: 'We accept all major credit cards through Stripe. Annual plans can also be paid via PayPal or cryptocurrency (USDT).',
             },
             {
-              q: 'Do you offer discounts for startups or education?',
-              a: 'Yes! We offer 50% off for verified startups, students, and educational institutions. Contact us to apply.',
+              q: 'What is a credit?',
+              a: 'Credits power your document generation. 1,000 credits = 1 standard document. Pro and Max subscribers can purchase additional credit packs when needed.',
             },
             {
-              q: 'What happens when I hit my word limit?',
-              a: "We'll notify you when you're approaching your limit. You can upgrade anytime or purchase additional capacity without changing plans.",
-            },
-            {
-              q: 'Is my data secure?',
-              a: 'Absolutely. We use bank-level encryption, are SOC 2 compliant (Enterprise), and never train AI on your data without explicit consent.',
+              q: 'What about teams?',
+              a: 'Multi-user workspaces are available for Enterprise customers. Contact us to discuss team pricing and features like SSO, API access, and dedicated support.',
             },
           ].map((faq, i) => (
             <div key={i} className="border rounded-lg p-5 bg-card">
@@ -321,17 +342,17 @@ export default function PricingPage() {
 
       {/* CTA */}
       <section className="bg-primary text-primary-foreground py-16 px-6 text-center">
-        <h2 className="text-3xl font-bold mb-4">Ready to transform your writing?</h2>
+        <h2 className="text-3xl font-bold mb-4">Ready to write your book?</h2>
         <p className="text-lg opacity-90 mb-8 max-w-2xl mx-auto">
-          Join thousands of writers, researchers, and teams using Penworth to create better content faster.
+          Join thousands of authors using Penworth to write and publish books faster than ever.
         </p>
         <div className="flex gap-4 justify-center">
           <Link href="/signup">
             <Button size="lg" variant="secondary">
-              Start Free Trial
+              Start Free
             </Button>
           </Link>
-          <Link href="mailto:sales@penworth.ai">
+          <Link href="mailto:enterprise@penworth.ai">
             <Button size="lg" variant="outline" className="bg-transparent border-white/30 hover:bg-white/10">
               Contact Sales
             </Button>
