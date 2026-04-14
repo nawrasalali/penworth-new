@@ -56,12 +56,8 @@ export async function POST(request: NextRequest) {
 
     const tier = (orgMember?.organizations as any)?.subscription_tier || 'free';
 
-    if (tier === 'free') {
-      return NextResponse.json(
-        { error: 'Export requires Pro plan or higher. Upgrade to export your documents.' },
-        { status: 403 }
-      );
-    }
+    // Free tier can export with branding, Pro+ without branding
+    const includeBranding = tier === 'free';
 
     // Sort chapters by order
     const chapters = (project.chapters || []).sort(
@@ -72,8 +68,8 @@ export async function POST(request: NextRequest) {
     const documentContent = generateDocumentContent(project as Project, chapters);
 
     if (format === 'docx') {
-      // Generate DOCX
-      const docxBuffer = await generateDOCX(project as Project, chapters);
+      // Generate DOCX (with branding for free tier)
+      const docxBuffer = await generateDOCX(project as Project, chapters, includeBranding);
       
       return new NextResponse(new Uint8Array(docxBuffer), {
         headers: {
@@ -82,8 +78,8 @@ export async function POST(request: NextRequest) {
         },
       });
     } else if (format === 'pdf') {
-      // Generate PDF
-      const pdfBuffer = await generatePDF(project as Project, chapters);
+      // Generate PDF (with branding for free tier)
+      const pdfBuffer = await generatePDF(project as Project, chapters, includeBranding);
       
       return new NextResponse(new Uint8Array(pdfBuffer), {
         headers: {
@@ -122,7 +118,7 @@ function generateDocumentContent(project: Project, chapters: Chapter[]): string 
   return content;
 }
 
-async function generateDOCX(project: Project, chapters: Chapter[]): Promise<Buffer> {
+async function generateDOCX(project: Project, chapters: Chapter[], includeBranding: boolean = true): Promise<Buffer> {
   // Simple DOCX generation using minimal XML structure
   // In production, use a library like docx or officegen
   
@@ -138,6 +134,41 @@ async function generateDOCX(project: Project, chapters: Chapter[]): Promise<Buff
     `).join('')}
   `).join('');
 
+  // Penworth branding footer (for free tier)
+  const brandingFooter = includeBranding ? `
+    <w:p>
+      <w:pPr><w:jc w:val="center"/></w:pPr>
+    </w:p>
+    <w:p>
+      <w:pPr><w:jc w:val="center"/></w:pPr>
+      <w:r>
+        <w:rPr><w:sz w:val="20"/><w:color w:val="666666"/></w:rPr>
+        <w:t>───────────────────────────────────</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:jc w:val="center"/></w:pPr>
+      <w:r>
+        <w:rPr><w:sz w:val="20"/><w:color w:val="666666"/></w:rPr>
+        <w:t>Written with Penworth.ai</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:jc w:val="center"/></w:pPr>
+      <w:r>
+        <w:rPr><w:sz w:val="18"/><w:color w:val="1B3A57"/></w:rPr>
+        <w:t>Transform your ideas into published books with AI</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:jc w:val="center"/></w:pPr>
+      <w:r>
+        <w:rPr><w:sz w:val="18"/><w:color w:val="2E5A82"/><w:u w:val="single"/></w:rPr>
+        <w:t>https://penworth.ai</w:t>
+      </w:r>
+    </w:p>
+  ` : '';
+
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
@@ -151,6 +182,7 @@ async function generateDOCX(project: Project, chapters: Chapter[]): Promise<Buff
     </w:p>
     ` : ''}
     ${content}
+    ${brandingFooter}
   </w:body>
 </w:document>`;
 
@@ -181,9 +213,22 @@ async function generateDOCX(project: Project, chapters: Chapter[]): Promise<Buff
   return buffer;
 }
 
-async function generatePDF(project: Project, chapters: Chapter[]): Promise<Buffer> {
+async function generatePDF(project: Project, chapters: Chapter[], includeBranding: boolean = true): Promise<Buffer> {
   // Simple PDF generation
   // In production, use a library like pdfkit, puppeteer, or similar
+  
+  const brandingText = includeBranding ? `
+0 -60 Td
+/F1 10 Tf
+0.4 0.4 0.4 rg
+(-------------------------------------------) Tj
+0 -15 Td
+(Written with Penworth.ai) Tj
+0 -15 Td
+(Transform your ideas into published books) Tj
+0 -15 Td
+(https://penworth.ai) Tj
+0 0 0 rg` : '';
   
   // Create minimal PDF structure
   const content = `%PDF-1.4
@@ -197,7 +242,7 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
 endobj
 4 0 obj
-<< /Length 200 >>
+<< /Length 500 >>
 stream
 BT
 /F1 24 Tf
@@ -206,6 +251,7 @@ BT
 0 -30 Td
 /F1 12 Tf
 ${chapters.map((ch, i) => `0 -20 Td (${escapePdf(ch.title)}) Tj`).join('\n')}
+${brandingText}
 ET
 endstream
 endobj
@@ -219,11 +265,11 @@ xref
 0000000058 00000 n 
 0000000115 00000 n 
 0000000266 00000 n 
-0000000518 00000 n 
+0000000818 00000 n 
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-600
+900
 %%EOF`;
 
   return Buffer.from(content, 'utf-8');
