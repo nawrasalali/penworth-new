@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Penworth Logo Mark - Billion Dollar Brand -->
+  <g transform="translate(30, 30)">
+    <path d="M0 140 L0 0 L50 0 C95 0 120 25 120 55 C120 85 95 110 50 110 L30 110 L30 140 Z" fill="#1B3A57"/>
+    <path d="M30 26 L50 26 C75 26 90 38 90 55 C90 72 75 84 50 84 L30 84 Z" fill="white"/>
+    <rect x="130" y="75" width="35" height="7" rx="3.5" fill="#1B3A57" opacity="0.25"/>
+    <rect x="130" y="55" width="50" height="7" rx="3.5" fill="#1B3A57" opacity="0.45"/>
+    <rect x="130" y="35" width="65" height="7" rx="3.5" fill="#1B3A57" opacity="0.7"/>
+    <rect x="130" y="15" width="80" height="7" rx="3.5" fill="#1B3A57"/>
+  </g>
+</svg>
