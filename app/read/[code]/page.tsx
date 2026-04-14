@@ -242,20 +242,44 @@ export default function ReadPage() {
       </main>
 
       {/* CTA Footer */}
-      <footer className="bg-primary text-white py-12 mt-12">
+      <footer className="bg-gradient-to-br from-primary to-primary/80 text-white py-16 mt-12">
         <div className="max-w-3xl mx-auto px-4 text-center">
-          <Sparkles className="h-8 w-8 mx-auto mb-4" />
-          <h3 className="text-2xl font-bold mb-2">Want to write your own book?</h3>
-          <p className="text-primary-foreground/80 mb-6">
-            This book was created with Penworth AI. Transform your ideas into a published book in 48 hours.
+          <div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-2 text-sm mb-6">
+            <Sparkles className="h-4 w-4" />
+            Written with AI in under 48 hours
+          </div>
+          <h3 className="text-3xl font-bold mb-3">You have a book inside you.</h3>
+          <p className="text-xl text-white/90 mb-8 max-w-xl mx-auto">
+            Penworth transforms your ideas into a complete, publishable book. 
+            No writing experience needed. Start free today.
           </p>
-          <Link href="/signup">
-            <Button size="lg" variant="secondary" className="font-semibold">
-              Start Writing for Free
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/signup">
+              <Button size="lg" variant="secondary" className="font-semibold text-lg px-8 py-6 h-auto">
+                Start Writing for Free →
+              </Button>
+            </Link>
+            <Link href="/">
+              <Button size="lg" variant="outline" className="font-semibold text-lg px-8 py-6 h-auto border-white/30 text-white hover:bg-white/10">
+                Learn More
+              </Button>
+            </Link>
+          </div>
+          <p className="text-sm text-white/70 mt-6">
+            No credit card required • Publish to Amazon KDP for free
+          </p>
         </div>
       </footer>
+
+      {/* Sticky Mobile CTA */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t shadow-lg sm:hidden z-50">
+        <Link href="/signup" className="block">
+          <Button size="lg" className="w-full font-semibold">
+            <Sparkles className="h-4 w-4 mr-2" />
+            Start Writing Your Book — Free
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }
