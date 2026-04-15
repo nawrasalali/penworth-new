@@ -110,10 +110,6 @@ export default function HomePage() {
         {/* Hero Section */}
         <section className="container py-24 md:py-32">
           <div className="mx-auto max-w-4xl text-center">
-            <div className="mb-6 inline-flex items-center rounded-full border px-4 py-1.5 text-sm">
-              <span className="mr-2">🚀</span>
-              <span>AI-powered knowledge creation</span>
-            </div>
             <h1 className="mb-6 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
               Knowledge,{' '}
               <span className="gradient-text">verified.</span>
