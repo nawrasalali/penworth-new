@@ -1,11 +1,17 @@
 // Penworth v2 Plan Configuration
 // DO NOT MODIFY - This follows the exact v2 pricing specification
+// IMPORTANT: 1000 credits = 1 document. Credits ARE the document limit.
 
 export type PublishingConnector = 'kdp' | 'ingram_spark' | 'd2d' | 'lulu' | 'google_play';
 
+export const CREDIT_COSTS = {
+  standardDocument: 1_000, // 1 document costs 1000 credits
+} as const;
+
 export const PLAN_LIMITS: Record<string, {
   monthlyCredits: number;
-  maxDocuments: number;
+  // Document limit = monthlyCredits / CREDIT_COSTS.standardDocument
+  // Free: 1000 credits = 1 doc, Pro: 2000 = 2 docs, Max: 5000 = 5 docs
   models: string[];
   exportFormats: string[];
   hasBranding: boolean;
@@ -19,8 +25,7 @@ export const PLAN_LIMITS: Record<string, {
   supportLevel: string;
 }> = {
   free: {
-    monthlyCredits: 1_000,
-    maxDocuments: 1,
+    monthlyCredits: 1_000, // = 1 document/month
     models: ['claude-haiku-4.5'],
     exportFormats: ['pdf'],
     hasBranding: true,
@@ -32,8 +37,7 @@ export const PLAN_LIMITS: Record<string, {
     supportLevel: 'community',
   },
   pro: {
-    monthlyCredits: 2_000,
-    maxDocuments: 2,
+    monthlyCredits: 2_000, // = 2 documents/month
     models: ['claude-haiku-4.5', 'claude-sonnet-4.6'],
     exportFormats: ['pdf', 'docx'],
     hasBranding: false,
@@ -46,8 +50,7 @@ export const PLAN_LIMITS: Record<string, {
     supportLevel: 'email',
   },
   max: {
-    monthlyCredits: 5_000,
-    maxDocuments: 5,
+    monthlyCredits: 5_000, // = 5 documents/month
     models: ['claude-haiku-4.5', 'claude-sonnet-4.6', 'claude-opus-4.6'],
     exportFormats: ['pdf', 'docx', 'epub'],
     hasBranding: false,
@@ -62,9 +65,11 @@ export const PLAN_LIMITS: Record<string, {
   },
 };
 
-export const CREDIT_COSTS = {
-  standardDocument: 1_000,
-} as const;
+// Helper to calculate document limit from credits
+export function getDocumentLimit(plan: string): number {
+  const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
+  return Math.floor(limits.monthlyCredits / CREDIT_COSTS.standardDocument);
+}
 
 export const CREDIT_PACKS = [
   { id: 'v2_credits_1000', name: 'Single', credits: 1_000, price: 39, priceInCents: 3_900 },
