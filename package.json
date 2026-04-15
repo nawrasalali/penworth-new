@@ -1,6 +1,6 @@
 {
-  "name": "penworth-command",
-  "version": "1.0.0",
+  "name": "penworth-new",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,8 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.49.1",
     "next": "14.2.11",
+    "next-themes": "^0.4.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "stripe": "^17.5.0",
@@ -19,7 +21,8 @@
     "date-fns": "^4.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "tailwind-merge": "^2.5.4"
+    "tailwind-merge": "^2.5.4",
+    "resend": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.8.1",

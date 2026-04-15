@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import { Toaster } from 'sonner';
+import { ThemeProvider } from '@/components/theme-provider';
 import './globals.css';
 
 const inter = Inter({ 
@@ -10,24 +10,24 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Penworth - Knowledge, Verified',
+    default: 'Penworth - AI Book Writing Platform',
     template: '%s | Penworth',
   },
-  description: 'AI-powered knowledge platform that transforms expertise into verified, compliance-ready, publication-quality documents.',
-  keywords: ['AI writing', 'knowledge platform', 'document automation', 'enterprise content'],
+  description: 'From idea to published book in 48 hours. Penworth transforms your expertise into professionally written, publication-ready books with AI.',
+  keywords: ['AI writing', 'book writing', 'AI author', 'publish book', 'write book with AI'],
   authors: [{ name: 'Penworth' }],
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://penworth.ai',
+    url: 'https://new.penworth.ai',
     siteName: 'Penworth',
-    title: 'Penworth - Knowledge, Verified',
-    description: 'AI-powered knowledge platform for verified, compliance-ready documents.',
+    title: 'Penworth - AI Book Writing Platform',
+    description: 'From idea to published book in 48 hours. Write your book with AI.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Penworth - Knowledge, Verified',
-    description: 'AI-powered knowledge platform for verified, compliance-ready documents.',
+    title: 'Penworth - AI Book Writing Platform',
+    description: 'From idea to published book in 48 hours. Write your book with AI.',
   },
   robots: {
     index: true,
@@ -43,17 +43,14 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>
-        {children}
-        <Toaster 
-          position="bottom-right" 
-          toastOptions={{
-            style: {
-              background: 'hsl(var(--background))',
-              color: 'hsl(var(--foreground))',
-              border: '1px solid hsl(var(--border))',
-            },
-          }}
-        />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -20,7 +20,7 @@ export default async function ProjectsPage({
 }: {
   searchParams: { status?: string; type?: string; q?: string };
 }) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   // Build query

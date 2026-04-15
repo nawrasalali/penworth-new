@@ -21,7 +21,7 @@ export default async function ProjectDetailPage({
 }: {
   params: { id: string };
 }) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data: project, error } = await supabase
     .from('projects')
