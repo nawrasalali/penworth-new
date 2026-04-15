@@ -19,6 +19,20 @@ import {
   Upload,
 } from 'lucide-react';
 
+// All supported languages with their subdomains
+const LANGUAGES = [
+  { code: 'en', name: 'English', subdomain: 'new', flag: '🇬🇧' },
+  { code: 'ar', name: 'العربية', subdomain: 'ar', flag: '🇸🇦', rtl: true },
+  { code: 'es', name: 'Español', subdomain: 'es', flag: '🇪🇸' },
+  { code: 'fr', name: 'Français', subdomain: 'fr', flag: '🇫🇷' },
+  { code: 'pt', name: 'Português', subdomain: 'pt', flag: '🇧🇷' },
+  { code: 'ru', name: 'Русский', subdomain: 'ru', flag: '🇷🇺' },
+  { code: 'zh', name: '中文', subdomain: 'zh', flag: '🇨🇳' },
+  { code: 'vi', name: 'Tiếng Việt', subdomain: 'vi', flag: '🇻🇳' },
+  { code: 'bn', name: 'বাংলা', subdomain: 'bn', flag: '🇧🇩' },
+  { code: 'id', name: 'Indonesia', subdomain: 'id', flag: '🇮🇩' },
+];
+
 const translations = {
   en: {
     nav: { features: 'Features', pricing: 'Pricing', login: 'Log in', getStarted: 'Get Started' },
@@ -98,15 +112,35 @@ const translations = {
   },
 };
 
+type LangCode = 'en' | 'ar';
+
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
-  const [lang, setLang] = useState<'en' | 'ar'>('en');
+  const [lang, setLang] = useState<LangCode>('en');
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('annual');
   
   const t = translations[lang];
   const isRTL = lang === 'ar';
+  const currentLang = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0];
+
+  // Handle language change - redirect to subdomain for other languages
+  const handleLanguageChange = (langCode: string) => {
+    if (langCode === 'en') {
+      setLang('en');
+      setLangMenuOpen(false);
+    } else if (langCode === 'ar') {
+      setLang('ar');
+      setLangMenuOpen(false);
+    } else {
+      // Redirect to the appropriate subdomain
+      const targetLang = LANGUAGES.find(l => l.code === langCode);
+      if (targetLang) {
+        window.location.href = `https://${targetLang.subdomain}.penworth.ai`;
+      }
+    }
+  };
 
   useEffect(() => { setMounted(true); }, []);
   if (!mounted) return <div className="min-h-screen bg-white dark:bg-neutral-950" />;
@@ -130,17 +164,25 @@ export default function HomePage() {
             </nav>
 
             <div className="flex items-center gap-2">
-              {/* Language */}
+              {/* Language Selector - All 10 Languages */}
               <div className="relative">
                 <button onClick={() => setLangMenuOpen(!langMenuOpen)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
                   <Globe className="h-4 w-4" />
-                  <span className="hidden sm:inline">{lang === 'en' ? 'EN' : 'عربي'}</span>
+                  <span className="hidden sm:inline">{currentLang.flag} {currentLang.code.toUpperCase()}</span>
                   <ChevronDown className="h-3 w-3" />
                 </button>
                 {langMenuOpen && (
-                  <div className="absolute top-full mt-2 right-0 w-36 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-1.5 shadow-xl">
-                    <button onClick={() => { setLang('en'); setLangMenuOpen(false); }} className={`w-full rounded-lg px-3 py-2 text-sm text-left hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors ${lang === 'en' ? 'bg-neutral-100 dark:bg-neutral-800' : ''}`}>English</button>
-                    <button onClick={() => { setLang('ar'); setLangMenuOpen(false); }} className={`w-full rounded-lg px-3 py-2 text-sm text-left hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors ${lang === 'ar' ? 'bg-neutral-100 dark:bg-neutral-800' : ''}`}>العربية</button>
+                  <div className="absolute top-full mt-2 right-0 w-44 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-1.5 shadow-xl max-h-[400px] overflow-y-auto">
+                    {LANGUAGES.map((language) => (
+                      <button
+                        key={language.code}
+                        onClick={() => handleLanguageChange(language.code)}
+                        className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-left hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors ${lang === language.code ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400' : ''}`}
+                      >
+                        <span>{language.flag}</span>
+                        <span>{language.name}</span>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
