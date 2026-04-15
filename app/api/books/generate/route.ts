@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { inngest } from '@/inngest/client';
-import { PLAN_LIMITS, CREDIT_COSTS } from '@/lib/plans';
+import { PLAN_LIMITS, CREDIT_COSTS, getDocumentLimit } from '@/lib/plans';
 
 export async function POST(request: NextRequest) {
   try {
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     const plan = (profile.plan as keyof typeof PLAN_LIMITS) || 'free';
     const limits = PLAN_LIMITS[plan];
-    const creditCost = CREDIT_COSTS.standardDocument; // 1000 credits
+    const creditCost = CREDIT_COSTS.standardDocument; // 1000 credits = 1 document
 
     // Check if monthly reset is needed
     const resetDate = new Date(profile.documents_reset_at || 0);
@@ -84,34 +84,26 @@ export async function POST(request: NextRequest) {
         .eq('id', user.id);
     }
 
-    // Check document limit
-    if (documentsThisMonth >= limits.maxDocuments) {
-      return NextResponse.json(
-        { 
-          error: `You've reached your ${limits.maxDocuments} document${limits.maxDocuments > 1 ? 's' : ''}/month limit. Upgrade for more.`,
-          code: 'DOCUMENT_LIMIT_REACHED'
-        },
-        { status: 403 }
-      );
-    }
-
     // Calculate total available credits (monthly + purchased)
     const totalCredits = creditsBalance + (profile.credits_purchased || 0);
+    const documentLimit = getDocumentLimit(plan);
 
-    // Check credit balance
+    // Check credit balance - this IS the document limit check
+    // 1000 credits = 1 document, so insufficient credits = document limit reached
     if (totalCredits < creditCost) {
       const upgradeMessage = plan === 'free' 
-        ? 'Upgrade to Pro to purchase credit packs.'
+        ? 'Upgrade to Pro for more documents and the ability to purchase credit packs.'
         : 'Purchase a credit pack to continue.';
       
       return NextResponse.json(
         { 
-          error: `Insufficient credits. You have ${totalCredits} credits, need ${creditCost}.`,
+          error: `You've used your ${documentLimit} document${documentLimit > 1 ? 's' : ''} for this month. ${upgradeMessage}`,
           code: 'INSUFFICIENT_CREDITS',
           creditsAvailable: totalCredits,
           creditsNeeded: creditCost,
+          documentsUsed: documentsThisMonth,
+          documentLimit,
           canBuyCredits: limits.canBuyCredits,
-          upgradeMessage
         },
         { status: 403 }
       );
