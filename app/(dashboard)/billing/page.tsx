@@ -1,464 +1,139 @@
-'use client';
+import { Suspense } from 'react';
+import { 
+  DollarSign, 
+  TrendingUp, 
+  Users, 
+  Cpu, 
+  Building2, 
+  CreditCard,
+  GitBranch,
+  Shield,
+  Bell,
+  RefreshCw,
+  Target
+} from 'lucide-react';
+import { CFOAgent } from '@/components/agents/cfo-agent';
+import { CMOAgent } from '@/components/agents/cmo-agent';
+import { CTOAgent } from '@/components/agents/cto-agent';
+import { COOAgent } from '@/components/agents/coo-agent';
+import { CampaignAgent } from '@/components/agents/campaign-agent';
+import { MDAgent } from '@/components/agents/md-agent';
+import { AlertsPanel } from '@/components/alerts-panel';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Check, CreditCard, Zap } from 'lucide-react';
+export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
-interface Subscription {
-  plan: 'free' | 'pro' | 'max';
-  status: 'active' | 'past_due' | 'canceled' | 'trialing';
-  current_period_end: string;
-  cancel_at_period_end: boolean;
-}
-
-interface UsageData {
-  credits_used: number;
-  credits_limit: number;
-  credits_purchased: number;
-  documents_this_month: number;
-  documents_limit: number;
-}
-
-const PLANS = [
-  {
-    id: 'free',
-    name: 'Free',
-    monthlyPrice: 0,
-    annualPrice: 0,
-    features: [
-      '1 document per month',
-      '1,000 credits/month',
-      'AI writing assistance',
-      'PDF export',
-      'Publish to Amazon KDP',
-      'Community support',
-    ],
-    limitations: [
-      '"Created with Penworth.ai" branding',
-      'Cannot purchase credit packs',
-    ],
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    monthlyPrice: 19,
-    annualPrice: 190,
-    popular: true,
-    features: [
-      '2 documents per month',
-      '2,000 credits/month',
-      'Enhanced AI writing',
-      'PDF & DOCX export',
-      'No Penworth branding',
-      'All 8 industry prompts',
-      'Sell on Marketplace',
-      'Purchase credit add-ons',
-      'Email support (48hr)',
-    ],
-  },
-  {
-    id: 'max',
-    name: 'Max',
-    monthlyPrice: 49,
-    annualPrice: 490,
-    features: [
-      '5 documents per month',
-      '5,000 credits/month',
-      'Premium AI writing',
-      'PDF, DOCX & EPUB export',
-      'All publishing platforms',
-      'All prompts + custom',
-      'Credit rollover (2,500 max)',
-      'Priority support (24hr)',
-    ],
-  },
-];
-
-const CREDIT_PACKS = [
-  { id: 'v2_credits_1000', name: 'Single', credits: 1000, price: 39, perDoc: '39.00' },
-  { id: 'v2_credits_3000', name: 'Triple', credits: 3000, price: 99, perDoc: '33.00', savings: '15%' },
-  { id: 'v2_credits_10000', name: 'Bulk', credits: 10000, price: 290, perDoc: '29.00', savings: '26%' },
-];
-
-export default function BillingPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [usage, setUsage] = useState<UsageData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('annual');
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const supabase = createClient();
-
-  useEffect(() => {
-    // Check for success messages from Stripe redirect
-    if (searchParams.get('success') === 'true') {
-      setSuccessMessage('Subscription activated! Welcome to your new plan.');
-    } else if (searchParams.get('credits') === 'success') {
-      setSuccessMessage('Credits added to your account!');
-    }
-    loadBillingData();
-  }, [searchParams]);
-
-  const loadBillingData = async () => {
-    setIsLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-
-    // Load profile with plan info
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('plan, credits_balance, credits_purchased')
-      .eq('id', user.id)
-      .single();
-
-    const plan = (profile?.plan as 'free' | 'pro' | 'max') || 'free';
-
-    // Get subscription status from org
-    const { data: orgMember } = await supabase
-      .from('org_members')
-      .select('organizations(subscription_tier, stripe_subscription_id)')
-      .eq('user_id', user.id)
-      .single();
-
-    const orgPlan = (orgMember?.organizations as any)?.subscription_tier;
-
-    setSubscription({
-      plan: orgPlan || plan,
-      status: 'active',
-      current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      cancel_at_period_end: false,
-    });
-
-    // Get documents this month
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    const { count: docsThisMonth } = await supabase
-      .from('projects')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .gte('created_at', startOfMonth.toISOString());
-
-    // Get plan limits
-    const planLimits = {
-      free: { credits: 1000, docs: 1 },
-      pro: { credits: 2000, docs: 2 },
-      max: { credits: 5000, docs: 5 },
-    };
-
-    const limits = planLimits[plan] || planLimits.free;
-
-    setUsage({
-      credits_used: limits.credits - (profile?.credits_balance || 0),
-      credits_limit: limits.credits,
-      credits_purchased: profile?.credits_purchased || 0,
-      documents_this_month: docsThisMonth || 0,
-      documents_limit: limits.docs,
-    });
-
-    setIsLoading(false);
-  };
-
-  const handleUpgrade = async (planId: string) => {
-    if (planId === 'free') return;
-
-    setIsProcessing(true);
-    try {
-      const response = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          planId,
-          billingPeriod,
-        }),
-      });
-
-      const { url, error } = await response.json();
-      if (error) throw new Error(error);
-      if (url) window.location.href = url;
-    } catch (error) {
-      alert('Failed to start checkout. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleBuyCreditPack = async (packId: string) => {
-    if (subscription?.plan === 'free') {
-      alert('Credit packs are only available for Pro and Max subscribers. Please upgrade first.');
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const response = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ creditPackId: packId }),
-      });
-
-      const { url, error } = await response.json();
-      if (error) throw new Error(error);
-      if (url) window.location.href = url;
-    } catch (error) {
-      alert('Failed to start checkout. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleManageBilling = async () => {
-    setIsProcessing(true);
-    try {
-      const response = await fetch('/api/stripe/portal', {
-        method: 'POST',
-      });
-
-      const { url, error } = await response.json();
-      if (error) throw new Error(error);
-      if (url) window.location.href = url;
-    } catch (error) {
-      alert('Failed to open billing portal. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  const currentPlan = PLANS.find(p => p.id === subscription?.plan) || PLANS[0];
-
+export default function CommandCenter() {
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8">Billing & Subscription</h1>
-
-      {/* Success Message */}
-      {successMessage && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
-          <Check className="inline w-5 h-5 mr-2" />
-          {successMessage}
-        </div>
-      )}
-
-      {/* Current Plan */}
-      <div className="border rounded-lg p-6 mb-8 bg-card">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-xl font-semibold mb-1">Current Plan: {currentPlan.name}</h2>
-            <p className="text-muted-foreground">
-              {subscription?.plan === 'free' 
-                ? 'Free forever' 
-                : `$${currentPlan.monthlyPrice}/month or $${currentPlan.annualPrice}/year`
-              }
-            </p>
-            {subscription?.current_period_end && subscription.plan !== 'free' && (
-              <p className="text-sm text-muted-foreground mt-2">
-                {subscription.cancel_at_period_end 
-                  ? `Cancels on ${new Date(subscription.current_period_end).toLocaleDateString()}`
-                  : `Renews on ${new Date(subscription.current_period_end).toLocaleDateString()}`
-                }
-              </p>
-            )}
-          </div>
-          {subscription?.plan !== 'free' && (
-            <Button variant="outline" onClick={handleManageBilling} disabled={isProcessing}>
-              <CreditCard className="w-4 h-4 mr-2" />
-              Manage Billing
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Usage */}
-      {usage && (
-        <div className="grid gap-4 md:grid-cols-2 mb-8">
-          <div className="border rounded-lg p-4 bg-card">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">Credits This Month</h3>
-            <p className="text-2xl font-bold">{(usage.credits_limit - usage.credits_used).toLocaleString()}</p>
-            <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-primary transition-all"
-                style={{ width: `${Math.min(100, (usage.credits_used / usage.credits_limit) * 100)}%` }}
-              />
+    <div className="min-h-screen bg-navy-950">
+      {/* Header */}
+      <header className="border-b border-navy-800 bg-navy-900/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                  <span className="text-xl font-bold">P</span>
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white">Command Center</h1>
+                  <p className="text-xs text-navy-400">Executive Intelligence</p>
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {usage.credits_used.toLocaleString()} used of {usage.credits_limit.toLocaleString()}
-            </p>
-            {usage.credits_purchased > 0 && (
-              <p className="text-xs text-green-600 mt-1">
-                + {usage.credits_purchased.toLocaleString()} purchased credits available
-              </p>
-            )}
-          </div>
-
-          <div className="border rounded-lg p-4 bg-card">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">Documents This Month</h3>
-            <p className="text-2xl font-bold">{usage.documents_this_month}</p>
-            <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-primary transition-all"
-                style={{ width: `${(usage.documents_this_month / usage.documents_limit) * 100}%` }}
-              />
+            
+            <div className="flex items-center gap-4">
+              {/* Alerts */}
+              <button className="relative p-2 rounded-lg hover:bg-navy-800 transition-colors">
+                <Bell className="h-5 w-5 text-navy-400" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+              </button>
+              
+              {/* Refresh */}
+              <button className="flex items-center gap-2 px-3 py-2 rounded-lg bg-navy-800 hover:bg-navy-700 transition-colors text-sm">
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </button>
+              
+              {/* Last Updated */}
+              <div className="text-xs text-navy-400">
+                Last synced: {new Date().toLocaleTimeString()}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              of {usage.documents_limit} max
-            </p>
           </div>
         </div>
-      )}
+      </header>
 
-      {/* Plans */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">Available Plans</h2>
-        <div className="inline-flex items-center gap-2 p-1 bg-muted rounded-lg">
-          <button
-            onClick={() => setBillingPeriod('monthly')}
-            className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-              billingPeriod === 'monthly' ? 'bg-background shadow' : ''
-            }`}
-          >
-            Monthly
-          </button>
-          <button
-            onClick={() => setBillingPeriod('annual')}
-            className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-              billingPeriod === 'annual' ? 'bg-background shadow' : ''
-            }`}
-          >
-            Annual
-            <span className="ml-1 text-xs text-green-600">Save 17%</span>
-          </button>
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Financial & Marketing Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <Suspense fallback={<AgentSkeleton title="CFO Agent" />}>
+            <CFOAgent />
+          </Suspense>
+
+          <Suspense fallback={<AgentSkeleton title="CMO Agent" />}>
+            <CMOAgent />
+          </Suspense>
         </div>
-      </div>
 
-      <div className="grid gap-6 md:grid-cols-3 mb-12">
-        {PLANS.map((plan) => (
-          <div 
-            key={plan.id}
-            className={`border rounded-lg p-6 relative ${
-              plan.popular ? 'border-primary ring-2 ring-primary/20' : ''
-            } ${subscription?.plan === plan.id ? 'bg-primary/5' : 'bg-card'}`}
-          >
-            {plan.popular && (
-              <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-medium">
-                Most Popular
-              </span>
-            )}
+        {/* Campaign Agent - Full Width */}
+        <div className="mb-6">
+          <Suspense fallback={<AgentSkeleton title="Campaign Agent" />}>
+            <CampaignAgent />
+          </Suspense>
+        </div>
 
-            <h3 className="text-lg font-semibold mb-2">{plan.name}</h3>
-            <div className="mb-4">
-              {plan.monthlyPrice === 0 ? (
-                <span className="text-2xl font-bold">Free</span>
-              ) : (
-                <>
-                  <span className="text-3xl font-bold">
-                    ${billingPeriod === 'annual' ? plan.annualPrice : plan.monthlyPrice}
-                  </span>
-                  <span className="text-muted-foreground">
-                    /{billingPeriod === 'annual' ? 'year' : 'mo'}
-                  </span>
-                </>
-              )}
-            </div>
+        {/* Master Distributor Agent - Full Width */}
+        <div className="mb-6">
+          <Suspense fallback={<AgentSkeleton title="Distributor Agent" wide />}>
+            <MDAgent />
+          </Suspense>
+        </div>
 
-            <ul className="space-y-2 mb-6">
-              {plan.features.map((feature, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm">
-                  <Check className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
-                  {feature}
-                </li>
-              ))}
-              {plan.limitations?.map((limitation, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <span className="mt-0.5">✗</span>
-                  {limitation}
-                </li>
-              ))}
-            </ul>
+        {/* Tech & Ops Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Suspense fallback={<AgentSkeleton title="CTO Agent" />}>
+            <CTOAgent />
+          </Suspense>
 
-            {subscription?.plan === plan.id ? (
-              <Button variant="outline" className="w-full" disabled>
-                Current Plan
-              </Button>
-            ) : (
-              <Button 
-                className="w-full"
-                variant={plan.popular ? 'default' : 'outline'}
-                onClick={() => handleUpgrade(plan.id)}
-                disabled={isProcessing || plan.monthlyPrice === 0}
-              >
-                {plan.monthlyPrice === 0 ? 'Downgrade' : 'Upgrade'}
-              </Button>
-            )}
+          <Suspense fallback={<AgentSkeleton title="COO Agent" />}>
+            <COOAgent />
+          </Suspense>
+        </div>
+
+        {/* Alerts Panel */}
+        <div className="mt-8">
+          <Suspense fallback={<div className="metric-card animate-pulse h-48" />}>
+            <AlertsPanel />
+          </Suspense>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-navy-800 mt-12">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex items-center justify-between text-xs text-navy-500">
+            <span>Penworth Command Center v1.1</span>
+            <span>A.C.N. 675 668 710 PTY LTD</span>
           </div>
-        ))}
-      </div>
-
-      {/* Credit Packs */}
-      <div className="mb-12">
-        <div className="flex items-center gap-2 mb-4">
-          <Zap className="w-5 h-5 text-yellow-500" />
-          <h2 className="text-xl font-semibold">Credit Add-On Packs</h2>
         </div>
-        <p className="text-muted-foreground mb-6">
-          Need more credits? Purchase add-on packs. Available for Pro and Max subscribers only.
-        </p>
+      </footer>
+    </div>
+  );
+}
 
-        <div className="grid gap-4 md:grid-cols-3">
-          {CREDIT_PACKS.map((pack) => (
-            <div key={pack.id} className="border rounded-lg p-6 bg-card">
-              <h3 className="font-semibold mb-1">{pack.name}</h3>
-              <p className="text-3xl font-bold mb-1">${pack.price}</p>
-              <p className="text-sm text-muted-foreground mb-3">
-                {pack.credits.toLocaleString()} credits
-              </p>
-              <p className="text-sm mb-4">
-                ${pack.perDoc}/document
-                {pack.savings && (
-                  <span className="ml-2 text-green-600 font-medium">({pack.savings} off)</span>
-                )}
-              </p>
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => handleBuyCreditPack(pack.id)}
-                disabled={isProcessing || subscription?.plan === 'free'}
-              >
-                {subscription?.plan === 'free' ? 'Upgrade to Buy' : 'Buy Credits'}
-              </Button>
-            </div>
-          ))}
-        </div>
-        <p className="text-sm text-muted-foreground mt-4">
-          Purchased credits never expire • Used after monthly credits are exhausted
-        </p>
+function AgentSkeleton({ title, wide }: { title: string; wide?: boolean }) {
+  return (
+    <div className={`metric-card animate-pulse ${wide ? 'col-span-2' : ''}`}>
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-8 h-8 rounded-lg bg-navy-700" />
+        <div className="h-5 w-32 bg-navy-700 rounded" />
       </div>
-
-      {/* Enterprise CTA */}
-      <div className="border rounded-lg p-6 bg-muted/30 text-center">
-        <h3 className="font-semibold mb-2">Publishing 50+ documents a month?</h3>
-        <p className="text-muted-foreground mb-4">
-          Get volume pricing, SSO, API access, and dedicated support.
-        </p>
-        <Button variant="outline" asChild>
-          <a href="mailto:enterprise@penworth.ai">Contact Sales</a>
-        </Button>
+      <div className="space-y-3">
+        <div className="h-16 bg-navy-700 rounded" />
+        <div className="h-16 bg-navy-700 rounded" />
+        <div className="h-16 bg-navy-700 rounded" />
       </div>
     </div>
   );
