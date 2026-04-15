@@ -1,18 +1,17 @@
 # Dependencies
-/node_modules
-/.pnp
+node_modules
+.pnp
 .pnp.js
-.yarn/install-state.gz
 
 # Testing
-/coverage
+coverage
 
 # Next.js
-/.next/
-/out/
+.next/
+out/
 
 # Production
-/build
+build
 
 # Misc
 .DS_Store
@@ -24,8 +23,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # Local env files
-.env*.local
 .env
+.env*.local
 
 # Vercel
 .vercel
@@ -33,16 +32,3 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
-
-# Supabase
-/supabase/.branches
-/supabase/.temp
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
-Thumbs.db
