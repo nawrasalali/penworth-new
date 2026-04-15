@@ -19,7 +19,7 @@ import {
   Upload,
 } from 'lucide-react';
 
-// All supported languages with their subdomains
+// All supported languages with their subdomains (11 total)
 const LANGUAGES = [
   { code: 'en', name: 'English', subdomain: 'new', flag: '🇬🇧' },
   { code: 'ar', name: 'العربية', subdomain: 'ar', flag: '🇸🇦', rtl: true },
@@ -30,7 +30,8 @@ const LANGUAGES = [
   { code: 'zh', name: '中文', subdomain: 'zh', flag: '🇨🇳' },
   { code: 'vi', name: 'Tiếng Việt', subdomain: 'vi', flag: '🇻🇳' },
   { code: 'bn', name: 'বাংলা', subdomain: 'bn', flag: '🇧🇩' },
-  { code: 'id', name: 'Indonesia', subdomain: 'id', flag: '🇮🇩' },
+  { code: 'id', name: 'Bahasa Indonesia', subdomain: 'id', flag: '🇮🇩' },
+  { code: 'hi', name: 'हिन्दी', subdomain: 'hi', flag: '🇮🇳' },
 ];
 
 const translations = {
