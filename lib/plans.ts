@@ -1,7 +1,23 @@
 // Penworth v2 Plan Configuration
 // DO NOT MODIFY - This follows the exact v2 pricing specification
 
-export const PLAN_LIMITS = {
+export type PublishingConnector = 'kdp' | 'ingram_spark' | 'd2d' | 'lulu' | 'google_play';
+
+export const PLAN_LIMITS: Record<string, {
+  monthlyCredits: number;
+  maxDocuments: number;
+  models: string[];
+  exportFormats: string[];
+  hasBranding: boolean;
+  publishingConnectors: PublishingConnector[];
+  industryPrompts: string | string[];
+  marketplaceSell: boolean;
+  marketplaceCommission?: number;
+  creditRollover?: number;
+  creditRolloverMax: number;
+  canBuyCredits: boolean;
+  supportLevel: string;
+}> = {
   free: {
     monthlyCredits: 1_000,
     maxDocuments: 1,
@@ -44,7 +60,7 @@ export const PLAN_LIMITS = {
     canBuyCredits: true,
     supportLevel: 'priority_email',
   },
-} as const;
+};
 
 export const CREDIT_COSTS = {
   standardDocument: 1_000,
@@ -68,5 +84,5 @@ export const STRIPE_PRODUCTS = {
   v2_credits_10000: process.env.STRIPE_PRICE_CREDITS_10000 || '',
 } as const;
 
-export type PlanId = keyof typeof PLAN_LIMITS;
+export type PlanId = 'free' | 'pro' | 'max';
 export type CreditPackId = typeof CREDIT_PACKS[number]['id'];
