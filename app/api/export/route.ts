@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getWatermarkStatus } from '@/lib/watermark';
 
 interface Chapter {
   id: string;
@@ -47,33 +48,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    // Check subscription tier for export access
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('plan')
-      .eq('id', user.id)
-      .single();
-
-    const plan = profile?.plan || 'free';
-
-    // Check if user has unlocked branding-free export via sharing
-    let unlockedBySharing = false;
-    if (plan === 'free') {
-      const { data: shareTrack } = await supabase
-        .from('share_tracks')
-        .select('unlocked')
-        .eq('project_id', projectId)
-        .eq('user_id', user.id)
-        .eq('unlocked', true)
-        .single();
-      
-      unlockedBySharing = !!shareTrack?.unlocked;
-    }
-
-    // v2 spec: Free tier exports have "Created with Penworth.ai" branding
-    // UNLESS they've unlocked via sharing (5 unique clicks)
-    // Pro and Max have no branding
-    const includeBranding = plan === 'free' && !unlockedBySharing;
+    // v2 watermark logic (lib/watermark.ts):
+    // - Paid tier (pro/max/enterprise) -> no watermark
+    // - Free + has_purchased_credits -> no watermark
+    // - Free + has_referred_users -> no watermark
+    // - Otherwise -> small footer watermark
+    const watermarkStatus = await getWatermarkStatus(supabase, user.id);
+    const includeBranding = watermarkStatus.shouldShowWatermark;
 
     // Sort chapters by order
     const chapters = (project.chapters || []).sort(
@@ -150,7 +131,7 @@ async function generateDOCX(project: Project, chapters: Chapter[], includeBrandi
     `).join('')}
   `).join('');
 
-  // Penworth branding footer (for free tier)
+  // Small footer watermark per v2 spec: single discrete line
   const brandingFooter = includeBranding ? `
     <w:p>
       <w:pPr><w:jc w:val="center"/></w:pPr>
@@ -158,29 +139,8 @@ async function generateDOCX(project: Project, chapters: Chapter[], includeBrandi
     <w:p>
       <w:pPr><w:jc w:val="center"/></w:pPr>
       <w:r>
-        <w:rPr><w:sz w:val="20"/><w:color w:val="666666"/></w:rPr>
-        <w:t>───────────────────────────────────</w:t>
-      </w:r>
-    </w:p>
-    <w:p>
-      <w:pPr><w:jc w:val="center"/></w:pPr>
-      <w:r>
-        <w:rPr><w:sz w:val="20"/><w:color w:val="666666"/></w:rPr>
-        <w:t>Created with Penworth.ai</w:t>
-      </w:r>
-    </w:p>
-    <w:p>
-      <w:pPr><w:jc w:val="center"/></w:pPr>
-      <w:r>
-        <w:rPr><w:sz w:val="18"/><w:color w:val="1B3A57"/></w:rPr>
-        <w:t>Transform your ideas into published books with AI</w:t>
-      </w:r>
-    </w:p>
-    <w:p>
-      <w:pPr><w:jc w:val="center"/></w:pPr>
-      <w:r>
-        <w:rPr><w:sz w:val="18"/><w:color w:val="2E5A82"/><w:u w:val="single"/></w:rPr>
-        <w:t>https://penworth.ai</w:t>
+        <w:rPr><w:sz w:val="16"/><w:color w:val="888888"/><w:i/></w:rPr>
+        <w:t>by penworth.ai</w:t>
       </w:r>
     </w:p>
   ` : '';
@@ -233,17 +193,12 @@ async function generatePDF(project: Project, chapters: Chapter[], includeBrandin
   // Simple PDF generation
   // In production, use a library like pdfkit, puppeteer, or similar
   
+  // Small footer watermark per v2 spec: single discrete italic line
   const brandingText = includeBranding ? `
-0 -60 Td
-/F1 10 Tf
-0.4 0.4 0.4 rg
-(-------------------------------------------) Tj
-0 -15 Td
-(Created with Penworth.ai) Tj
-0 -15 Td
-(Transform your ideas into published books) Tj
-0 -15 Td
-(https://penworth.ai) Tj
+0 -40 Td
+/F1 9 Tf
+0.5 0.5 0.5 rg
+(by penworth.ai) Tj
 0 0 0 rg` : '';
   
   // Create minimal PDF structure
