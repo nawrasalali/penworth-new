@@ -351,8 +351,32 @@ function EditorContentNew() {
     return data.score;
   };
 
+  // Handler: Propose stronger idea
+  const handleProposeStronger = async (originalTopic: string, currentScore: ValidationScore) => {
+    const response = await fetch('/api/ai/propose-stronger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        originalTopic,
+        contentType: project?.content_type,
+        currentScore,
+      }),
+    });
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    return data.proposal;
+  };
+
   // Handler: Proceed from validation
   const handleValidationProceed = async (topic: string, score: ValidationScore) => {
+    // Update the project title to the chosen idea so downstream agents use it
+    if (project && topic !== project.title) {
+      await supabase
+        .from('projects')
+        .update({ title: topic })
+        .eq('id', project.id);
+      setProject({ ...project, title: topic });
+    }
     await advanceToNextAgent({
       topic,
       score,
@@ -736,6 +760,7 @@ function EditorContentNew() {
         return (
           <ValidateScreen
             onValidate={handleValidate}
+            onProposeStronger={handleProposeStronger}
             onProceed={handleValidationProceed}
             initialTopic={project?.title || ''}
           />
@@ -745,6 +770,8 @@ function EditorContentNew() {
         return (
           <InterviewScreen
             questions={interviewQuestions}
+            chosenIdea={session?.validation_data?.chosenTopic || project?.title}
+            ideaPositioning={session?.validation_data?.positioning}
             onAnswer={handleInterviewAnswer}
             onSaveAndExit={handleSaveAndExit}
             onStopAndNext={handleStopInterview}

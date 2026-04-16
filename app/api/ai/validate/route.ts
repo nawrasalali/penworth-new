@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { ValidationScore } from '@/types/agent-workflow';
+import { modelFor, maxTokensFor } from '@/lib/ai/model-router';
 
 const anthropic = new Anthropic();
 
@@ -65,8 +66,8 @@ Respond ONLY with valid JSON matching this exact structure:
 }`;
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2048,
+      model: modelFor('validate_idea'),
+      max_tokens: maxTokensFor('validate_idea'),
       system: systemPrompt,
       messages: [
         {

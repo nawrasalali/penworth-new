@@ -24,6 +24,8 @@ import {
 
 interface InterviewScreenProps {
   questions: InterviewQuestion[];
+  chosenIdea?: string;            // The validated idea from Validate stage
+  ideaPositioning?: string;       // Optional positioning hook (if from stronger proposal)
   onAnswer: (questionId: string, answer: string) => void;
   onSaveAndExit: () => void;
   onStopAndNext: (followUpAnswers: Record<string, string>) => void;
@@ -34,6 +36,8 @@ type Phase = 'interview' | 'followup';
 
 export function InterviewScreen({
   questions,
+  chosenIdea,
+  ideaPositioning,
   onAnswer,
   onSaveAndExit,
   onStopAndNext,
@@ -103,19 +107,39 @@ export function InterviewScreen({
 
   // Interview Phase
   if (phase === 'interview') {
+    // When we have a chosen idea, the very first question should reference it.
+    // We override the rendered question text for index 0 only if chosenIdea is present.
+    const isFirstQuestion = currentIndex === 0;
+    const firstQuestionIntro = chosenIdea && isFirstQuestion
+      ? `Great — we're moving forward with: "${chosenIdea}". ${ideaPositioning ? `That's "${ideaPositioning}". ` : ''}To make sure I capture your vision accurately, let me start with this: ${currentQuestion?.question}`
+      : currentQuestion?.question;
+
     return (
       <div className="flex-1 flex flex-col p-6 max-w-2xl mx-auto w-full">
+        {/* Chosen idea banner — visible throughout the interview as a north star */}
+        {chosenIdea && (
+          <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3">
+            <div className="text-[10px] uppercase tracking-wider text-primary font-semibold mb-1">
+              Writing About
+            </div>
+            <p className="text-sm font-medium">{chosenIdea}</p>
+            {ideaPositioning && (
+              <p className="text-xs text-muted-foreground italic mt-1">{ideaPositioning}</p>
+            )}
+          </div>
+        )}
+
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
             <Mic className="h-5 w-5 text-primary" />
             <h1 className="text-xl font-bold">Interview: Let's dive deeper</h1>
           </div>
-          
+
           {/* Progress Bar */}
           <div className="flex items-center gap-3">
             <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-              <div 
+              <div
                 className="h-full bg-primary transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
@@ -125,7 +149,7 @@ export function InterviewScreen({
             </span>
           </div>
         </div>
-        
+
         {/* Question Card */}
         <div className="flex-1 overflow-y-auto">
           <div className="rounded-xl border bg-card p-6 mb-4">
@@ -133,7 +157,7 @@ export function InterviewScreen({
               <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Bot className="h-4 w-4 text-primary" />
               </div>
-              <p className="text-lg">{currentQuestion?.question}</p>
+              <p className="text-lg">{firstQuestionIntro}</p>
             </div>
             
             {/* Multiple Choice Options */}
