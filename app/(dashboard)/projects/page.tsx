@@ -23,11 +23,19 @@ export default async function ProjectsPage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Build query
+  if (!user) {
+    return (
+      <div className="p-8">
+        <p className="text-muted-foreground">Please log in to view your projects.</p>
+      </div>
+    );
+  }
+
+  // Build query - simple filter by user_id
   let query = supabase
     .from('projects')
     .select('*, organizations(name, industry)')
-    .or(`user_id.eq.${user?.id},org_id.in.(select org_id from org_members where user_id = '${user?.id}')`)
+    .eq('user_id', user.id)
     .order('updated_at', { ascending: false });
 
   // Apply filters
@@ -41,7 +49,11 @@ export default async function ProjectsPage({
     query = query.ilike('title', `%${searchParams.q}%`);
   }
 
-  const { data: projects } = await query;
+  const { data: projects, error } = await query;
+
+  if (error) {
+    console.error('Projects query error:', error);
+  }
 
   const statusOptions = ['draft', 'in_progress', 'review', 'approved', 'published'];
   const typeOptions = Object.keys(CONTENT_TYPE_LABELS);
