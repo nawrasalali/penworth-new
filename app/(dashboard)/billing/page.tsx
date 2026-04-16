@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -79,7 +79,7 @@ const CREDIT_PACKS = [
   { id: 'v2_credits_10000', name: 'Bulk', credits: 10000, price: 290, perDoc: '29.00', savings: '26%' },
 ];
 
-export default function BillingPage() {
+function BillingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -448,5 +448,21 @@ export default function BillingPage() {
         </Button>
       </div>
     </div>
+  );
+}
+
+export default function BillingPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex-1 space-y-8 p-8">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/4 mb-8"></div>
+          <div className="h-64 bg-muted rounded mb-8"></div>
+          <div className="h-48 bg-muted rounded"></div>
+        </div>
+      </div>
+    }>
+      <BillingContent />
+    </Suspense>
   );
 }
