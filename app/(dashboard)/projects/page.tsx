@@ -66,60 +66,52 @@ export default async function ProjectsPage({
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4 mb-6">
-        <div className="relative flex-1 max-w-sm">
+        <form className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <form>
-            <Input
-              name="q"
-              placeholder="Search projects..."
-              defaultValue={searchParams.q}
-              className="pl-9"
-            />
-          </form>
-        </div>
+          <Input
+            name="q"
+            placeholder="Search projects..."
+            defaultValue={searchParams.q}
+            className="pl-9"
+          />
+          {searchParams.status && <input type="hidden" name="status" value={searchParams.status} />}
+          {searchParams.type && <input type="hidden" name="type" value={searchParams.type} />}
+        </form>
         <div className="flex items-center gap-2">
-          <select
-            name="status"
-            defaultValue={searchParams.status || ''}
-            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-            onChange={(e) => {
-              const url = new URL(window.location.href);
-              if (e.target.value) {
-                url.searchParams.set('status', e.target.value);
-              } else {
-                url.searchParams.delete('status');
-              }
-              window.location.href = url.toString();
-            }}
-          >
-            <option value="">All Statuses</option>
-            {statusOptions.map((status) => (
-              <option key={status} value={status}>
-                {status.replace('_', ' ')}
-              </option>
-            ))}
-          </select>
-          <select
-            name="type"
-            defaultValue={searchParams.type || ''}
-            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-            onChange={(e) => {
-              const url = new URL(window.location.href);
-              if (e.target.value) {
-                url.searchParams.set('type', e.target.value);
-              } else {
-                url.searchParams.delete('type');
-              }
-              window.location.href = url.toString();
-            }}
-          >
-            <option value="">All Types</option>
-            {typeOptions.map((type) => (
-              <option key={type} value={type}>
-                {CONTENT_TYPE_LABELS[type]}
-              </option>
-            ))}
-          </select>
+          <form>
+            {searchParams.q && <input type="hidden" name="q" value={searchParams.q} />}
+            {searchParams.type && <input type="hidden" name="type" value={searchParams.type} />}
+            <select
+              name="status"
+              defaultValue={searchParams.status || ''}
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer"
+              onChange={(e) => e.currentTarget.form?.submit()}
+            >
+              <option value="">All Statuses</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status.replace('_', ' ')}
+                </option>
+              ))}
+            </select>
+          </form>
+          <form>
+            {searchParams.q && <input type="hidden" name="q" value={searchParams.q} />}
+            {searchParams.status && <input type="hidden" name="status" value={searchParams.status} />}
+            <select
+              name="type"
+              defaultValue={searchParams.type || ''}
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer"
+              onChange={(e) => e.currentTarget.form?.submit()}
+            >
+              <option value="">All Types</option>
+              {typeOptions.map((type) => (
+                <option key={type} value={type}>
+                  {CONTENT_TYPE_LABELS[type]}
+                </option>
+              ))}
+            </select>
+          </form>
         </div>
       </div>
 
