@@ -42,6 +42,7 @@ function EditorContent({ params }: { params: { id: string } }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const hasCreatedNewChapter = useRef(false); // Prevent infinite chapter creation
 
   const [project, setProject] = useState<any>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -77,8 +78,12 @@ function EditorContent({ params }: { params: { id: string } }) {
         setContent(chapter.content);
         setTitle(chapter.title);
       }
-    } else if (isNew) {
+    } else if (isNew && !hasCreatedNewChapter.current) {
+      // Only create new chapter once - prevent infinite loop!
+      hasCreatedNewChapter.current = true;
       createNewChapter();
+      // Clear the ?new param from URL to prevent re-triggering
+      router.replace(`/projects/${params.id}/editor`, { scroll: false });
     } else if (chapters.length > 0 && !activeChapterId) {
       // Default to first chapter
       setActiveChapterId(chapters[0].id);
