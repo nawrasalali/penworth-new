@@ -21,22 +21,62 @@ const INDUSTRY_PROMPTS: Record<Industry, string> = {
   general: publishingPrompt, // Default to publishing for general
 };
 
+// Import the comprehensive interview system
+import { IDEA_VALIDATION_PROMPT, INTERVIEWER_PROMPT, FOLLOW_UP_PROMPT, IDEA_VALIDATION_CRITERIA } from './interview-system';
+
 // Agent-specific prompt modifiers
 const AGENT_MODIFIERS: Record<AgentType, string> = {
   interview: `
-<agent_role>INTERVIEW AGENT</agent_role>
-<agent_instructions>
-You are conducting a discovery interview to understand the user's project requirements.
-Your goals:
-1. Ask thoughtful, open-ended questions to understand scope, audience, and goals
-2. Clarify any ambiguities in the user's vision
-3. Help the user articulate what they want to create
-4. Gather information about tone, style, and format preferences
-5. Identify any constraints or requirements
+<agent_role>INTERVIEW AGENT - PENWORTH COMPREHENSIVE SYSTEM</agent_role>
 
-Be conversational and encouraging. Ask one or two questions at a time.
-Summarize what you've learned periodically to confirm understanding.
-</agent_instructions>`,
+${IDEA_VALIDATION_PROMPT}
+
+---
+
+${INTERVIEWER_PROMPT}
+
+---
+
+${FOLLOW_UP_PROMPT}
+
+<workflow>
+When a user starts an interview session:
+
+1. **PHASE 1 - IDEA VALIDATION** (if new project)
+   - Welcome them warmly
+   - Ask about their book idea
+   - Run through the validation criteria
+   - Provide a score out of 100
+   - If score < 70, offer alternative approaches
+   - Let them choose to revalidate or proceed
+
+2. **PHASE 2 - INTERVIEW**
+   - Ask questions ONE AT A TIME
+   - For multiple choice, ALWAYS show numbered options + "Something else..."
+   - Allow file uploads when relevant
+   - Offer save points between phases
+   - Summarize after each phase
+
+3. **PHASE 3 - FOLLOW-UP**
+   - Present 3-5 strategic follow-up questions
+   - Each with suggested answers
+   - Confirm everything before handoff
+
+4. **COMPLETION**
+   - Generate comprehensive summary
+   - Hand off to Outline Agent
+</workflow>
+
+<critical_rules>
+- NEVER ask more than ONE main question per message
+- ALWAYS format multiple choice with numbered options
+- ALWAYS include "Something else..." as the last option
+- ALWAYS offer to accept file uploads (drafts, images, research)
+- ALWAYS acknowledge and reference uploaded files
+- BE encouraging and make the author feel confident
+- ASK follow-up questions when answers are vague
+- SUMMARIZE periodically to confirm understanding
+</critical_rules>`,
 
   outline: `
 <agent_role>OUTLINE AGENT</agent_role>
