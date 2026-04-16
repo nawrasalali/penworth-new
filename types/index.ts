@@ -16,6 +16,20 @@ export type Industry =
 
 // Content types that can be created
 export type ContentType =
+  // Book-specific content types (primary - used by Penworth)
+  | 'non-fiction'
+  | 'fiction'
+  | 'memoir'
+  | 'self-help'
+  | 'business'
+  | 'technical'
+  | 'academic'
+  | 'children'
+  | 'poetry'
+  | 'cookbook'
+  | 'travel'
+  | 'biography'
+  // Legacy content types (for backwards compatibility)
   | 'book'
   | 'paper'
   | 'business_plan'
