@@ -256,10 +256,22 @@ export interface InterviewSession {
     acknowledgedAt?: string;
   };
   
-  // Author & Cover
+  // Author & Cover (structured)
   authorInfo: AuthorInfo;
   coverConfig: CoverConfig;
   followUpData: Record<string, string>;
+  
+  // Database fields (direct from DB)
+  book_title?: string | null;
+  author_name?: string | null;
+  about_author?: string | null;
+  author_photo_url?: string | null;
+  front_cover_url?: string | null;
+  front_cover_prompt?: string | null;
+  front_cover_regenerations?: number;
+  back_cover_url?: string | null;
+  back_cover_prompt?: string | null;
+  back_cover_regenerations?: number;
   
   createdAt: string;
   updatedAt: string;
