@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 interface QAScreenProps {
-  qaChecks: { name: string; status: 'pending' | 'checking' | 'passed' | 'warning' }[];
+  qaChecks: { name: string; status: 'pending' | 'checking' | 'passed' | 'warning' | 'failed'; detail?: string }[];
   isChecking: boolean;
   onAcknowledge: () => void;
 }

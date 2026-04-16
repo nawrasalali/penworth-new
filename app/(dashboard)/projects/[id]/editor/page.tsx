@@ -28,6 +28,7 @@ import { ResearchScreen } from '@/components/editor/ResearchScreen';
 import { OutlineScreen } from '@/components/editor/OutlineScreen';
 import { WritingScreen } from '@/components/editor/WritingScreen';
 import { QAScreen } from '@/components/editor/QAScreen';
+import { CoverDesignScreen } from '@/components/editor/CoverDesignScreen';
 import { PublishScreen } from '@/components/editor/PublishScreen';
 import { DocumentPreview } from '@/components/editor/DocumentPreview';
 
@@ -45,7 +46,7 @@ import {
 } from '@/types/agent-workflow';
 
 // Import interview system for questions
-import { getInterviewQuestions } from '@/lib/ai/agents/interview-system';
+import { getRichInterviewQuestions } from '@/lib/ai/agents/interview-system';
 
 // =============================================================================
 // TYPES
@@ -120,19 +121,19 @@ function NavigationSidebar({
   }
 
   return (
-    <div className="w-[240px] border-r bg-muted/20 flex flex-col">
+    <div className="w-[240px] shrink-0 border-r bg-muted/20 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="p-3 border-b flex items-center justify-between">
+      <div className="p-3 border-b flex items-center justify-between gap-2">
         <button
           onClick={onNavigateHome}
-          className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors"
+          className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors min-w-0 flex-1"
         >
-          <ArrowLeft className="h-4 w-4" />
-          <span className="truncate">{project?.title || 'Project'}</span>
+          <ArrowLeft className="h-4 w-4 shrink-0" />
+          <span className="truncate min-w-0">{project?.title || 'Project'}</span>
         </button>
         <button
           onClick={() => setCollapsed(true)}
-          className="p-1 hover:bg-muted rounded"
+          className="p-1 hover:bg-muted rounded shrink-0"
         >
           <X className="h-4 w-4" />
         </button>
@@ -207,15 +208,21 @@ function EditorContentNew() {
   const [project, setProject] = useState<Project | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [userCredits, setUserCredits] = useState(1000);
+  const [userCredits, setUserCredits] = useState(0);
   const [isFreeTier, setIsFreeTier] = useState(true);
+  const [userProfile, setUserProfile] = useState<{
+    full_name?: string | null;
+    email?: string | null;
+    is_admin?: boolean;
+    plan?: string | null;
+  }>({});
 
   // Agent-specific state
   const [interviewQuestions, setInterviewQuestions] = useState<InterviewQuestion[]>([]);
   const [researchResources, setResearchResources] = useState<ResearchResource[]>([]);
   const [researchSteps, setResearchSteps] = useState<{ text: string; completed: boolean }[]>([]);
   const [outlineSections, setOutlineSections] = useState<OutlineSection[]>([]);
-  const [qaChecks, setQaChecks] = useState<{ name: string; status: 'pending' | 'checking' | 'passed' | 'warning' }[]>([]);
+  const [qaChecks, setQaChecks] = useState<{ name: string; status: 'pending' | 'checking' | 'passed' | 'warning' | 'failed'; detail?: string }[]>([]);
   const [currentChapterContent, setCurrentChapterContent] = useState('');
   
   // Processing states
@@ -233,12 +240,14 @@ function EditorContentNew() {
     outline: 'waiting',
     writing: 'waiting',
     qa: 'waiting',
+    cover: 'waiting',
     publishing: 'waiting',
   };
 
   // Author info
+  // Author info: session first (user already edited), else profile fallback
   const authorInfo: AuthorInfo = {
-    name: session?.author_name || '',
+    name: session?.author_name || userProfile.full_name || '',
     title: '',
     aboutAuthor: session?.about_author || '',
     photoUrl: session?.author_photo_url ?? undefined,
@@ -286,14 +295,9 @@ function EditorContentNew() {
         if (sessionData.session) {
           setSession(sessionData.session);
           
-          // Load interview questions based on content type
-          const questions = getInterviewQuestions(projectData.content_type);
-          setInterviewQuestions(questions.map((q, idx) => ({
-            id: `q-${idx}`,
-            question: q,
-            type: idx < 3 ? 'multiple_choice' : 'open',
-            options: idx < 3 ? ['Option A', 'Option B', 'Option C', 'Something else...'] : undefined,
-          })));
+          // Load interview questions based on content type with real options
+          const richQuestions = getRichInterviewQuestions(projectData.content_type);
+          setInterviewQuestions(richQuestions);
         }
 
         // Load chapters
@@ -307,25 +311,33 @@ function EditorContentNew() {
           setChapters(chaptersData);
         }
 
-        // Load user profile for credits
+        // Load user profile (correct columns from Supabase schema)
         const { data: profile } = await supabase
           .from('profiles')
-          .select('credits, subscription_tier')
+          .select('full_name, email, credits_balance, credits_purchased, plan, is_admin')
           .eq('id', user.id)
           .single();
 
         if (profile) {
-          setUserCredits(profile.credits || 0);
-          setIsFreeTier(!profile.subscription_tier || profile.subscription_tier === 'free');
+          const totalCredits = (profile.credits_balance || 0) + (profile.credits_purchased || 0);
+          setUserCredits(totalCredits);
+          setIsFreeTier(!profile.plan || profile.plan === 'free');
+          setUserProfile({
+            full_name: profile.full_name,
+            email: profile.email,
+            is_admin: profile.is_admin || false,
+            plan: profile.plan,
+          });
         }
 
-        // Initialize QA checks
+        // Initialize QA checks (labels match real endpoint)
         setQaChecks([
-          { name: 'Spell check', status: 'pending' },
-          { name: 'Grammar check', status: 'pending' },
-          { name: 'Plagiarism scan', status: 'pending' },
-          { name: 'Readability score', status: 'pending' },
-          { name: 'Formatting consistency', status: 'pending' },
+          { name: 'Chapter word count', status: 'pending' },
+          { name: 'AI filler phrases', status: 'pending' },
+          { name: 'Readability (Flesch)', status: 'pending' },
+          { name: 'Tonal consistency', status: 'pending' },
+          { name: 'Cross-chapter coherence', status: 'pending' },
+          { name: 'Structural completeness', status: 'pending' },
         ]);
 
       } catch (error) {
@@ -419,32 +431,47 @@ function EditorContentNew() {
     startResearch();
   };
 
-  // Start research process
+  // Start research process — real AI call
   const startResearch = async () => {
     setIsResearching(true);
     setResearchSteps([
-      { text: 'Searching academic databases...', completed: false },
-      { text: 'Finding relevant articles...', completed: false },
-      { text: 'Analyzing existing books...', completed: false },
-      { text: 'Gathering statistics...', completed: false },
-      { text: 'Compiling sources...', completed: false },
+      { text: 'Reading your interview answers...', completed: false },
+      { text: 'Identifying knowledge gaps...', completed: false },
+      { text: 'Generating credibility-tagged findings...', completed: false },
+      { text: 'Ranking by relevance to your idea...', completed: false },
+      { text: 'Compiling research foundation...', completed: false },
     ]);
 
-    // Simulate research steps
-    for (let i = 0; i < 5; i++) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setResearchSteps(prev => 
-        prev.map((step, idx) => idx <= i ? { ...step, completed: true } : step)
-      );
+    // Animate the steps optimistically while the real call runs
+    const stepInterval = setInterval(() => {
+      setResearchSteps(prev => {
+        const nextIncomplete = prev.findIndex(s => !s.completed);
+        if (nextIncomplete === -1) return prev;
+        return prev.map((s, i) => i === nextIncomplete ? { ...s, completed: true } : s);
+      });
+    }, 1200);
+
+    try {
+      const response = await fetch('/api/ai/research', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      const data = await response.json();
+      clearInterval(stepInterval);
+      setResearchSteps(prev => prev.map(s => ({ ...s, completed: true })));
+
+      if (data.error) {
+        toast.error(data.error);
+        setIsResearching(false);
+        return;
+      }
+
+      setResearchResources(data.resources || []);
+    } catch (err) {
+      clearInterval(stepInterval);
+      toast.error('Research failed. Please try again.');
     }
-
-    // Generate mock research resources
-    setResearchResources([
-      { id: 'r1', type: 'generated', title: 'Market Analysis Report 2024', summary: 'Comprehensive market trends...', isSelected: true },
-      { id: 'r2', type: 'generated', title: 'Industry Best Practices', summary: 'Key strategies for...', isSelected: true },
-      { id: 'r3', type: 'generated', title: 'Expert Interviews Compilation', summary: 'Insights from industry leaders...', isSelected: true },
-    ]);
-
     setIsResearching(false);
   };
 
@@ -487,37 +514,36 @@ function EditorContentNew() {
     startOutlineGeneration();
   };
 
-  // Start outline generation
+  // Start outline generation — real AI call
   const startOutlineGeneration = async () => {
     setIsGeneratingOutline(true);
-    
-    // Generate mock outline sections
-    const sections: OutlineSection[] = [
-      { id: 'fm1', type: 'front_matter', title: 'Introduction', status: 'pending' },
-      { id: 'fm2', type: 'front_matter', title: 'Preface', status: 'pending' },
-      { id: 'ch1', type: 'chapter', title: 'Chapter 1: Getting Started', description: 'Foundation concepts', status: 'pending' },
-      { id: 'ch2', type: 'chapter', title: 'Chapter 2: Core Principles', description: 'Key fundamentals', status: 'pending' },
-      { id: 'ch3', type: 'chapter', title: 'Chapter 3: Advanced Techniques', description: 'Expert strategies', status: 'pending' },
-      { id: 'ch4', type: 'chapter', title: 'Chapter 4: Real-World Applications', description: 'Practical examples', status: 'pending' },
-      { id: 'ch5', type: 'chapter', title: 'Chapter 5: Future Outlook', description: 'Emerging trends', status: 'pending' },
-      { id: 'bm1', type: 'back_matter', title: 'Conclusion', status: 'pending' },
-      { id: 'bm2', type: 'back_matter', title: 'References', status: 'pending' },
-    ];
 
-    setOutlineSections(sections);
+    try {
+      const response = await fetch('/api/ai/outline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      const data = await response.json();
 
-    // Simulate section generation
-    for (let i = 0; i < sections.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setOutlineSections(prev =>
-        prev.map((s, idx) => idx === i ? { ...s, status: 'generating' } : s)
-      );
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setOutlineSections(prev =>
-        prev.map((s, idx) => idx === i ? { ...s, status: 'complete' } : s)
-      );
+      if (data.error) {
+        toast.error(data.error);
+        setIsGeneratingOutline(false);
+        return;
+      }
+
+      // Animate sections appearing one-by-one for a "building outline" feel
+      const sections: OutlineSection[] = data.sections || [];
+      setOutlineSections(sections.map(s => ({ ...s, status: 'pending' as const })));
+      for (let i = 0; i < sections.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, 250));
+        setOutlineSections(prev =>
+          prev.map((s, idx) => idx === i ? { ...s, status: 'complete' as const } : s)
+        );
+      }
+    } catch (err) {
+      toast.error('Outline generation failed. Please try again.');
     }
-
     setIsGeneratingOutline(false);
   };
 
@@ -540,65 +566,133 @@ function EditorContentNew() {
     startWriting();
   };
 
-  // Start writing process
+  // Start writing process — triggers real Inngest writeBook (uses Opus)
   const startWriting = async () => {
     setIsWriting(true);
-    
-    // Create chapters from outline
-    const chapterSections = outlineSections.filter(s => s.type === 'chapter');
-    
-    for (let i = 0; i < chapterSections.length; i++) {
-      setCurrentChapterContent('');
-      
-      // Simulate streaming content
-      const sampleContent = `This is the beginning of ${chapterSections[i].title}. The content explores ${chapterSections[i].description || 'important topics'}...`;
-      
-      for (let j = 0; j < sampleContent.length; j++) {
-        await new Promise(resolve => setTimeout(resolve, 20));
-        setCurrentChapterContent(prev => prev + sampleContent[j]);
-      }
-      
-      // Update chapters list
-      setChapters(prev => [
-        ...prev,
-        {
-          id: `ch-${i}`,
-          title: chapterSections[i].title.replace(/Chapter \d+: /, ''),
-          content: sampleContent,
-          order_index: i,
-          status: 'complete',
-          word_count: sampleContent.split(' ').length,
-        },
-      ]);
-    }
+    setCurrentChapterContent('');
 
-    setIsWriting(false);
-    
-    // Advance to QA
-    await advanceToNextAgent({
-      currentChapter: chapterSections.length,
-      totalChapters: chapterSections.length,
-      progress: 100,
-    });
-    
-    // Start QA checks
-    startQAChecks();
+    try {
+      // Get the outline's chapter array (with keyPoints) from the session
+      const sessionResp = await fetch(`/api/interview-session?projectId=${projectId}`);
+      const sessionData = await sessionResp.json();
+      const outlineData = sessionData?.session?.outline_data;
+      const outlineChapters = outlineData?.chapters;
+
+      if (!outlineChapters || outlineChapters.length === 0) {
+        toast.error('No outline found. Please regenerate the outline first.');
+        setIsWriting(false);
+        return;
+      }
+
+      // Trigger Inngest durable book writing
+      const startResp = await fetch('/api/books/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          outline: { chapters: outlineChapters },
+          voiceProfile: {
+            tone: session?.follow_up_data?.style || 'professional',
+            style: session?.follow_up_data?.style || 'conversational',
+            vocabulary: session?.follow_up_data?.audience || 'general',
+          },
+        }),
+      });
+      const startData = await startResp.json();
+
+      if (startData.error) {
+        toast.error(startData.error);
+        setIsWriting(false);
+        return;
+      }
+
+      toast.info(`Writing ${startData.totalChapters} chapters. This typically takes 3-8 minutes.`);
+
+      // Subscribe to SSE for real-time progress
+      const eventSource = new EventSource(`/api/books/generate/stream?projectId=${projectId}`);
+      eventSource.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'chapter_started' || msg.type === 'chapter_update') {
+            setChapters(prev => {
+              const existing = prev.find(ch => ch.id === msg.chapter.id);
+              if (existing) {
+                return prev.map(ch => ch.id === msg.chapter.id ? { ...ch, ...msg.chapter } : ch);
+              }
+              return [...prev, {
+                id: msg.chapter.id,
+                title: msg.chapter.title,
+                content: '',
+                order_index: msg.chapter.order_index,
+                status: msg.chapter.status,
+                word_count: msg.chapter.word_count || 0,
+              }];
+            });
+          }
+          if (msg.type === 'complete') {
+            eventSource.close();
+            setIsWriting(false);
+            // Refresh chapters fully so we have actual content
+            supabase
+              .from('chapters')
+              .select('*')
+              .eq('project_id', projectId)
+              .order('order_index')
+              .then(({ data }) => {
+                if (data) setChapters(data);
+              });
+            // Advance to QA
+            advanceToNextAgent({
+              currentChapter: outlineChapters.length,
+              totalChapters: outlineChapters.length,
+              progress: 100,
+            }).then(() => startQAChecks());
+          }
+        } catch (err) {
+          console.error('SSE parse error:', err);
+        }
+      };
+      eventSource.onerror = () => {
+        eventSource.close();
+        setIsWriting(false);
+        toast.error('Lost connection to writing stream. Chapters may still be generating in the background.');
+      };
+    } catch (err) {
+      toast.error('Failed to start writing. Please try again.');
+      setIsWriting(false);
+    }
   };
 
-  // Start QA checks
+  // Start QA checks — real endpoint
   const startQAChecks = async () => {
     setIsCheckingQA(true);
-    
-    for (let i = 0; i < qaChecks.length; i++) {
-      setQaChecks(prev =>
-        prev.map((check, idx) => idx === i ? { ...check, status: 'checking' } : check)
-      );
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setQaChecks(prev =>
-        prev.map((check, idx) => idx === i ? { ...check, status: 'passed' } : check)
-      );
+    setQaChecks([
+      { name: 'Chapter word count', status: 'checking' },
+      { name: 'AI filler phrases', status: 'checking' },
+      { name: 'Readability (Flesch)', status: 'checking' },
+      { name: 'Tonal consistency', status: 'checking' },
+      { name: 'Cross-chapter coherence', status: 'checking' },
+      { name: 'Structural completeness', status: 'checking' },
+    ]);
+
+    try {
+      const response = await fetch('/api/ai/qa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      const data = await response.json();
+
+      if (data.error) {
+        toast.error(data.error);
+        setIsCheckingQA(false);
+        return;
+      }
+
+      setQaChecks(data.checks || []);
+    } catch (err) {
+      toast.error('QA checks failed. Please try again.');
     }
-    
     setIsCheckingQA(false);
   };
 
@@ -684,7 +778,7 @@ function EditorContentNew() {
   };
 
   // Handler: Upload author photo
-  const handleUploadAuthorPhoto = (file: File) => {
+  const handleUploadAuthorPhoto = async (file: File) => {
     toast.info('Photo upload coming soon');
   };
 
@@ -824,6 +918,26 @@ function EditorContentNew() {
             qaChecks={qaChecks}
             isChecking={isCheckingQA}
             onAcknowledge={handleQAAcknowledge}
+          />
+        );
+
+      case 'cover':
+        return (
+          <CoverDesignScreen
+            bookTitle={session?.book_title || project?.title || 'Untitled'}
+            authorInfo={authorInfo}
+            coverConfig={coverConfig}
+            userCredits={userCredits}
+            onUpdateAuthorInfo={handleUpdateAuthorInfo}
+            onGenerateCover={handleGenerateCover}
+            onUploadAuthorPhoto={handleUploadAuthorPhoto}
+            onApproveAndContinue={async () => {
+              await advanceToNextAgent({
+                frontCoverUrl: coverConfig.frontCoverUrl,
+                backCoverUrl: coverConfig.backCoverUrl,
+                approved: true,
+              });
+            }}
           />
         );
 

@@ -904,3 +904,34 @@ export function getInterviewQuestions(contentType: string): string[] {
   const questions = INTERVIEW_QUESTIONS[contentType as ContentType] || DEFAULT_QUESTIONS;
   return questions.map(q => q.question);
 }
+
+/**
+ * Get the full rich interview questions for a content type, mapped into the
+ * shape the UI's InterviewScreen expects. Preserves real options, helpText,
+ * and the "Something else..." escape hatch on every multiple-choice question.
+ */
+export function getRichInterviewQuestions(contentType: string): Array<{
+  id: string;
+  question: string;
+  type: 'open' | 'multiple_choice';
+  options?: string[];
+  helpText?: string;
+  followUp?: string;
+}> {
+  const questions = INTERVIEW_QUESTIONS[contentType as ContentType] || DEFAULT_QUESTIONS;
+  return questions.map((q) => {
+    // Collapse 'scale' and 'yes_no' into 'open' for the UI (it only handles
+    // 'open' vs 'multiple_choice' today). They read as open-ended text prompts.
+    const uiType: 'open' | 'multiple_choice' =
+      q.type === 'multiple_choice' ? 'multiple_choice' : 'open';
+
+    return {
+      id: q.id,
+      question: q.question,
+      type: uiType,
+      options: uiType === 'multiple_choice' ? q.options : undefined,
+      helpText: q.helpText,
+      followUp: q.followUp,
+    };
+  });
+}

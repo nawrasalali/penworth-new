@@ -16,7 +16,7 @@ export function AgentPipeline({
   activeMessages 
 }: AgentPipelineProps) {
   return (
-    <div className="w-[200px] border-r bg-muted/20 p-3 overflow-y-auto">
+    <div className="w-[200px] shrink-0 border-r bg-muted/20 p-3 overflow-y-auto">
       <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
         Agent Pipeline
       </h2>

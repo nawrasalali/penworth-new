@@ -58,7 +58,7 @@ export function DocumentPreview({
   const isBook = ['fiction', 'non-fiction', 'memoir', 'self-help', 'children', 'poetry', 'cookbook', 'travel', 'biography'].includes(contentType);
   
   return (
-    <div className="w-[300px] border-l bg-muted/10 p-4 overflow-y-auto flex flex-col">
+    <div className="w-[300px] shrink-0 border-l bg-muted/10 p-4 overflow-y-auto flex flex-col">
       {/* Document Preview */}
       <div className="mb-4">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">

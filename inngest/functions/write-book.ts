@@ -2,6 +2,7 @@ import { inngest } from '../client';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { buildSystemPrompt, getPromptById } from '@/lib/industry-prompts';
+import { modelFor, maxTokensFor, calculateCost as calcCostByTask } from '@/lib/ai/model-router';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -80,10 +81,11 @@ export const writeBook = inngest.createFunction(
           previousChaptersSummary: writtenChapters.map(c => c.title).join(', '),
         });
 
-        // Call Claude API for chapter content
+        // Chapter writing uses Opus — prose quality is the product.
+        const writeModel = modelFor('write_chapter');
         const response = await anthropic.messages.create({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 8192,
+          model: writeModel,
+          max_tokens: maxTokensFor('write_chapter'),
           system: getSystemPrompt(industry, voiceProfile),
           messages: [{ role: 'user', content: chapterPrompt }],
         });
@@ -107,7 +109,7 @@ export const writeBook = inngest.createFunction(
             word_count: wordCount,
             metadata: {
               generatedAt: new Date().toISOString(),
-              model: 'claude-sonnet-4-20250514',
+              model: writeModel,
               tokensUsed: {
                 input: response.usage.input_tokens,
                 output: response.usage.output_tokens,
@@ -131,14 +133,14 @@ export const writeBook = inngest.createFunction(
           })
           .eq('id', projectId);
 
-        // Log AI usage
+        // Log AI usage with correct model-based cost
         await supabase.from('usage').insert({
           user_id: userId,
           action_type: 'chapter_write',
           tokens_input: response.usage.input_tokens,
           tokens_output: response.usage.output_tokens,
-          model: 'claude-sonnet-4-20250514',
-          cost_usd: calculateCost(response.usage.input_tokens, response.usage.output_tokens),
+          model: writeModel,
+          cost_usd: calcCostByTask('write_chapter', response.usage.input_tokens, response.usage.output_tokens),
           metadata: { projectId, chapterId: chapter.id, chapterNumber: i + 1 },
         });
 
@@ -302,12 +304,6 @@ function getSystemPrompt(industry: string, voiceProfile?: VoiceProfile, customIn
   basePrompt += `\n\n## Formatting Requirements\n- Write clear, engaging, and authoritative content\n- Use well-structured paragraphs with clear headings and sections\n- Include practical examples and actionable insights\n- Avoid filler content or unnecessary repetition\n- Format properly for publication`;
 
   return basePrompt;
-}
-
-function calculateCost(inputTokens: number, outputTokens: number): number {
-  const inputCost = (inputTokens / 1_000_000) * 3.00;
-  const outputCost = (outputTokens / 1_000_000) * 15.00;
-  return Number((inputCost + outputCost).toFixed(6));
 }
 
 export default writeBook;

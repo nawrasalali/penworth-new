@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
         outline: 'waiting',
         writing: 'waiting',
         qa: 'waiting',
+        cover: 'waiting',
         publishing: 'waiting',
       };
 
@@ -146,7 +147,7 @@ export async function POST(request: NextRequest) {
     }
 
     const agentOrder: AgentName[] = [
-      'validate', 'interview', 'research', 'outline', 'writing', 'qa', 'publishing'
+      'validate', 'interview', 'research', 'outline', 'writing', 'qa', 'cover', 'publishing'
     ];
 
     if (action === 'advance') {

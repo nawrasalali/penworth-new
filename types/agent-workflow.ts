@@ -10,6 +10,7 @@ export type AgentName =
   | 'outline' 
   | 'writing' 
   | 'qa' 
+  | 'cover'
   | 'publishing';
 
 export type AgentStatus = 'waiting' | 'active' | 'completed';
@@ -21,6 +22,7 @@ export interface AgentStatusMap {
   outline: AgentStatus;
   writing: AgentStatus;
   qa: AgentStatus;
+  cover: AgentStatus;
   publishing: AgentStatus;
 }
 
@@ -83,8 +85,16 @@ export const AGENTS: AgentInfo[] = [
     completedMessage: 'QA complete',
   },
   {
-    id: 'publishing',
+    id: 'cover',
     number: 7,
+    name: 'Cover Design Agent',
+    shortName: 'Cover',
+    activeMessage: 'Designing your cover...',
+    completedMessage: 'Cover approved',
+  },
+  {
+    id: 'publishing',
+    number: 8,
     name: 'Publishing Agent',
     shortName: 'Publishing',
     activeMessage: 'Preparing for publish...',

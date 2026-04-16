@@ -40,6 +40,7 @@ export function useAgentWorkflow({ projectId, onError }: UseAgentWorkflowOptions
       outline: 'waiting',
       writing: 'waiting',
       qa: 'waiting',
+      cover: 'waiting',
       publishing: 'waiting',
     },
   });
