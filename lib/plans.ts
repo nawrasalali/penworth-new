@@ -23,18 +23,20 @@ export const PLAN_LIMITS: Record<string, {
   creditRolloverMax: number;
   canBuyCredits: boolean;
   supportLevel: string;
+  freeDocumentFirstMonth?: boolean; // Only for free tier
 }> = {
   free: {
-    monthlyCredits: 1_000, // = 1 document/month
+    monthlyCredits: 1_000, // = 1 document for first month only
     models: ['claude-haiku-4.5'],
     exportFormats: ['pdf'],
-    hasBranding: true,
+    hasBranding: true, // Has small "by penworth.ai" watermark - removed on top-up or referral
     publishingConnectors: ['kdp'],
     industryPrompts: ['general'],
     marketplaceSell: false,
     creditRolloverMax: 0,
-    canBuyCredits: false,
+    canBuyCredits: true, // FREE USERS CAN TOP UP ANYTIME
     supportLevel: 'community',
+    freeDocumentFirstMonth: true, // 1 free document for first month only, then must top up or upgrade
   },
   pro: {
     monthlyCredits: 2_000, // = 2 documents/month
@@ -69,6 +71,60 @@ export const PLAN_LIMITS: Record<string, {
 export function getDocumentLimit(plan: string): number {
   const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
   return Math.floor(limits.monthlyCredits / CREDIT_COSTS.standardDocument);
+}
+
+/**
+ * Check if user should have branding/watermark removed
+ * Watermark is removed if:
+ * - User is on paid plan (Pro/Max)
+ * - User is on free plan but has topped up credits
+ * - User is on free plan but has successful referrals
+ */
+export function shouldHaveWatermark(
+  subscriptionTier: string,
+  hasToppedUp: boolean,
+  referralCount: number
+): boolean {
+  // Paid plans never have watermark
+  if (subscriptionTier === 'pro' || subscriptionTier === 'max') {
+    return false;
+  }
+  
+  // Free tier: remove watermark if topped up or has referrals
+  if (subscriptionTier === 'free' || !subscriptionTier) {
+    if (hasToppedUp || referralCount > 0) {
+      return false;
+    }
+    return true;
+  }
+  
+  return true;
+}
+
+/**
+ * Check if free user can still use their free monthly document
+ * Free tier gets 1 document free for the FIRST MONTH only
+ * After that, they must top up or upgrade to continue writing
+ * But their account stays active forever
+ */
+export function canUseFreeDocument(
+  accountCreatedAt: Date,
+  documentsCreatedThisMonth: number
+): boolean {
+  const now = new Date();
+  const accountCreatedDate = new Date(accountCreatedAt);
+  
+  // Check if within first month of account creation
+  const oneMonthAfterCreation = new Date(accountCreatedDate);
+  oneMonthAfterCreation.setMonth(oneMonthAfterCreation.getMonth() + 1);
+  
+  if (now <= oneMonthAfterCreation) {
+    // Within first month - can use 1 free document
+    return documentsCreatedThisMonth < 1;
+  }
+  
+  // After first month - must top up or upgrade
+  return false;
 }
 
 export const CREDIT_PACKS = [

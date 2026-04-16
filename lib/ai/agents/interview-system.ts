@@ -896,3 +896,11 @@ export function calculateProgress(
   const questions = INTERVIEW_QUESTIONS[contentType] || DEFAULT_QUESTIONS;
   return Math.round((state.answeredQuestions.size / questions.length) * 100);
 }
+
+/**
+ * Get interview questions for a content type as simple strings
+ */
+export function getInterviewQuestions(contentType: string): string[] {
+  const questions = INTERVIEW_QUESTIONS[contentType as ContentType] || DEFAULT_QUESTIONS;
+  return questions.map(q => q.question);
+}

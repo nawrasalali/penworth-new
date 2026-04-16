@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     // Handle credit pack purchase
     if (creditPackId) {
-      return handleCreditPackPurchase(user.id, creditPackId, supabase);
+      return handleCreditPackPurchase(user.id, creditPackId, supabase, user.email!);
     }
 
     // Handle subscription
@@ -163,22 +163,10 @@ export async function POST(request: NextRequest) {
 async function handleCreditPackPurchase(
   userId: string,
   creditPackId: string,
-  supabase: any
+  supabase: any,
+  userEmail: string
 ) {
-  // Check user is Pro or Max (free users cannot buy credits)
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('plan')
-    .eq('id', userId)
-    .single();
-
-  if (!profile || profile.plan === 'free') {
-    return NextResponse.json(
-      { error: 'Credit packs are only available for Pro and Max subscribers. Please upgrade first.' },
-      { status: 403 }
-    );
-  }
-
+  // All tiers can now buy credit packs (including free)
   const priceId = CREDIT_PACK_PRICES[creditPackId];
   if (!priceId) {
     return NextResponse.json({ error: 'Invalid credit pack' }, { status: 400 });
@@ -186,17 +174,66 @@ async function handleCreditPackPurchase(
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
 
-  // Get customer ID
+  // Get or create customer ID
   const { data: orgMember } = await supabase
     .from('org_members')
     .select('organizations(stripe_customer_id)')
     .eq('user_id', userId)
     .single();
 
-  const customerId = (orgMember?.organizations as any)?.stripe_customer_id;
+  let customerId = (orgMember?.organizations as any)?.stripe_customer_id;
 
+  // If no customer ID, create one (for free users buying their first credit pack)
   if (!customerId) {
-    return NextResponse.json({ error: 'No billing account found' }, { status: 400 });
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', userId)
+      .single();
+
+    const customer = await stripe.customers.create({
+      email: userEmail,
+      name: profile?.full_name || undefined,
+      metadata: {
+        supabase_user_id: userId,
+      },
+    });
+    customerId = customer.id;
+
+    // Save to organization (create one if needed)
+    let orgId: string | null = null;
+    const { data: existingOrg } = await supabase
+      .from('org_members')
+      .select('org_id')
+      .eq('user_id', userId)
+      .single();
+
+    if (existingOrg?.org_id) {
+      await supabase
+        .from('organizations')
+        .update({ stripe_customer_id: customerId })
+        .eq('id', existingOrg.org_id);
+    } else {
+      // Create organization for free user
+      const { data: newOrg } = await supabase
+        .from('organizations')
+        .insert({
+          name: profile?.full_name ? `${profile.full_name}'s Workspace` : 'My Workspace',
+          slug: `workspace-${userId.slice(0, 8)}`,
+          industry: 'general',
+          stripe_customer_id: customerId,
+        })
+        .select()
+        .single();
+
+      if (newOrg) {
+        await supabase.from('org_members').insert({
+          org_id: newOrg.id,
+          user_id: userId,
+          role: 'owner',
+        });
+      }
+    }
   }
 
   const session = await stripe.checkout.sessions.create({
@@ -214,6 +251,7 @@ async function handleCreditPackPurchase(
     metadata: {
       user_id: userId,
       credit_pack_id: creditPackId,
+      price_id: priceId, // Add price_id for webhook to identify credits amount
     },
   });
 

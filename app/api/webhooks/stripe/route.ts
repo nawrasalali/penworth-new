@@ -8,6 +8,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
+// Credit pack price IDs
+const CREDIT_PACK_PRICES = {
+  'price_1TM90DDAwDFDea8LXyYMDoYU': 1000,  // 1000 credits
+  'price_1TM91IDAwDFDea8LFYWHxO1C': 3000,  // 3000 credits
+  'price_1TM91zDAwDFDea8LlLpGQetJ': 10000, // 10000 credits
+};
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text();
@@ -28,6 +35,38 @@ export async function POST(request: NextRequest) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         
+        // Handle credit pack purchase (one-time payment)
+        if (session.mode === 'payment') {
+          const userId = session.metadata?.user_id;
+          const priceId = session.metadata?.price_id;
+          
+          if (userId && priceId && priceId in CREDIT_PACK_PRICES) {
+            const creditsToAdd = CREDIT_PACK_PRICES[priceId as keyof typeof CREDIT_PACK_PRICES];
+            
+            // Get current profile
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('credits_balance, credits_purchased, has_purchased_credits')
+              .eq('id', userId)
+              .single();
+            
+            if (profile) {
+              // Add credits and set has_purchased_credits flag (removes watermark for free users)
+              await supabase
+                .from('profiles')
+                .update({
+                  credits_balance: (profile.credits_balance || 0) + creditsToAdd,
+                  credits_purchased: (profile.credits_purchased || 0) + creditsToAdd,
+                  has_purchased_credits: true, // This removes the watermark for free users
+                })
+                .eq('id', userId);
+              
+              console.log(`Added ${creditsToAdd} credits to user ${userId}`);
+            }
+          }
+        }
+        
+        // Handle subscription
         if (session.mode === 'subscription') {
           const subscription = await stripe.subscriptions.retrieve(
             session.subscription as string
@@ -55,8 +94,15 @@ export async function POST(request: NextRequest) {
               })
               .eq('id', orgId);
           } else if (userId) {
-            // For individual subscriptions, we'd update the user profile
-            // This could be extended based on your needs
+            // For individual subscriptions, update user profile
+            await supabase
+              .from('profiles')
+              .update({
+                subscription_tier: tier,
+                stripe_customer_id: customerId,
+                stripe_subscription_id: subscription.id,
+              })
+              .eq('id', userId);
           }
         }
         break;

@@ -17,6 +17,18 @@ import {
   MessageSquare,
   FileText,
   Upload,
+  Bot,
+  Search,
+  PenTool,
+  ShieldCheck,
+  Rocket,
+  Library,
+  Users,
+  CreditCard,
+  Headphones,
+  Clock,
+  Award,
+  Brain,
 } from 'lucide-react';
 
 // All supported languages with their subdomains (11 total)
@@ -34,27 +46,123 @@ const LANGUAGES = [
   { code: 'hi', name: 'हिन्दी', subdomain: 'hi', flag: '🇮🇳' },
 ];
 
+// Document types for the new section
+const DOCUMENT_TYPES = {
+  en: {
+    title: 'Create Any Document Type',
+    subtitle: 'From books to business plans, Penworth handles them all',
+    categories: [
+      {
+        name: 'Books',
+        types: ['Fiction', 'Non-Fiction', 'Memoir', 'Self-Help', 'Biography', 'Children\'s Books', 'Poetry', 'Cookbook', 'Travel Guide'],
+      },
+      {
+        name: 'Academic & Scientific',
+        types: ['Research Papers', 'Thesis', 'Dissertations', 'Technical Documentation', 'White Papers'],
+      },
+      {
+        name: 'Business & Finance',
+        types: ['Business Plans', 'Financial Reports', 'Proposals', 'Case Studies', 'Market Analysis'],
+      },
+    ],
+  },
+  ar: {
+    title: 'أنشئ أي نوع من المستندات',
+    subtitle: 'من الكتب إلى خطط العمل، Penworth يتعامل معها جميعاً',
+    categories: [
+      {
+        name: 'الكتب',
+        types: ['روايات', 'غير خيالي', 'مذكرات', 'تطوير ذاتي', 'سيرة ذاتية', 'كتب أطفال', 'شعر', 'كتب طبخ', 'دليل سفر'],
+      },
+      {
+        name: 'أكاديمي وعلمي',
+        types: ['أوراق بحثية', 'رسائل ماجستير', 'رسائل دكتوراه', 'توثيق تقني', 'أوراق بيضاء'],
+      },
+      {
+        name: 'أعمال ومالية',
+        types: ['خطط عمل', 'تقارير مالية', 'مقترحات', 'دراسات حالة', 'تحليل سوق'],
+      },
+    ],
+  },
+};
+
+// AI Agents data
+const AI_AGENTS = {
+  en: {
+    title: 'Powered by 7 Specialized AI Agents',
+    subtitle: 'Each agent is an expert in their domain, powered by Claude — the world\'s most capable AI',
+    agents: [
+      { name: 'Validator Agent', description: 'Scores your idea against market demand, audience clarity, and commercial viability before you start', icon: ShieldCheck },
+      { name: 'Interview Agent', description: 'Conducts an intelligent conversation to extract your expertise, vision, and unique perspective', icon: MessageSquare },
+      { name: 'Research Agent', description: 'Gathers credible sources, statistics, and relevant data to strengthen your document', icon: Search },
+      { name: 'Outline Agent', description: 'Creates a professional structure with chapters, sections, and logical flow', icon: FileText },
+      { name: 'Writing Agent', description: 'Transforms your outline into polished, engaging content in your voice', icon: PenTool },
+      { name: 'QA Agent', description: 'Checks grammar, readability, consistency, and plagiarism automatically', icon: Shield },
+      { name: 'Publishing Agent', description: 'Formats for KDP, generates covers, and prepares for 17+ publishing platforms', icon: Rocket },
+    ],
+  },
+  ar: {
+    title: 'مدعوم بـ 7 وكلاء ذكاء اصطناعي متخصصين',
+    subtitle: 'كل وكيل خبير في مجاله، مدعوم بـ Claude - أقوى ذكاء اصطناعي في العالم',
+    agents: [
+      { name: 'وكيل التحقق', description: 'يقيّم فكرتك بناءً على طلب السوق ووضوح الجمهور والجدوى التجارية', icon: ShieldCheck },
+      { name: 'وكيل المقابلة', description: 'يجري محادثة ذكية لاستخراج خبرتك ورؤيتك', icon: MessageSquare },
+      { name: 'وكيل البحث', description: 'يجمع مصادر موثوقة وإحصاءات لتقوية مستندك', icon: Search },
+      { name: 'وكيل المخطط', description: 'ينشئ هيكلاً احترافياً بالفصول والأقسام', icon: FileText },
+      { name: 'وكيل الكتابة', description: 'يحول مخططك إلى محتوى متقن وجذاب', icon: PenTool },
+      { name: 'وكيل الجودة', description: 'يتحقق من القواعد والقراءة والاتساق تلقائياً', icon: Shield },
+      { name: 'وكيل النشر', description: 'يُهيئ لـ KDP وينشئ الأغلفة ويُعد لـ 17+ منصة', icon: Rocket },
+    ],
+  },
+};
+
+// Benefits data
+const BENEFITS = {
+  en: {
+    title: 'Why Authors Choose Penworth',
+    items: [
+      { title: 'Lifetime Account', description: 'Your library is saved forever. Access your documents anytime, from any device.', icon: Library },
+      { title: 'Publishing Marketplace', description: 'Publish to our marketplace where readers can discover and buy your work.', icon: Users },
+      { title: 'One-Click Publishing', description: 'We handle formatting, covers, and distribution. Just click publish.', icon: Zap },
+      { title: 'Top Up Anytime', description: 'All tiers can purchase credit packs whenever needed. No restrictions.', icon: CreditCard },
+      { title: 'Audiobooks Coming Soon', description: 'AI-powered audiobook generation is in our pipeline. Stay tuned!', icon: Headphones },
+      { title: 'Fast Creation', description: 'Go from idea to publication-ready document in hours, not months.', icon: Clock },
+    ],
+  },
+  ar: {
+    title: 'لماذا يختار المؤلفون Penworth',
+    items: [
+      { title: 'حساب مدى الحياة', description: 'مكتبتك محفوظة للأبد. الوصول لمستنداتك في أي وقت.', icon: Library },
+      { title: 'سوق النشر', description: 'انشر في سوقنا حيث يمكن للقراء اكتشاف وشراء عملك.', icon: Users },
+      { title: 'نشر بنقرة واحدة', description: 'نتولى التنسيق والأغلفة والتوزيع. فقط انقر نشر.', icon: Zap },
+      { title: 'شحن رصيد في أي وقت', description: 'جميع المستويات يمكنها شراء حزم رصيد عند الحاجة.', icon: CreditCard },
+      { title: 'الكتب الصوتية قريباً', description: 'إنشاء كتب صوتية بالذكاء الاصطناعي في خططنا المستقبلية.', icon: Headphones },
+      { title: 'إنشاء سريع', description: 'من الفكرة إلى مستند جاهز للنشر في ساعات، ليس أشهر.', icon: Clock },
+    ],
+  },
+};
+
 const translations = {
   en: {
     nav: { features: 'Features', pricing: 'Pricing', login: 'Log in', getStarted: 'Get Started' },
     hero: {
-      badge: 'AI-Powered Book Creation',
-      title: 'Write your book.',
+      badge: 'AI-Powered Document Creation',
+      title: 'Write your document.',
       titleHighlight: 'AI does the rest.',
-      subtitle: 'From idea to published book in 48 hours. Penworth transforms your expertise into professionally written, publication-ready books with AI.',
+      subtitle: 'From idea to final documents in hours. Penworth transforms your expertise into professionally written, publication-ready documents with AI.',
       cta: 'Start Writing Free',
       ctaSecondary: 'See How It Works',
       noCard: 'No credit card required',
-      freeCredits: '1,000 free credits',
+      freeCredits: '1 free document per month',
     },
     features: {
       title: 'Everything you need to publish',
-      subtitle: 'Professional book creation, powered by AI',
+      subtitle: 'Professional document creation, powered by AI',
       items: [
         { title: 'AI Interview', description: 'Our AI interviews you about your topic, extracting your unique expertise and perspective.' },
-        { title: 'Smart Outline', description: 'Generate a structured book outline that captures your vision and organizes your ideas.' },
-        { title: 'Chapter Writing', description: 'AI writes each chapter in your voice, maintaining consistency throughout your book.' },
-        { title: 'One-Click Publishing', description: 'Export to PDF, DOCX, or publish directly to Amazon KDP with a single click.' },
+        { title: 'Smart Outline', description: 'Generate a structured document outline that captures your vision and organizes your ideas.' },
+        { title: 'Chapter Writing', description: 'AI writes each section in your voice, maintaining consistency throughout your document.' },
+        { title: 'One-Click Publishing', description: 'Export to PDF, DOCX, or publish directly to Amazon KDP and 16 other platforms.' },
       ],
     },
     pricing: {
@@ -63,36 +171,99 @@ const translations = {
       monthly: 'Monthly',
       annual: 'Annual',
       save: 'Save 17%',
+      allCanTopUp: '✨ All tiers can top up credits anytime',
       plans: {
-        free: { name: 'Free', price: '$0', description: 'Perfect for trying Penworth', features: ['1,000 credits (1 book)', 'PDF export with branding', 'Amazon KDP publishing', 'Basic AI model'], cta: 'Get Started' },
-        pro: { name: 'Pro', price: '$19', priceAnnual: '$190', period: '/month', periodAnnual: '/year', description: 'For serious authors', features: ['2,000 credits (2 books)', 'PDF & DOCX export', 'No branding', 'Advanced AI model', 'Buy extra credit packs'], cta: 'Start Pro', popular: true },
-        max: { name: 'Max', price: '$49', priceAnnual: '$490', period: '/month', periodAnnual: '/year', description: 'For power users', features: ['5,000 credits (5 books)', 'All export formats', 'All publishing platforms', 'Premium AI model', 'Credit rollover', 'Priority support'], cta: 'Start Max' },
+        free: { 
+          name: 'Free', 
+          price: '$0', 
+          description: 'Perfect for trying Penworth', 
+          features: [
+            '1 document free for first month', 
+            'PDF export with small watermark', 
+            'Amazon KDP publishing', 
+            'Basic AI model',
+            'Top up credits anytime',
+            'Watermark removed when you top up',
+          ], 
+          cta: 'Get Started',
+          note: 'Account stays active forever',
+        },
+        pro: { 
+          name: 'Pro', 
+          price: '$19', 
+          priceAnnual: '$190', 
+          period: '/month', 
+          periodAnnual: '/year', 
+          description: 'For serious authors', 
+          features: [
+            '2,000 credits (2 documents)', 
+            'PDF & DOCX export', 
+            'No watermark', 
+            'Advanced AI model', 
+            'Top up credit packs anytime',
+          ], 
+          cta: 'Start Pro', 
+          popular: true 
+        },
+        max: { 
+          name: 'Max', 
+          price: '$49', 
+          priceAnnual: '$490', 
+          period: '/month', 
+          periodAnnual: '/year', 
+          description: 'For power users', 
+          features: [
+            '5,000 credits (5 documents)', 
+            'All export formats', 
+            'All 17 publishing platforms', 
+            'Premium AI model', 
+            'Credit rollover', 
+            'Priority support',
+          ], 
+          cta: 'Start Max' 
+        },
       },
-      creditPacks: { title: 'Need more credits?', subtitle: 'Credit packs for Pro and Max subscribers', packs: [{ credits: '1,000', price: '$39', label: 'Single' }, { credits: '3,000', price: '$99', label: 'Triple' }, { credits: '10,000', price: '$290', label: 'Bulk' }] },
+      creditPacks: { 
+        title: 'Need more credits?', 
+        subtitle: 'Credit packs available for ALL tiers — including Free!', 
+        packs: [
+          { credits: '1,000', price: '$39', label: 'Single' }, 
+          { credits: '3,000', price: '$99', label: 'Triple' }, 
+          { credits: '10,000', price: '$290', label: 'Bulk' }
+        ] 
+      },
     },
-    cta: { title: 'Ready to write your book?', subtitle: 'Join thousands of authors who have published with Penworth.', button: 'Start Writing Free' },
-    footer: { copyright: '© 2026 A.C.N. 675 668 710 PTY LTD. All rights reserved.', privacy: 'Privacy', terms: 'Terms' },
+    cta: { 
+      title: 'Ready to write your document?', 
+      subtitle: 'Join thousands of authors who have published with Penworth.', 
+      button: 'Start Writing Free' 
+    },
+    footer: { 
+      copyright: '© 2026 A.C.N. 675 668 710 PTY LTD. All rights reserved.', 
+      privacy: 'Privacy', 
+      terms: 'Terms' 
+    },
   },
   ar: {
     nav: { features: 'المميزات', pricing: 'الأسعار', login: 'تسجيل الدخول', getStarted: 'ابدأ الآن' },
     hero: {
-      badge: 'إنشاء الكتب بالذكاء الاصطناعي',
-      title: 'اكتب كتابك.',
+      badge: 'إنشاء المستندات بالذكاء الاصطناعي',
+      title: 'اكتب مستندك.',
       titleHighlight: 'الذكاء الاصطناعي يفعل الباقي.',
-      subtitle: 'من الفكرة إلى الكتاب المنشور في 48 ساعة. يحول Penworth خبرتك إلى كتب مكتوبة باحتراف وجاهزة للنشر.',
+      subtitle: 'من الفكرة إلى المستندات النهائية في ساعات. يحول Penworth خبرتك إلى مستندات مكتوبة باحتراف وجاهزة للنشر.',
       cta: 'ابدأ الكتابة مجاناً',
       ctaSecondary: 'شاهد كيف يعمل',
       noCard: 'لا حاجة لبطاقة ائتمان',
-      freeCredits: '1,000 رصيد مجاني',
+      freeCredits: 'مستند واحد مجاني شهرياً',
     },
     features: {
       title: 'كل ما تحتاجه للنشر',
-      subtitle: 'إنشاء كتب احترافية بقوة الذكاء الاصطناعي',
+      subtitle: 'إنشاء مستندات احترافية بقوة الذكاء الاصطناعي',
       items: [
         { title: 'مقابلة الذكاء الاصطناعي', description: 'يجري الذكاء الاصطناعي مقابلة معك حول موضوعك.' },
-        { title: 'مخطط ذكي', description: 'إنشاء مخطط كتاب منظم يلتقط رؤيتك.' },
-        { title: 'كتابة الفصول', description: 'يكتب الذكاء الاصطناعي كل فصل بصوتك.' },
-        { title: 'نشر بنقرة واحدة', description: 'تصدير إلى PDF أو النشر على Amazon KDP.' },
+        { title: 'مخطط ذكي', description: 'إنشاء مخطط مستند منظم يلتقط رؤيتك.' },
+        { title: 'كتابة الأقسام', description: 'يكتب الذكاء الاصطناعي كل قسم بصوتك.' },
+        { title: 'نشر بنقرة واحدة', description: 'تصدير إلى PDF أو النشر على Amazon KDP و16 منصة أخرى.' },
       ],
     },
     pricing: {
@@ -101,15 +272,78 @@ const translations = {
       monthly: 'شهري',
       annual: 'سنوي',
       save: 'وفر 17%',
+      allCanTopUp: '✨ جميع المستويات يمكنها شحن الرصيد في أي وقت',
       plans: {
-        free: { name: 'مجاني', price: '$0', description: 'مثالي للتجربة', features: ['1,000 رصيد (كتاب واحد)', 'تصدير PDF', 'نشر Amazon KDP', 'نموذج AI أساسي'], cta: 'ابدأ الآن' },
-        pro: { name: 'برو', price: '$19', priceAnnual: '$190', period: '/شهر', periodAnnual: '/سنة', description: 'للمؤلفين الجادين', features: ['2,000 رصيد (كتابان)', 'تصدير PDF و DOCX', 'بدون علامة تجارية', 'نموذج AI متقدم'], cta: 'ابدأ برو', popular: true },
-        max: { name: 'ماكس', price: '$49', priceAnnual: '$490', period: '/شهر', periodAnnual: '/سنة', description: 'للمحترفين', features: ['5,000 رصيد (5 كتب)', 'جميع الصيغ', 'جميع المنصات', 'دعم ذو أولوية'], cta: 'ابدأ ماكس' },
+        free: { 
+          name: 'مجاني', 
+          price: '$0', 
+          description: 'مثالي للتجربة', 
+          features: [
+            'مستند واحد مجاني للشهر الأول', 
+            'تصدير PDF مع علامة صغيرة', 
+            'نشر Amazon KDP', 
+            'نموذج AI أساسي',
+            'شحن الرصيد في أي وقت',
+            'تُزال العلامة عند الشحن',
+          ], 
+          cta: 'ابدأ الآن',
+          note: 'الحساب يبقى نشطاً للأبد',
+        },
+        pro: { 
+          name: 'برو', 
+          price: '$19', 
+          priceAnnual: '$190', 
+          period: '/شهر', 
+          periodAnnual: '/سنة', 
+          description: 'للمؤلفين الجادين', 
+          features: [
+            '2,000 رصيد (مستندان)', 
+            'تصدير PDF و DOCX', 
+            'بدون علامة تجارية', 
+            'نموذج AI متقدم',
+            'شحن حزم رصيد في أي وقت',
+          ], 
+          cta: 'ابدأ برو', 
+          popular: true 
+        },
+        max: { 
+          name: 'ماكس', 
+          price: '$49', 
+          priceAnnual: '$490', 
+          period: '/شهر', 
+          periodAnnual: '/سنة', 
+          description: 'للمحترفين', 
+          features: [
+            '5,000 رصيد (5 مستندات)', 
+            'جميع الصيغ', 
+            'جميع 17 منصة نشر', 
+            'نموذج AI متميز',
+            'ترحيل الرصيد',
+            'دعم ذو أولوية',
+          ], 
+          cta: 'ابدأ ماكس' 
+        },
       },
-      creditPacks: { title: 'تحتاج المزيد؟', subtitle: 'حزم رصيد إضافية', packs: [{ credits: '1,000', price: '$39', label: 'فردي' }, { credits: '3,000', price: '$99', label: 'ثلاثي' }, { credits: '10,000', price: '$290', label: 'جماعي' }] },
+      creditPacks: { 
+        title: 'تحتاج المزيد من الرصيد؟', 
+        subtitle: 'حزم الرصيد متاحة لجميع المستويات — بما فيها المجاني!', 
+        packs: [
+          { credits: '1,000', price: '$39', label: 'فردي' }, 
+          { credits: '3,000', price: '$99', label: 'ثلاثي' }, 
+          { credits: '10,000', price: '$290', label: 'جماعي' }
+        ] 
+      },
     },
-    cta: { title: 'مستعد لكتابة كتابك؟', subtitle: 'انضم لآلاف المؤلفين.', button: 'ابدأ الكتابة مجاناً' },
-    footer: { copyright: '© 2026 A.C.N. 675 668 710 PTY LTD', privacy: 'الخصوصية', terms: 'الشروط' },
+    cta: { 
+      title: 'مستعد لكتابة مستندك؟', 
+      subtitle: 'انضم لآلاف المؤلفين.', 
+      button: 'ابدأ الكتابة مجاناً' 
+    },
+    footer: { 
+      copyright: '© 2026 A.C.N. 675 668 710 PTY LTD', 
+      privacy: 'الخصوصية', 
+      terms: 'الشروط' 
+    },
   },
 };
 
@@ -123,6 +357,9 @@ export default function HomePage() {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('annual');
   
   const t = translations[lang];
+  const docTypes = DOCUMENT_TYPES[lang];
+  const agents = AI_AGENTS[lang];
+  const benefits = BENEFITS[lang];
   const isRTL = lang === 'ar';
   const currentLang = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0];
 
@@ -161,11 +398,12 @@ export default function HomePage() {
 
             <nav className="hidden md:flex items-center gap-8">
               <Link href="#features" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors">{t.nav.features}</Link>
+              <Link href="#agents" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors">AI Agents</Link>
               <Link href="#pricing" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors">{t.nav.pricing}</Link>
             </nav>
 
             <div className="flex items-center gap-2">
-              {/* Language Selector - All 10 Languages */}
+              {/* Language Selector */}
               <div className="relative">
                 <button onClick={() => setLangMenuOpen(!langMenuOpen)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
                   <Globe className="h-4 w-4" />
@@ -239,6 +477,31 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* Document Types Section */}
+        <section className="py-24 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">{docTypes.title}</h2>
+              <p className="text-lg text-neutral-600 dark:text-neutral-400">{docTypes.subtitle}</p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+              {docTypes.categories.map((category, i) => (
+                <div key={i} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
+                  <h3 className="font-semibold text-lg mb-4 text-amber-600 dark:text-amber-400">{category.name}</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {category.types.map((type, j) => (
+                      <span key={j} className="inline-block rounded-full bg-neutral-100 dark:bg-neutral-800 px-3 py-1 text-sm text-neutral-600 dark:text-neutral-400">
+                        {type}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Features */}
         <section id="features" className="py-24 border-t border-neutral-200 dark:border-neutral-800">
           <div className="mx-auto max-w-6xl px-6">
@@ -265,14 +528,73 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* AI Agents Section */}
+        <section id="agents" className="py-24 border-t border-neutral-200 dark:border-neutral-800 bg-gradient-to-b from-neutral-50 to-white dark:from-neutral-900/50 dark:to-neutral-950">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="text-center mb-16">
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-2 mb-6">
+                <Brain className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <span className="text-sm font-medium text-amber-600 dark:text-amber-400">Powered by Claude</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">{agents.title}</h2>
+              <p className="text-lg text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto">{agents.subtitle}</p>
+            </div>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {agents.agents.map((agent, i) => {
+                const Icon = agent.icon;
+                return (
+                  <div key={i} className="relative group rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 hover:border-amber-500/50 hover:shadow-xl hover:shadow-amber-500/5 transition-all">
+                    <div className="absolute top-4 right-4 text-xs font-medium text-neutral-400 dark:text-neutral-600">
+                      {i + 1}/7
+                    </div>
+                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/20">
+                      <Icon className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="font-semibold mb-2">{agent.name}</h3>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">{agent.description}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* Benefits Section */}
+        <section className="py-24 border-t border-neutral-200 dark:border-neutral-800">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">{benefits.title}</h2>
+            </div>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {benefits.items.map((benefit, i) => {
+                const Icon = benefit.icon;
+                return (
+                  <div key={i} className="flex gap-4 p-6 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+                    <div className="flex-shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20">
+                      <Icon className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-1">{benefit.title}</h3>
+                      <p className="text-sm text-neutral-600 dark:text-neutral-400">{benefit.description}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
         {/* Pricing */}
         <section id="pricing" className="py-24 bg-neutral-50 dark:bg-neutral-900/50">
           <div className="mx-auto max-w-6xl px-6">
             <div className="text-center mb-12">
               <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">{t.pricing.title}</h2>
-              <p className="text-lg text-neutral-600 dark:text-neutral-400 mb-8">{t.pricing.subtitle}</p>
+              <p className="text-lg text-neutral-600 dark:text-neutral-400 mb-4">{t.pricing.subtitle}</p>
+              <p className="text-sm font-medium text-amber-600 dark:text-amber-400">{t.pricing.allCanTopUp}</p>
 
-              <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-1">
+              <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-1 mt-8">
                 <button onClick={() => setBillingPeriod('monthly')} className={`rounded-full px-5 py-2.5 text-sm font-medium transition-all ${billingPeriod === 'monthly' ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-sm' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'}`}>{t.pricing.monthly}</button>
                 <button onClick={() => setBillingPeriod('annual')} className={`rounded-full px-5 py-2.5 text-sm font-medium transition-all flex items-center gap-2 ${billingPeriod === 'annual' ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-sm' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'}`}>
                   {t.pricing.annual}
@@ -287,9 +609,10 @@ export default function HomePage() {
                 <h3 className="font-semibold text-lg mb-1">{t.pricing.plans.free.name}</h3>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">{t.pricing.plans.free.description}</p>
                 <div className="mb-6"><span className="text-4xl font-bold">{t.pricing.plans.free.price}</span></div>
-                <ul className="space-y-3 mb-8">
+                <ul className="space-y-3 mb-4">
                   {t.pricing.plans.free.features.map((f, i) => <li key={i} className="flex items-start gap-3 text-sm"><Check className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" /><span className="text-neutral-600 dark:text-neutral-400">{f}</span></li>)}
                 </ul>
+                <p className="text-xs text-amber-600 dark:text-amber-400 mb-4">{t.pricing.plans.free.note}</p>
                 <Link href="/signup" className="block w-full rounded-xl border border-neutral-300 dark:border-neutral-700 py-3 text-center font-medium hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">{t.pricing.plans.free.cta}</Link>
               </div>
 
@@ -329,11 +652,11 @@ export default function HomePage() {
               <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-6">{t.pricing.creditPacks.subtitle}</p>
               <div className="flex flex-wrap items-center justify-center gap-4">
                 {t.pricing.creditPacks.packs.map((pack, i) => (
-                  <div key={i} className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-6 py-4 text-center hover:border-amber-500/50 transition-colors">
+                  <Link key={i} href="/billing" className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-6 py-4 text-center hover:border-amber-500/50 transition-colors">
                     <div className="font-semibold text-lg">{pack.credits}</div>
                     <div className="text-xs text-neutral-500">{pack.label}</div>
                     <div className="text-amber-600 dark:text-amber-400 font-bold mt-1">{pack.price}</div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>

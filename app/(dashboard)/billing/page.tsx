@@ -28,15 +28,16 @@ const PLANS = [
     monthlyPrice: 0,
     annualPrice: 0,
     features: [
-      '1,000 credits/month (1 document)',
+      '1,000 credits for first month (1 document)',
       'AI writing assistance',
       'PDF export',
       'Publish to Amazon KDP',
       'Community support',
+      'Top up credit packs anytime',
+      'Account stays active forever',
     ],
     limitations: [
-      '"Created with Penworth.ai" branding',
-      'Cannot purchase credit packs',
+      '"Created with Penworth.ai" branding (removed when you top up)',
     ],
   },
   {
@@ -191,11 +192,6 @@ function BillingContent() {
   };
 
   const handleBuyCreditPack = async (packId: string) => {
-    if (subscription?.plan === 'free') {
-      alert('Credit packs are only available for Pro and Max subscribers. Please upgrade first.');
-      return;
-    }
-
     setIsProcessing(true);
     try {
       const response = await fetch('/api/stripe/checkout', {
@@ -403,9 +399,14 @@ function BillingContent() {
           <Zap className="w-5 h-5 text-yellow-500" />
           <h2 className="text-xl font-semibold">Credit Add-On Packs</h2>
         </div>
-        <p className="text-muted-foreground mb-6">
-          Need more credits? Purchase add-on packs. Available for Pro and Max subscribers only.
+        <p className="text-muted-foreground mb-2">
+          Need more credits? Purchase add-on packs anytime. <strong>Available for ALL tiers!</strong>
         </p>
+        {subscription?.plan === 'free' && (
+          <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
+            ✨ Free users who purchase credits automatically have the "by Penworth" watermark removed!
+          </p>
+        )}
 
         <div className="grid gap-4 md:grid-cols-3">
           {CREDIT_PACKS.map((pack) => (
@@ -425,9 +426,9 @@ function BillingContent() {
                 variant="outline" 
                 className="w-full"
                 onClick={() => handleBuyCreditPack(pack.id)}
-                disabled={isProcessing || subscription?.plan === 'free'}
+                disabled={isProcessing}
               >
-                {subscription?.plan === 'free' ? 'Upgrade to Buy' : 'Buy Credits'}
+                Buy Credits
               </Button>
             </div>
           ))}
