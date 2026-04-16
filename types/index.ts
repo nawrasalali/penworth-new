@@ -321,3 +321,6 @@ export interface InviteMemberForm {
   email: string;
   role: OrgRole;
 }
+
+// Re-export agent workflow types
+export * from './agent-workflow';

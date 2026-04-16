@@ -1,375 +1,433 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Check, Lock, ExternalLink, Download, BookOpen, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import {
+  Rocket,
+  Download,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Check,
+  Sparkles,
+  BookOpen,
+  Globe,
+  Store,
+  ArrowLeft
+} from 'lucide-react';
 
-interface Platform {
+interface PublishingPlatform {
   id: string;
   name: string;
+  slug: string;
   description: string;
-  url: string;
-  available: boolean;
-  icon: string;
-  requiredPlan?: string;
+  website_url: string;
+  platform_type: 'self_publish' | 'traditional' | 'marketplace' | 'aggregator';
+  display_order: number;
 }
 
-interface Project {
+interface ProjectData {
   id: string;
   title: string;
   description: string;
+  content_type: string;
   status: string;
-  metadata: any;
+  metadata: {
+    author_name?: string;
+    about_author?: string;
+    word_count?: number;
+    chapter_count?: number;
+  };
 }
 
-export default function PublishPage() {
+function PublishingPageContent() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
   
-  const [project, setProject] = useState<Project | null>(null);
-  const [platforms, setPlatforms] = useState<Platform[]>([]);
-  const [userPlan, setUserPlan] = useState<string>('free');
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
-  const [publishingData, setPublishingData] = useState<any>(null);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [step, setStep] = useState<'select' | 'prepare' | 'instructions'>('select');
-
+  const [platforms, setPlatforms] = useState<PublishingPlatform[]>([]);
+  const [project, setProject] = useState<ProjectData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [expandedPlatform, setExpandedPlatform] = useState<string | null>(null);
+  const [generatingGuide, setGeneratingGuide] = useState<string | null>(null);
+  const [publishingToPenworth, setPublishingToPenworth] = useState(false);
+  const [publishedToPenworth, setPublishedToPenworth] = useState(false);
+  const [generatedGuides, setGeneratedGuides] = useState<Record<string, string>>({});
+  
   const supabase = createClient();
-
+  
   useEffect(() => {
     loadData();
   }, [projectId]);
-
+  
   const loadData = async () => {
-    setIsLoading(true);
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-
-    const { data: projectData } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('id', projectId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (!projectData) {
-      router.push('/projects');
-      return;
-    }
-
-    setProject(projectData);
-
-    const res = await fetch('/api/publish');
-    if (res.ok) {
-      const data = await res.json();
-      setPlatforms(data.platforms);
-      setUserPlan(data.plan);
-    }
-
-    setIsLoading(false);
-  };
-
-  const handleSelectPlatform = (platformId: string) => {
-    const platform = platforms.find(p => p.id === platformId);
-    if (!platform?.available) return;
-    
-    setSelectedPlatform(platformId);
-    setStep('prepare');
-  };
-
-  const handlePublish = async () => {
-    if (!selectedPlatform || !project) return;
-
-    setIsPublishing(true);
+    setLoading(true);
     try {
-      const res = await fetch('/api/publish', {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+      
+      // Load platforms from database
+      const { data: platformsData } = await supabase
+        .from('publishing_platforms')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order');
+      
+      // Load project
+      const { data: projectData } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+      
+      if (platformsData) setPlatforms(platformsData);
+      if (projectData) setProject(projectData);
+      
+      // Check if already published to Penworth
+      if (projectData) {
+        const { data: listing } = await supabase
+          .from('marketplace_listings')
+          .select('id')
+          .eq('project_id', projectId)
+          .eq('status', 'published')
+          .single();
+        
+        if (listing) setPublishedToPenworth(true);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handlePublishToPenworth = async () => {
+    if (!project) return;
+    
+    setPublishingToPenworth(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      
+      // Get user's tier
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('subscription_tier')
+        .eq('id', user.id)
+        .single();
+      
+      const isFreeTier = !profile?.subscription_tier || profile.subscription_tier === 'free';
+      
+      // Create marketplace listing
+      const { error } = await supabase
+        .from('marketplace_listings')
+        .insert({
+          project_id: project.id,
+          seller_id: user.id,
+          title: project.title,
+          description: project.description,
+          status: 'published',
+          published_at: new Date().toISOString(),
+          is_free_tier: isFreeTier,
+          word_count: project.metadata?.word_count || 0,
+          chapter_count: project.metadata?.chapter_count || 0,
+        });
+      
+      if (error) throw error;
+      
+      setPublishedToPenworth(true);
+    } catch (error) {
+      console.error('Error publishing to Penworth:', error);
+    } finally {
+      setPublishingToPenworth(false);
+    }
+  };
+  
+  const handleGenerateGuide = async (platform: PublishingPlatform) => {
+    if (!project) return;
+    
+    setGeneratingGuide(platform.id);
+    try {
+      const response = await fetch('/api/publishing/generate-guide', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId: project.id,
-          platform: selectedPlatform,
-        }),
+          platformSlug: platform.slug,
+          projectData: {
+            title: project.title,
+            description: project.description,
+            authorName: project.metadata?.author_name || 'Author',
+            aboutAuthor: project.metadata?.about_author || '',
+            wordCount: project.metadata?.word_count || 0,
+            chapterCount: project.metadata?.chapter_count || 0,
+            contentType: project.content_type,
+          }
+        })
       });
-
-      const data = await res.json();
       
-      if (!res.ok) {
-        alert(data.error || 'Failed to prepare publishing');
-        return;
+      const data = await response.json();
+      
+      if (data.guide) {
+        setGeneratedGuides(prev => ({
+          ...prev,
+          [platform.id]: data.guide
+        }));
       }
-
-      setPublishingData(data);
-      setStep('instructions');
     } catch (error) {
-      alert('Failed to prepare publishing');
+      console.error('Error generating guide:', error);
     } finally {
-      setIsPublishing(false);
+      setGeneratingGuide(null);
     }
   };
-
-  const getPlatformIcon = (iconName: string) => {
-    switch (iconName) {
-      case 'amazon': return '📚';
-      case 'book': return '📖';
-      case 'share': return '🔗';
-      case 'printer': return '🖨️';
-      case 'play': return '▶️';
-      default: return '📄';
+  
+  const handleDownloadGuide = (platform: PublishingPlatform) => {
+    const guide = generatedGuides[platform.id];
+    if (!guide) return;
+    
+    const blob = new Blob([guide], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project?.title || 'book'}-${platform.slug}-guide.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  
+  const getPlatformIcon = (type: string) => {
+    switch (type) {
+      case 'marketplace': return <Store className="h-5 w-5" />;
+      case 'self_publish': return <BookOpen className="h-5 w-5" />;
+      case 'aggregator': return <Globe className="h-5 w-5" />;
+      default: return <BookOpen className="h-5 w-5" />;
     }
   };
-
-  if (isLoading) {
+  
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
-
-  if (!project) return null;
-
-  if (project.status !== 'complete') {
+  
+  if (!project) {
     return (
-      <div className="p-6 max-w-4xl mx-auto">
-        <Link href={`/projects/${projectId}/editor`} className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6">
-          <ArrowLeft className="w-4 h-4" />
-          Back to Editor
-        </Link>
+      <div className="p-6 max-w-4xl mx-auto text-center">
+        <p className="text-muted-foreground">Project not found</p>
+      </div>
+    );
+  }
+  
+  const penworthPlatform = platforms.find(p => p.slug === 'penworth');
+  const otherPlatforms = platforms.filter(p => p.slug !== 'penworth');
 
-        <div className="border rounded-lg p-8 text-center">
-          <BookOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Book Not Ready</h2>
-          <p className="text-muted-foreground mb-4">
-            Your book must be complete before you can publish. Current status: <strong>{project.status}</strong>
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="border-b">
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <Link 
+            href={`/projects/${projectId}/editor`} 
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Editor
+          </Link>
+          
+          <div className="flex items-center gap-3 mb-2">
+            <Rocket className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-bold">Publish Your Work</h1>
+          </div>
+          <p className="text-muted-foreground">
+            Choose where to publish "{project.title}". Generate platform-specific guides with all the details you need.
           </p>
-          <Button asChild>
-            <Link href={`/projects/${projectId}/editor`}>Continue Writing</Link>
+        </div>
+      </div>
+      
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* Penworth Marketplace - Featured */}
+        {penworthPlatform && (
+          <div className="mb-8">
+            <div className={cn(
+              'rounded-xl border-2 overflow-hidden',
+              publishedToPenworth ? 'border-green-500 bg-green-500/5' : 'border-primary bg-primary/5'
+            )}>
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4 flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      'h-12 w-12 rounded-xl flex items-center justify-center',
+                      publishedToPenworth ? 'bg-green-500' : 'bg-primary'
+                    )}>
+                      <Sparkles className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold">{penworthPlatform.name}</h2>
+                      <p className="text-sm text-muted-foreground">
+                        {penworthPlatform.description}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {publishedToPenworth ? (
+                    <div className="flex items-center gap-2 text-green-600">
+                      <Check className="h-5 w-5" />
+                      <span className="font-medium">Published!</span>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={handlePublishToPenworth}
+                      disabled={publishingToPenworth}
+                      size="lg"
+                      className="bg-gradient-to-r from-primary to-amber-500"
+                    >
+                      {publishingToPenworth ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Rocket className="mr-2 h-4 w-4" />
+                      )}
+                      One-Click Publish
+                    </Button>
+                  )}
+                </div>
+                
+                <div className="rounded-lg bg-background/50 p-4">
+                  <h4 className="font-medium mb-2">Why Penworth Marketplace?</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>✓ Instant publication - no manual work required</li>
+                    <li>✓ We handle all formatting and distribution</li>
+                    <li>✓ Reach readers in the Penworth ecosystem</li>
+                    <li>✓ Set your own pricing (coming soon)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Other Platforms */}
+        <h3 className="font-semibold text-lg mb-4">Other Publishing Platforms ({otherPlatforms.length})</h3>
+        
+        <div className="space-y-3">
+          {otherPlatforms.map((platform) => (
+            <div 
+              key={platform.id}
+              className="rounded-xl border bg-card overflow-hidden"
+            >
+              {/* Platform Header */}
+              <button
+                onClick={() => setExpandedPlatform(
+                  expandedPlatform === platform.id ? null : platform.id
+                )}
+                className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
+                    {getPlatformIcon(platform.platform_type)}
+                  </div>
+                  <div className="text-left">
+                    <h3 className="font-medium">{platform.name}</h3>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {platform.platform_type.replace('_', ' ')}
+                    </p>
+                  </div>
+                </div>
+                
+                {expandedPlatform === platform.id ? (
+                  <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                )}
+              </button>
+              
+              {/* Expanded Content */}
+              {expandedPlatform === platform.id && (
+                <div className="p-4 pt-0 border-t">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {platform.description}
+                  </p>
+                  
+                  {/* Generated Guide Preview */}
+                  {generatedGuides[platform.id] && (
+                    <div className="rounded-lg bg-muted/50 p-4 mb-4 max-h-60 overflow-y-auto">
+                      <h4 className="font-medium text-sm mb-2">Your Publishing Guide:</h4>
+                      <pre className="text-xs whitespace-pre-wrap font-mono">
+                        {generatedGuides[platform.id].slice(0, 1000)}
+                        {generatedGuides[platform.id].length > 1000 && '...'}
+                      </pre>
+                    </div>
+                  )}
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {!generatedGuides[platform.id] ? (
+                      <Button
+                        onClick={() => handleGenerateGuide(platform)}
+                        disabled={generatingGuide === platform.id}
+                      >
+                        {generatingGuide === platform.id ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="mr-2 h-4 w-4" />
+                        )}
+                        Generate Publishing Guide
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => handleDownloadGuide(platform)}
+                        variant="default"
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download Guide
+                      </Button>
+                    )}
+                    
+                    <Button
+                      variant="outline"
+                      onClick={() => window.open(platform.website_url, '_blank')}
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Visit {platform.name.split(' ')[0]}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        
+        {/* Back Button */}
+        <div className="mt-8 text-center">
+          <Button
+            variant="outline"
+            onClick={() => router.push(`/projects/${projectId}`)}
+          >
+            ← Back to Project
           </Button>
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <Link href={`/projects/${projectId}/editor`} className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6">
-        <ArrowLeft className="w-4 h-4" />
-        Back to Editor
-      </Link>
-
-      <h1 className="text-3xl font-bold mb-2">Publish Your Book</h1>
-      <p className="text-muted-foreground mb-8">
-        "{project.title}" • {project.metadata?.totalWordCount?.toLocaleString() || '—'} words
-      </p>
-
-      {/* Step 1: Select Platform */}
-      {step === 'select' && (
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Choose a Publishing Platform</h2>
-          
-          <div className="grid gap-4 md:grid-cols-2">
-            {platforms.map((platform) => (
-              <button
-                key={platform.id}
-                onClick={() => handleSelectPlatform(platform.id)}
-                disabled={!platform.available}
-                className={`text-left border rounded-lg p-4 transition-all ${
-                  platform.available 
-                    ? 'hover:border-primary hover:shadow-md cursor-pointer' 
-                    : 'opacity-60 cursor-not-allowed'
-                } ${selectedPlatform === platform.id ? 'border-primary ring-2 ring-primary/20' : ''}`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{getPlatformIcon(platform.icon)}</span>
-                    <div>
-                      <h3 className="font-semibold">{platform.name}</h3>
-                      <p className="text-sm text-muted-foreground">{platform.description}</p>
-                    </div>
-                  </div>
-                  {!platform.available && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Lock className="w-3 h-3" />
-                      {platform.requiredPlan}
-                    </div>
-                  )}
-                  {platform.available && (
-                    <Check className="w-5 h-5 text-green-500" />
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {userPlan === 'free' && (
-            <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Free Plan:</strong> You can publish to Amazon KDP! 
-                Upgrade to Max for access to all 5 publishing platforms.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Step 2: Prepare */}
-      {step === 'prepare' && selectedPlatform && (
-        <div>
-          <button 
-            onClick={() => setStep('select')} 
-            className="text-sm text-muted-foreground hover:text-foreground mb-4"
-          >
-            ← Back to platform selection
-          </button>
-
-          <div className="border rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">
-              Prepare for {platforms.find(p => p.id === selectedPlatform)?.name}
-            </h2>
-
-            <div className="space-y-4 mb-6">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">1</div>
-                <div>
-                  <p className="font-medium">Export your manuscript</p>
-                  <p className="text-sm text-muted-foreground">Download as DOCX or PDF from the editor</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">2</div>
-                <div>
-                  <p className="font-medium">Prepare your book cover</p>
-                  <p className="text-sm text-muted-foreground">You'll need a professional cover image</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">3</div>
-                <div>
-                  <p className="font-medium">Get publishing instructions</p>
-                  <p className="text-sm text-muted-foreground">We'll guide you through the process</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <Button variant="outline" asChild>
-                <Link href={`/projects/${projectId}/editor`}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Export Manuscript
-                </Link>
-              </Button>
-              <Button onClick={handlePublish} disabled={isPublishing}>
-                {isPublishing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Preparing...
-                  </>
-                ) : (
-                  'Get Publishing Instructions'
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Instructions */}
-      {step === 'instructions' && publishingData && (
-        <div>
-          <button 
-            onClick={() => setStep('select')} 
-            className="text-sm text-muted-foreground hover:text-foreground mb-4"
-          >
-            ← Start over
-          </button>
-
-          <div className="border rounded-lg p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">
-                Publishing to {publishingData.publishingData.platform}
-              </h2>
-              <Button asChild>
-                <a href={publishingData.publishingData.uploadUrl} target="_blank" rel="noopener noreferrer">
-                  Open {publishingData.publishingData.platform}
-                  <ExternalLink className="w-4 h-4 ml-2" />
-                </a>
-              </Button>
-            </div>
-
-            <div className="bg-muted/50 rounded-lg p-4 mb-6">
-              <h3 className="font-medium mb-2">Your Book</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Title:</span>
-                  <span className="ml-2">{publishingData.publishingData.title}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Word Count:</span>
-                  <span className="ml-2">{publishingData.publishingData.wordCount?.toLocaleString()}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Chapters:</span>
-                  <span className="ml-2">{publishingData.publishingData.chapterCount}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <h3 className="font-medium mb-2">Platform Requirements</h3>
-              <div className="space-y-2 text-sm">
-                {Object.entries(publishingData.publishingData.requirements || {}).map(([key, value]) => (
-                  <div key={key} className="flex">
-                    <span className="text-muted-foreground w-32 capitalize">{key.replace('_', ' ')}:</span>
-                    <span>{value as string}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-medium mb-2">Step-by-Step Instructions</h3>
-              <div className="bg-muted/30 rounded-lg p-4">
-                <pre className="text-sm whitespace-pre-wrap font-sans">
-                  {publishingData.message}
-                </pre>
-              </div>
-            </div>
-
-            {publishingData.publishingData.helpUrl && (
-              <div className="mt-4 pt-4 border-t">
-                <a 
-                  href={publishingData.publishingData.helpUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-sm text-primary hover:underline"
-                >
-                  Need more help? Visit {publishingData.publishingData.platform} Help Center →
-                </a>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-6 p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg text-center">
-            <p className="text-green-800 dark:text-green-200 mb-3">
-              🎉 Congratulations on completing your book! Once published, readers will find it on {publishingData.publishingData.platform}.
-            </p>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/projects">View All Projects</Link>
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
+  );
+}
+
+export default function PublishingPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <PublishingPageContent />
+    </Suspense>
   );
 }
