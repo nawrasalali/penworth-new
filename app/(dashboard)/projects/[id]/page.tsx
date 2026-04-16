@@ -57,7 +57,7 @@ export default async function ProjectDetailPage({
           <div>
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-3xl font-bold tracking-tight">{project.title}</h1>
-              <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[project.status]}`}>
+              <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[project.status]?.bg || 'bg-neutral-100'} ${STATUS_COLORS[project.status]?.text || 'text-neutral-600'}`}>
                 {project.status.replace('_', ' ')}
               </span>
             </div>
@@ -121,7 +121,7 @@ export default async function ProjectDetailPage({
                           {formatWordCount(chapter.word_count || 0)}
                         </p>
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[chapter.status] || STATUS_COLORS.draft}`}>
+                      <span className={`text-xs px-2 py-1 rounded-full ${(STATUS_COLORS[chapter.status] || STATUS_COLORS.draft)?.bg} ${(STATUS_COLORS[chapter.status] || STATUS_COLORS.draft)?.text}`}>
                         {chapter.status}
                       </span>
                     </Link>

@@ -134,7 +134,7 @@ export default async function ProjectsPage({
                     <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
                       <FileText className="h-5 w-5 text-primary" />
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[project.status]}`}>
+                    <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[project.status]?.bg || 'bg-neutral-100'} ${STATUS_COLORS[project.status]?.text || 'text-neutral-600'}`}>
                       {project.status.replace('_', ' ')}
                     </span>
                   </div>

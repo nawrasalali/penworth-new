@@ -200,7 +200,7 @@ export default async function DashboardPage() {
                         </p>
                       </div>
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[project.status]}`}>
+                    <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[project.status]?.bg || 'bg-neutral-100'} ${STATUS_COLORS[project.status]?.text || 'text-neutral-600'}`}>
                       {project.status.replace('_', ' ')}
                     </span>
                   </Link>
