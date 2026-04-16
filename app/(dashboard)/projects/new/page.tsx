@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import {
   File,
   ArrowLeft,
   ArrowRight,
+  Loader2,
 } from 'lucide-react';
 import { CONTENT_TYPE_LABELS, INDUSTRY_LABELS } from '@/lib/utils';
 import type { ContentType, Visibility } from '@/types';
@@ -46,7 +47,7 @@ const contentTypeDescriptions: Record<string, string> = {
   other: 'Custom content that doesn\'t fit other categories.',
 };
 
-export default function NewProjectPage() {
+function NewProjectContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedType = searchParams.get('type') as ContentType | null;
@@ -247,7 +248,8 @@ export default function NewProjectPage() {
                 >
                   Back
                 </Button>
-                <Button type="submit" loading={loading}>
+                <Button type="submit" disabled={loading}>
+                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Create Project
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -257,5 +259,17 @@ export default function NewProjectPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+export default function NewProjectPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-8 max-w-4xl mx-auto flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <NewProjectContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -38,7 +38,7 @@ interface Message {
   content: string;
 }
 
-export default function EditorPage({ params }: { params: { id: string } }) {
+function EditorContent({ params }: { params: { id: string } }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -502,5 +502,17 @@ export default function EditorPage({ params }: { params: { id: string } }) {
         )}
       </div>
     </div>
+  );
+}
+
+export default function EditorPage({ params }: { params: { id: string } }) {
+  return (
+    <Suspense fallback={
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <EditorContent params={params} />
+    </Suspense>
   );
 }
