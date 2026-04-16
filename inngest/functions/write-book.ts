@@ -1,4 +1,4 @@
-import { inngest, BookWriteEvent } from '../client';
+import { inngest } from '../client';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { buildSystemPrompt, getPromptById } from '@/lib/industry-prompts';
@@ -12,22 +12,38 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+interface ChapterOutline {
+  title: string;
+  description: string;
+  keyPoints: string[];
+}
+
+interface VoiceProfile {
+  tone: string;
+  style: string;
+  vocabulary: string;
+}
+
 /**
  * Book Writing Pipeline - Durable Execution
- * 
- * Each chapter is written as a separate durable step.
- * If a chapter fails, only that chapter is retried - not the entire book.
- * Progress is persisted after each step completes.
  */
 export const writeBook = inngest.createFunction(
   {
     id: 'write-book',
     name: 'Write Complete Book',
     retries: 3,
+    triggers: [{ event: 'book/write' }],
   },
-  { event: 'book/write' },
-  async ({ event, step }) => {
-    const { projectId, userId, title, outline, industry, voiceProfile } = event.data;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async ({ event, step }: any) => {
+    const { projectId, userId, title, outline, industry, voiceProfile } = event.data as {
+      projectId: string;
+      userId: string;
+      title: string;
+      outline: { chapters: ChapterOutline[] };
+      industry: string;
+      voiceProfile?: VoiceProfile;
+    };
 
     // Step 1: Initialize project status
     await step.run('initialize-project', async () => {
@@ -178,15 +194,10 @@ export const writeBook = inngest.createFunction(
   }
 );
 
-/**
- * Give referral credits when a referred user completes their first book
- * Per PLG spec: 500 credits to the referrer
- */
 async function triggerReferralCredits(userId: string, projectId: string, bookTitle: string) {
   const REFERRAL_CREDITS = 500;
 
   try {
-    // Check if user was referred by someone
     const { data: referral } = await supabase
       .from('referrals')
       .select('referrer_id, status')
@@ -194,12 +205,8 @@ async function triggerReferralCredits(userId: string, projectId: string, bookTit
       .eq('status', 'pending')
       .single();
 
-    if (!referral) {
-      // User wasn't referred or already credited
-      return;
-    }
+    if (!referral) return;
 
-    // Update referral status to completed
     await supabase
       .from('referrals')
       .update({ 
@@ -209,7 +216,6 @@ async function triggerReferralCredits(userId: string, projectId: string, bookTit
       })
       .eq('referee_id', userId);
 
-    // Get referrer's current credits
     const { data: referrerProfile } = await supabase
       .from('profiles')
       .select('credits_balance, credits_purchased')
@@ -218,7 +224,6 @@ async function triggerReferralCredits(userId: string, projectId: string, bookTit
 
     if (!referrerProfile) return;
 
-    // Add credits to purchased (they never expire)
     const newCreditsPurchased = (referrerProfile.credits_purchased || 0) + REFERRAL_CREDITS;
 
     await supabase
@@ -226,34 +231,24 @@ async function triggerReferralCredits(userId: string, projectId: string, bookTit
       .update({ credits_purchased: newCreditsPurchased })
       .eq('id', referral.referrer_id);
 
-    // Log the credit transaction
     await supabase.from('credit_transactions').insert({
       user_id: referral.referrer_id,
       amount: REFERRAL_CREDITS,
       type: 'referral_bonus',
       description: `Referral bonus: Friend completed their first book "${bookTitle}"`,
-      metadata: { 
-        refereeId: userId, 
-        projectId,
-        bookTitle,
-      },
+      metadata: { refereeId: userId, projectId, bookTitle },
     });
 
-    // Get referrer email to send notification
     const { data: referrerData } = await supabase.auth.admin.getUserById(referral.referrer_id);
     
     if (referrerData?.user?.email) {
-      // TODO: Send email notification via Resend
       console.log(`Referral credits notification to send to: ${referrerData.user.email}`);
     }
-
   } catch (error) {
     console.error('Error triggering referral credits:', error);
-    // Don't throw - book completion should succeed even if referral fails
   }
 }
 
-// Helper: Build chapter writing prompt
 function buildChapterPrompt(params: {
   bookTitle: string;
   chapterNumber: number;
@@ -261,18 +256,10 @@ function buildChapterPrompt(params: {
   chapterDescription: string;
   keyPoints: string[];
   industry: string;
-  voiceProfile?: { tone: string; style: string; vocabulary: string };
+  voiceProfile?: VoiceProfile;
   previousChaptersSummary: string;
 }): string {
-  const {
-    bookTitle,
-    chapterNumber,
-    chapterTitle,
-    chapterDescription,
-    keyPoints,
-    voiceProfile,
-    previousChaptersSummary,
-  } = params;
+  const { bookTitle, chapterNumber, chapterTitle, chapterDescription, keyPoints, voiceProfile, previousChaptersSummary } = params;
 
   return `Write Chapter ${chapterNumber} of the book "${bookTitle}".
 
@@ -300,47 +287,24 @@ ${voiceProfile ? `## Voice Profile
 Write the complete chapter content now:`;
 }
 
-// Helper: Get system prompt based on industry
-function getSystemPrompt(industry: string, voiceProfile?: { tone: string; style: string; vocabulary: string }, customInstructions?: string): string {
-  // Get industry-specific prompt from library
+function getSystemPrompt(industry: string, voiceProfile?: VoiceProfile, customInstructions?: string): string {
   const industryPrompt = getPromptById(industry);
-  
   let basePrompt = industryPrompt?.systemPrompt || buildSystemPrompt('general');
 
-  // Add voice profile if provided
   if (voiceProfile) {
-    basePrompt += `
-
-## Voice Guidelines
-- Tone: ${voiceProfile.tone}
-- Style: ${voiceProfile.style}
-- Vocabulary: ${voiceProfile.vocabulary}`;
+    basePrompt += `\n\n## Voice Guidelines\n- Tone: ${voiceProfile.tone}\n- Style: ${voiceProfile.style}\n- Vocabulary: ${voiceProfile.vocabulary}`;
   }
 
-  // Add custom instructions for Max users
   if (customInstructions) {
-    basePrompt += `
-
-## Custom Instructions
-${customInstructions}`;
+    basePrompt += `\n\n## Custom Instructions\n${customInstructions}`;
   }
 
-  // Add standard formatting requirements
-  basePrompt += `
-
-## Formatting Requirements
-- Write clear, engaging, and authoritative content
-- Use well-structured paragraphs with clear headings and sections
-- Include practical examples and actionable insights
-- Avoid filler content or unnecessary repetition
-- Format properly for publication`;
+  basePrompt += `\n\n## Formatting Requirements\n- Write clear, engaging, and authoritative content\n- Use well-structured paragraphs with clear headings and sections\n- Include practical examples and actionable insights\n- Avoid filler content or unnecessary repetition\n- Format properly for publication`;
 
   return basePrompt;
 }
 
-// Helper: Calculate AI cost
 function calculateCost(inputTokens: number, outputTokens: number): number {
-  // Claude Sonnet pricing as of 2026
   const inputCost = (inputTokens / 1_000_000) * 3.00;
   const outputCost = (outputTokens / 1_000_000) * 15.00;
   return Number((inputCost + outputCost).toFixed(6));

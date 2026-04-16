@@ -81,14 +81,15 @@ export async function GET(request: NextRequest) {
             filter: `project_id=eq.${projectId}`,
           },
           (payload) => {
+            const newRecord = payload.new as Record<string, unknown>;
             const data = {
               type: payload.eventType === 'INSERT' ? 'chapter_started' : 'chapter_update',
               chapter: {
-                id: payload.new.id,
-                title: payload.new.title,
-                order_index: payload.new.order_index,
-                status: payload.new.status,
-                word_count: payload.new.word_count,
+                id: newRecord.id,
+                title: newRecord.title,
+                order_index: newRecord.order_index,
+                status: newRecord.status,
+                word_count: newRecord.word_count,
               },
             };
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
