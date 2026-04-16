@@ -241,7 +241,7 @@ function EditorContentNew() {
     name: session?.author_name || '',
     title: '',
     aboutAuthor: session?.about_author || '',
-    photoUrl: session?.author_photo_url,
+    photoUrl: session?.author_photo_url ?? undefined,
   };
 
   // Cover config
