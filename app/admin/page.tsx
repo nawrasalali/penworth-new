@@ -142,8 +142,16 @@ export default async function AdminPage() {
             Live business snapshot. Numbers are direct reads from production.
           </p>
         </div>
-        <div className="text-xs text-muted-foreground">
-          Last refreshed {new Date().toLocaleTimeString()}
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/computer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted"
+          >
+            <Cpu className="h-3.5 w-3.5" /> Computer sessions
+          </Link>
+          <div className="text-xs text-muted-foreground">
+            Last refreshed {new Date().toLocaleTimeString()}
+          </div>
         </div>
       </div>
 
