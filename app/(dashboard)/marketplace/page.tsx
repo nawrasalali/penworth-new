@@ -22,57 +22,53 @@ interface MarketplaceListing {
   id: string;
   title: string;
   description: string;
-  author_name: string;
+  seller_id: string;
   cover_url: string | null;
-  price: number;
-  currency: string;
-  category: string;
-  tags: string[];
-  rating: number;
+  front_cover_url: string | null;
+  price_cents: number;
+  license_type: string;
+  tags: string[] | null;
+  rating: number | null;
   reviews_count: number;
   downloads_count: number;
+  word_count: number;
+  chapter_count: number;
+  is_free_tier: boolean;
   created_at: string;
+  profiles?: {
+    full_name: string | null;
+    avatar_url: string | null;
+  };
 }
 
-const categories = [
-  'All Categories',
-  'Fiction',
-  'Non-Fiction',
-  'Business',
-  'Self-Help',
-  'Biography',
-  'Science',
-  'Technology',
-  'Health',
-  'Romance',
-  'Mystery',
-  'Fantasy',
-  'Children',
-];
+const LICENSE_FILTERS = ['All', 'personal', 'commercial', 'enterprise'];
 
 export default function MarketplacePage() {
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All Categories');
+  const [selectedLicense, setSelectedLicense] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
     fetchListings();
-  }, [selectedCategory, sortBy]);
+  }, [selectedLicense, sortBy]);
 
   const fetchListings = async () => {
     try {
       const supabase = createClient();
-      
+
       let query = supabase
         .from('marketplace_listings')
-        .select('*')
-        .eq('status', 'published');
+        .select(`
+          *,
+          profiles:seller_id (full_name, avatar_url)
+        `)
+        .eq('status', 'active');
 
-      if (selectedCategory !== 'All Categories') {
-        query = query.eq('category', selectedCategory);
+      if (selectedLicense !== 'All') {
+        query = query.eq('license_type', selectedLicense);
       }
 
       // Sort
@@ -87,10 +83,10 @@ export default function MarketplacePage() {
           query = query.order('rating', { ascending: false });
           break;
         case 'price_low':
-          query = query.order('price', { ascending: true });
+          query = query.order('price_cents', { ascending: true });
           break;
         case 'price_high':
-          query = query.order('price', { ascending: false });
+          query = query.order('price_cents', { ascending: false });
           break;
       }
 
@@ -105,11 +101,15 @@ export default function MarketplacePage() {
     }
   };
 
-  const filteredListings = listings.filter(listing =>
-    listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    listing.author_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    listing.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredListings = listings.filter((listing) => {
+    const authorName = listing.profiles?.full_name || '';
+    const q = searchQuery.toLowerCase();
+    return (
+      listing.title.toLowerCase().includes(q) ||
+      authorName.toLowerCase().includes(q) ||
+      listing.description?.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -143,12 +143,14 @@ export default function MarketplacePage() {
         
         <div className="flex gap-2">
           <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
+            value={selectedLicense}
+            onChange={(e) => setSelectedLicense(e.target.value)}
             className="px-3 py-2 border rounded-md text-sm bg-white"
           >
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
+            {LICENSE_FILTERS.map((lic) => (
+              <option key={lic} value={lic}>
+                {lic === 'All' ? 'All licenses' : lic.charAt(0).toUpperCase() + lic.slice(1)}
+              </option>
             ))}
           </select>
 
@@ -209,94 +211,106 @@ export default function MarketplacePage() {
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredListings.map((listing) => (
-            <Link key={listing.id} href={`/marketplace/${listing.id}`}>
-              <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group">
-                <div className="aspect-[3/4] bg-gradient-to-br from-primary/20 to-primary/5 relative">
-                  {listing.cover_url ? (
-                    <img
-                      src={listing.cover_url}
-                      alt={listing.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <BookOpen className="h-16 w-16 text-primary/30" />
-                    </div>
-                  )}
-                  {listing.price === 0 && (
-                    <Badge className="absolute top-2 right-2 bg-green-500">
-                      Free
-                    </Badge>
-                  )}
-                </div>
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-gray-900 group-hover:text-primary transition-colors line-clamp-1">
-                    {listing.title}
-                  </h3>
-                  <p className="text-sm text-gray-500">{listing.author_name}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <div className="flex items-center gap-1">
-                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                      <span className="text-sm font-medium">{listing.rating?.toFixed(1) || 'New'}</span>
-                    </div>
-                    <span className="text-gray-300">•</span>
-                    <span className="text-sm text-gray-500">{listing.downloads_count || 0} downloads</span>
-                  </div>
-                </CardContent>
-                <CardFooter className="p-4 pt-0 flex items-center justify-between">
-                  <Badge variant="outline">{listing.category}</Badge>
-                  <span className="font-bold text-primary">
-                    {listing.price === 0 ? 'Free' : `$${listing.price.toFixed(2)}`}
-                  </span>
-                </CardFooter>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredListings.map((listing) => (
-            <Link key={listing.id} href={`/marketplace/${listing.id}`}>
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                <CardContent className="p-4 flex gap-4">
-                  <div className="w-24 h-32 bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg flex-shrink-0">
-                    {listing.cover_url ? (
+          {filteredListings.map((listing) => {
+            const priceUsd = (listing.price_cents || 0) / 100;
+            const isFree = priceUsd === 0;
+            const authorName = listing.profiles?.full_name || 'Penworth author';
+            const coverSrc = listing.cover_url || listing.front_cover_url;
+            return (
+              <Link key={listing.id} href={`/marketplace/${listing.id}`}>
+                <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group">
+                  <div className="aspect-[3/4] bg-gradient-to-br from-primary/20 to-primary/5 relative">
+                    {coverSrc ? (
                       <img
-                        src={listing.cover_url}
+                        src={coverSrc}
                         alt={listing.title}
-                        className="w-full h-full object-cover rounded-lg"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <BookOpen className="h-8 w-8 text-primary/30" />
+                        <BookOpen className="h-16 w-16 text-primary/30" />
                       </div>
                     )}
+                    {isFree && (
+                      <Badge className="absolute top-2 right-2 bg-green-500">
+                        Free
+                      </Badge>
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{listing.title}</h3>
-                        <p className="text-sm text-gray-500">{listing.author_name}</p>
-                      </div>
-                      <span className="font-bold text-primary text-lg">
-                        {listing.price === 0 ? 'Free' : `$${listing.price.toFixed(2)}`}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 mt-2 line-clamp-2">{listing.description}</p>
-                    <div className="flex items-center gap-4 mt-3">
-                      <Badge variant="outline">{listing.category}</Badge>
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold text-gray-900 group-hover:text-primary transition-colors line-clamp-1">
+                      {listing.title}
+                    </h3>
+                    <p className="text-sm text-gray-500">{authorName}</p>
+                    <div className="flex items-center gap-2 mt-2">
                       <div className="flex items-center gap-1">
                         <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                        <span className="text-sm">{listing.rating?.toFixed(1) || 'New'}</span>
+                        <span className="text-sm font-medium">{listing.rating?.toFixed(1) || 'New'}</span>
                       </div>
+                      <span className="text-gray-300">•</span>
                       <span className="text-sm text-gray-500">{listing.downloads_count || 0} downloads</span>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                  </CardContent>
+                  <CardFooter className="p-4 pt-0 flex items-center justify-between">
+                    <Badge variant="outline">{listing.license_type || 'personal'}</Badge>
+                    <span className="font-bold text-primary">
+                      {isFree ? 'Free' : `$${priceUsd.toFixed(2)}`}
+                    </span>
+                  </CardFooter>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredListings.map((listing) => {
+            const priceUsd = (listing.price_cents || 0) / 100;
+            const isFree = priceUsd === 0;
+            const authorName = listing.profiles?.full_name || 'Penworth author';
+            const coverSrc = listing.cover_url || listing.front_cover_url;
+            return (
+              <Link key={listing.id} href={`/marketplace/${listing.id}`}>
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                  <CardContent className="p-4 flex gap-4">
+                    <div className="w-24 h-32 bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg flex-shrink-0">
+                      {coverSrc ? (
+                        <img
+                          src={coverSrc}
+                          alt={listing.title}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <BookOpen className="h-8 w-8 text-primary/30" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h3 className="font-semibold text-gray-900">{listing.title}</h3>
+                          <p className="text-sm text-gray-500">{authorName}</p>
+                        </div>
+                        <span className="font-bold text-primary text-lg">
+                          {isFree ? 'Free' : `$${priceUsd.toFixed(2)}`}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-2 line-clamp-2">{listing.description}</p>
+                      <div className="flex items-center gap-4 mt-3">
+                        <Badge variant="outline">{listing.license_type || 'personal'}</Badge>
+                        <div className="flex items-center gap-1">
+                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                          <span className="text-sm">{listing.rating?.toFixed(1) || 'New'}</span>
+                        </div>
+                        <span className="text-sm text-gray-500">{listing.downloads_count || 0} downloads</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
