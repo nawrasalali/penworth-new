@@ -14,6 +14,16 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/dashboard';
+  // Language passed from a landing page subdomain (e.g. ar.penworth.ai/login?lang=ar).
+  // Carries through OAuth so returning users land back on their language subdomain.
+  const lang = searchParams.get('lang');
+
+  const callbackQuery = (() => {
+    const qs = new URLSearchParams();
+    qs.set('redirect', redirect);
+    if (lang) qs.set('lang', lang);
+    return qs.toString();
+  })();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +32,7 @@ function LoginForm() {
 
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -30,6 +40,29 @@ function LoginForm() {
       if (error) {
         setError(error.message);
         return;
+      }
+
+      // If the user just came from ar.penworth.ai, send them home to ar.penworth.ai
+      // by hitting the callback route which reads preferred_language and rewrites
+      // the origin. Fall back to local redirect for English/no-lang users so we
+      // don't force an unnecessary full-page nav.
+      if (lang && lang !== 'en') {
+        window.location.href = `${window.location.origin}/auth/callback?${callbackQuery}&skip_code=1`;
+        return;
+      }
+
+      // Also check the user's stored preferred_language in case they're returning
+      // on the English host but signed up through another language originally.
+      if (data?.user?.id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('preferred_language')
+          .eq('id', data.user.id)
+          .single();
+        if (profile?.preferred_language && profile.preferred_language !== 'en') {
+          window.location.href = `${window.location.origin}/auth/callback?redirect=${redirect}&lang=${profile.preferred_language}&skip_code=1`;
+          return;
+        }
       }
 
       router.push(redirect);
@@ -46,7 +79,7 @@ function LoginForm() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?redirect=${redirect}`,
+        redirectTo: `${window.location.origin}/auth/callback?${callbackQuery}`,
       },
     });
 

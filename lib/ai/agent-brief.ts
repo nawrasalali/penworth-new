@@ -44,6 +44,14 @@ export interface AgentBrief {
   // Author info
   authorName?: string;
   aboutAuthor?: string;
+
+  /**
+   * Language the author chose at signup (e.g. 'ar', 'es', 'en').
+   * Read from profiles.preferred_language. Fed into every AI prompt so the
+   * AI writes the book natively in that language rather than in English.
+   */
+  language: string;
+  languageName: string;
 }
 
 /**
@@ -120,6 +128,14 @@ export async function loadAgentBrief(
     url: r.url || undefined,
   }));
 
+  // Author's preferred language — the AI writes natively in this language
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('preferred_language')
+    .eq('id', userId)
+    .single();
+  const language = (profile?.preferred_language || 'en').toLowerCase();
+
   return {
     projectId: project.id,
     userId: project.user_id,
@@ -139,14 +155,40 @@ export async function loadAgentBrief(
     selectedResearch,
     authorName: session.author_name || undefined,
     aboutAuthor: session.about_author || undefined,
+    language,
+    languageName: LANGUAGE_NAMES[language] || 'English',
   };
 }
+
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English',
+  ar: 'Arabic (Modern Standard Arabic)',
+  es: 'Spanish',
+  pt: 'Portuguese (Brazilian)',
+  ru: 'Russian',
+  zh: 'Chinese (Simplified)',
+  bn: 'Bengali',
+  hi: 'Hindi',
+  id: 'Indonesian (Bahasa Indonesia)',
+  fr: 'French',
+  vi: 'Vietnamese',
+};
 
 /**
  * Pretty-format the brief for inclusion in an AI system prompt.
  */
 export function formatBriefForPrompt(brief: AgentBrief): string {
   const parts: string[] = [];
+
+  // Language directive goes FIRST — this is non-negotiable. Every downstream
+  // agent must produce its output in the author's chosen language.
+  if (brief.language !== 'en') {
+    parts.push(`## LANGUAGE — CRITICAL`);
+    parts.push(
+      `This author writes in ${brief.languageName}. EVERY output (chapter titles, prose, research summaries, outlines, quality reports, questions) MUST be in ${brief.languageName} — not English. Think in ${brief.languageName} from the first word. Do not code-switch. Do not translate from English draft. Write natively in ${brief.languageName} as if the book was conceived in that language.`
+    );
+    parts.push('');
+  }
 
   parts.push(`## The Book Idea`);
   parts.push(`Title / Topic: ${brief.chosenIdea}`);

@@ -7,13 +7,16 @@ export async function GET(request: Request) {
   const code = searchParams.get('code');
   const redirect = searchParams.get('redirect') || '/dashboard';
   const langParam = searchParams.get('lang');
+  // skip_code=1 indicates this is a post-password-login redirect (no OAuth code
+  // to exchange). We still need to resolve the user's language and redirect.
+  const skipCode = searchParams.get('skip_code') === '1';
 
+  const supabase = await createClient();
+
+  // Exchange the OAuth code if present
   if (code) {
-    const supabase = await createClient();
     const { error, data } = await supabase.auth.exchangeCodeForSession(code);
-
     if (!error && data?.user) {
-      // Persist the chosen language to the user's profile
       if (isSupportedLang(langParam)) {
         await supabase
           .from('profiles')
@@ -21,8 +24,6 @@ export async function GET(request: Request) {
           .eq('id', data.user.id);
       }
 
-      // Resolve final language: URL param wins for fresh signups,
-      // fall back to stored preferred_language for returning users.
       let lang: string | null = langParam;
       if (!isSupportedLang(lang)) {
         const { data: profile } = await supabase
@@ -33,6 +34,25 @@ export async function GET(request: Request) {
         lang = profile?.preferred_language ?? 'en';
       }
 
+      const targetOrigin = originForLanguage(origin, lang);
+      return NextResponse.redirect(`${targetOrigin}${redirect}`);
+    }
+  }
+
+  // No code but session is already established (password login): resolve lang
+  // from URL param and redirect.
+  if (skipCode) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      let lang: string | null = langParam;
+      if (!isSupportedLang(lang)) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('preferred_language')
+          .eq('id', user.id)
+          .single();
+        lang = profile?.preferred_language ?? 'en';
+      }
       const targetOrigin = originForLanguage(origin, lang);
       return NextResponse.redirect(`${targetOrigin}${redirect}`);
     }
