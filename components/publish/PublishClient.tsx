@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Clock,
   ChevronDown,
+  Unlink,
 } from 'lucide-react';
 import { MetadataEditor } from './MetadataEditor';
 import { KitPanel } from './KitPanel';
@@ -126,6 +127,26 @@ export function PublishClient({
   };
 
   /**
+   * Revoke an OAuth connection. Optimistic local update, then refresh
+   * platforms to get canonical state.
+   */
+  const disconnectPlatform = async (slug: string, displayName: string) => {
+    if (!confirm(`Disconnect ${displayName}? You'll need to reconnect before publishing again.`)) return;
+    try {
+      const resp = await fetch(`/api/publishing/oauth/${slug}/disconnect`, { method: 'POST' });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        toast.error(err.error || 'Disconnect failed');
+        return;
+      }
+      toast.success(`Disconnected from ${displayName}`);
+      loadPlatforms();
+    } catch {
+      toast.error('Disconnect failed');
+    }
+  };
+
+  /**
    * Tier 1 — Penworth Store one-click publish.
    * Fires existing /api/publishing/penworth-store route, then kicks off
    * narration in the background (admin-gated; silent if non-admin).
@@ -188,11 +209,21 @@ export function PublishClient({
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Publish</h1>
-        <p className="text-muted-foreground mt-1">
-          Your document. Live everywhere. Penworth Store in one click, plus 16 other platforms.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Publish</h1>
+          <p className="text-muted-foreground mt-1">
+            Your document. Live everywhere. Penworth Store in one click, plus 16 other platforms.
+          </p>
+        </div>
+        {selectedId && (
+          <Link
+            href={`/publish/${selectedId}/status`}
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted"
+          >
+            Mission control <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        )}
       </div>
 
       {/* Document selector */}
@@ -361,6 +392,10 @@ export function PublishClient({
                     }
                     connectPlatform(p.oauth_provider);
                   }}
+                  onDisconnect={() => {
+                    if (!p.oauth_provider) return;
+                    disconnectPlatform(p.oauth_provider, p.name);
+                  }}
                 />
               ))}
             </div>
@@ -447,16 +482,19 @@ function PlatformCard({
   platform,
   onPublish,
   onConnect,
+  onDisconnect,
   publishLabel,
 }: {
   platform: Platform;
   onPublish: () => void;
   onConnect?: () => void;
+  onDisconnect?: () => void;
   publishLabel?: string;
 }) {
   const pub = platform.publication;
   const isLive = pub?.status === 'published';
   const needsConnect = platform.publish_tier === 'api_auto' && !platform.is_connected;
+  const isConnectedAuto = platform.publish_tier === 'api_auto' && platform.is_connected;
 
   return (
     <div className="group rounded-xl border bg-card hover:border-primary/40 hover:shadow-sm transition p-4 flex flex-col gap-3">
@@ -467,11 +505,15 @@ function PlatformCard({
             <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{platform.tagline}</div>
           )}
         </div>
-        {isLive && (
+        {isLive ? (
           <span className="shrink-0 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-400">
             Live
           </span>
-        )}
+        ) : isConnectedAuto ? (
+          <span className="shrink-0 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-sky-500/20 text-sky-700 dark:text-sky-400">
+            Connected
+          </span>
+        ) : null}
       </div>
 
       <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
@@ -506,6 +548,15 @@ function PlatformCard({
             className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition"
           >
             {publishLabel || 'Publish'}
+          </button>
+        )}
+        {isConnectedAuto && onDisconnect && (
+          <button
+            onClick={onDisconnect}
+            title="Disconnect account"
+            className="p-2 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition"
+          >
+            <Unlink className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
