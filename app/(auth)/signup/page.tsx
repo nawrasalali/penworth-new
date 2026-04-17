@@ -15,6 +15,12 @@ function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const plan = searchParams.get('plan');
+  // Language passed from the landing page subdomain (e.g. ar.penworth.ai/signup?lang=ar)
+  const lang = searchParams.get('lang') || 'en';
+  const qs = new URLSearchParams();
+  if (plan) qs.set('plan', plan);
+  if (lang && lang !== 'en') qs.set('lang', lang);
+  const callbackQuery = qs.toString() ? `?${qs.toString()}` : '';
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,21 +29,31 @@ function SignupForm() {
 
     try {
       const supabase = createClient();
-      
-      const { error } = await supabase.auth.signUp({
+
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
+            preferred_language: lang,
           },
-          emailRedirectTo: `${window.location.origin}/auth/callback${plan ? `?plan=${plan}` : ''}`,
+          emailRedirectTo: `${window.location.origin}/auth/callback${callbackQuery}`,
         },
       });
 
       if (error) {
         setError(error.message);
         return;
+      }
+
+      // Best-effort immediate profile update (the auth callback also writes it,
+      // so this is redundant but safer if the trigger has race conditions).
+      if (signUpData?.user?.id) {
+        await supabase
+          .from('profiles')
+          .update({ preferred_language: lang })
+          .eq('id', signUpData.user.id);
       }
 
       router.push('/login?message=Check your email to confirm your account');
@@ -53,7 +69,7 @@ function SignupForm() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback${plan ? `?plan=${plan}` : ''}`,
+        redirectTo: `${window.location.origin}/auth/callback${callbackQuery}`,
       },
     });
 
