@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { ValidationScore } from '@/types/agent-workflow';
 import { modelFor, maxTokensFor } from '@/lib/ai/model-router';
+import { createClient } from '@/lib/supabase/server';
+import { getUserLanguage, languageDirective } from '@/lib/ai/user-language';
 
 const anthropic = new Anthropic();
 
@@ -16,7 +18,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const systemPrompt = `You are an expert publishing consultant and market analyst. Your job is to evaluate book ideas for their commercial viability and provide actionable feedback.
+    // Resolve user's preferred language (for non-English users, prepend a
+    // directive so the validation output is produced in their language).
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const lang = user ? await getUserLanguage(supabase, user.id) : 'en';
+    const langPrefix = languageDirective(lang);
+
+    const systemPrompt = langPrefix + `You are an expert publishing consultant and market analyst. Your job is to evaluate book ideas for their commercial viability and provide actionable feedback.
 
 You will score ideas on these 6 criteria (each out of 10, totaling 100 points when weighted):
 1. Market Demand (20%): Is there proven demand for this topic? Are people actively searching for and buying books like this?

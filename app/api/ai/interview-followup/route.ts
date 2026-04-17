@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/lib/supabase/server';
 import { modelFor, maxTokensFor, calculateCost } from '@/lib/ai/model-router';
+import { getUserLanguage, languageDirective } from '@/lib/ai/user-language';
 
 const anthropic = new Anthropic();
 
@@ -36,12 +37,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ followup: null });
     }
 
+    const lang = await getUserLanguage(supabase, user.id);
+    const langPrefix = languageDirective(lang);
+
     const answeredSummary = answers
       .filter((a: { question: string; answer: string }) => a.answer && a.answer.trim())
       .map((a: { question: string; answer: string }, i: number) => `Q${i + 1}: ${a.question}\nA: ${a.answer}`)
       .join('\n\n');
 
-    const systemPrompt = `You are the interview agent for a book-writing platform. Your job: pick the single highest-value follow-up question to ask based on the author's prior answers.
+    const systemPrompt = langPrefix + `You are the interview agent for a book-writing platform. Your job: pick the single highest-value follow-up question to ask based on the author's prior answers.
 
 PICK ONE of four purposes:
 1. CLARIFY — resolve an ambiguity in an answer

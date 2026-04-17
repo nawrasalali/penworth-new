@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/lib/supabase/server';
 import { modelFor, maxTokensFor, calculateCost } from '@/lib/ai/model-router';
+import { getUserLanguage, languageDirective } from '@/lib/ai/user-language';
 
 const anthropic = new Anthropic();
 
@@ -83,6 +84,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No chapters to check' }, { status: 400 });
     }
 
+    // Load the user's preferred language once; prepend to AI sub-calls below.
+    const lang = await getUserLanguage(supabase, user.id);
+    const langPrefix = languageDirective(lang);
+
     const checks: QACheck[] = [];
 
     // === CHECK 1: Word count bounds (deterministic) ===
@@ -129,7 +134,7 @@ export async function POST(request: NextRequest) {
 
     // === CHECK 4: Haiku tone + readability review ===
     const toneSample = allContent.slice(0, 4000);
-    const tonePrompt = `You are a QA agent checking the tonal consistency of book content. Read this excerpt and respond ONLY with JSON:
+    const tonePrompt = langPrefix + `You are a QA agent checking the tonal consistency of book content. Read this excerpt and respond ONLY with JSON:
 {
   "consistent": true | false,
   "observation": "<one sentence>"
@@ -176,7 +181,7 @@ ${toneSample}`;
       .join('\n\n---\n\n')
       .slice(0, 12000);
 
-    const coherencePrompt = `You are a QA agent checking cross-chapter coherence for a book titled "${project.title}". Read these chapter openings and respond ONLY with JSON:
+    const coherencePrompt = langPrefix + `You are a QA agent checking cross-chapter coherence for a book titled "${project.title}". Read these chapter openings and respond ONLY with JSON:
 {
   "coherent": true | false,
   "issues": ["<specific issue>", ...]

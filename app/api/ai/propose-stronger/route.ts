@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { ValidationScore } from '@/types/agent-workflow';
 import { modelFor, maxTokensFor } from '@/lib/ai/model-router';
+import { createClient } from '@/lib/supabase/server';
+import { getUserLanguage, languageDirective } from '@/lib/ai/user-language';
 
 const anthropic = new Anthropic();
 
@@ -26,7 +28,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const systemPrompt = `You are a senior publishing strategist. An author has submitted an idea that scored ${currentScore.total}/100 in market evaluation. Your job is to propose ONE significantly stronger version of the same idea — not a different idea entirely, but the SAME core concept reframed to address its specific weaknesses and maximize market viability.
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const lang = user ? await getUserLanguage(supabase, user.id) : 'en';
+    const langPrefix = languageDirective(lang);
+
+    const systemPrompt = langPrefix + `You are a senior publishing strategist. An author has submitted an idea that scored ${currentScore.total}/100 in market evaluation. Your job is to propose ONE significantly stronger version of the same idea — not a different idea entirely, but the SAME core concept reframed to address its specific weaknesses and maximize market viability.
 
 RULES:
 1. Preserve the author's core intent and domain expertise — do not redirect them to an unrelated topic.
