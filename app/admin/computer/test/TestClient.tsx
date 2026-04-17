@@ -23,7 +23,7 @@ interface PlatformRow {
   is_connected: boolean;
 }
 
-const TESTABLE_SLUGS = ['kobo', 'google_play', 'publishdrive', 'streetlib'] as const;
+const TESTABLE_SLUGS = ['kobo', 'google_play', 'publishdrive', 'streetlib', 'kdp'] as const;
 
 export function TestClient() {
   const [projectId, setProjectId] = useState<string | null>(null);

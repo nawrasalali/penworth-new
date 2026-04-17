@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { BookOpen, Check } from 'lucide-react';
+import { ConsentCheckbox } from '@/components/auth/ConsentCheckbox';
+import { LEGAL_DOCUMENT_KEYS } from '@/lib/legal/documents';
 
 function SignupForm() {
   const [fullName, setFullName] = useState('');
@@ -12,6 +14,7 @@ function SignupForm() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const plan = searchParams.get('plan');
@@ -24,6 +27,10 @@ function SignupForm() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!consentAccepted) {
+      setError('Please accept all three agreements to continue.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -54,6 +61,19 @@ function SignupForm() {
           .from('profiles')
           .update({ preferred_language: lang })
           .eq('id', signUpData.user.id);
+
+        // Record legal consent. Best-effort — if this fails we still continue
+        // (the signup succeeded), but we log the failure so ops can follow up.
+        // The consent API is authenticated, so this needs a session. Email-
+        // verification signups may not have a session yet; in that case the
+        // post-verify callback route will record consent instead.
+        fetch('/api/legal/consent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ documents: LEGAL_DOCUMENT_KEYS }),
+        }).catch((err) => {
+          console.warn('[signup] consent record failed:', err);
+        });
       }
 
       router.push('/login?message=Check your email to confirm your account');
@@ -65,6 +85,10 @@ function SignupForm() {
   };
 
   const handleGoogleSignup = async () => {
+    if (!consentAccepted) {
+      setError('Please accept all three agreements to continue.');
+      return;
+    }
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -157,9 +181,12 @@ function SignupForm() {
               />
               <p className="text-xs text-neutral-500 mt-1.5">Must be at least 8 characters</p>
             </div>
+
+            <ConsentCheckbox onChange={setConsentAccepted} disabled={loading} />
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !consentAccepted}
               className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 py-3 text-sm font-semibold text-white hover:shadow-lg hover:shadow-amber-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {loading ? 'Creating account...' : 'Create account'}
@@ -178,7 +205,8 @@ function SignupForm() {
           <button
             type="button"
             onClick={handleGoogleSignup}
-            className="w-full flex items-center justify-center gap-2 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 py-3 text-sm font-medium hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+            disabled={!consentAccepted}
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 py-3 text-sm font-medium hover:bg-neutral-50 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -198,9 +226,11 @@ function SignupForm() {
 
           <p className="mt-4 text-center text-xs text-neutral-500">
             By creating an account, you agree to our{' '}
-            <Link href="/terms" className="underline hover:text-neutral-900 dark:hover:text-white">Terms</Link>
-            {' '}and{' '}
-            <Link href="/privacy" className="underline hover:text-neutral-900 dark:hover:text-white">Privacy Policy</Link>
+            <Link href="/legal/terms" className="underline hover:text-neutral-900 dark:hover:text-white">Terms</Link>
+            ,{' '}
+            <Link href="/legal/privacy" className="underline hover:text-neutral-900 dark:hover:text-white">Privacy Policy</Link>
+            , and{' '}
+            <Link href="/legal/acceptable-use" className="underline hover:text-neutral-900 dark:hover:text-white">Acceptable Use Policy</Link>
           </p>
         </div>
       </div>

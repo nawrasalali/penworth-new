@@ -687,8 +687,8 @@ export default function HomePage() {
             </div>
             <p className="text-sm text-neutral-500">{t.footer.copyright}</p>
             <div className="flex items-center gap-4">
-              <Link href="/privacy" className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors">{t.footer.privacy}</Link>
-              <Link href="/terms" className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors">{t.footer.terms}</Link>
+              <Link href="/legal/privacy" className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors">{t.footer.privacy}</Link>
+              <Link href="/legal/terms" className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors">{t.footer.terms}</Link>
             </div>
           </div>
         </div>

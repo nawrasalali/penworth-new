@@ -41,6 +41,8 @@ export function buildRecipe(slug: string, input: RecipeInput): Recipe | null {
       return publishDriveRecipe(input);
     case 'streetlib':
       return streetLibRecipe(input);
+    case 'kdp':
+      return kdpRecipe(input);
     default:
       return null;
   }
@@ -375,5 +377,171 @@ STEPS:
     systemPrompt,
     userGoal,
     loginUrl: 'https://publish.streetlib.com',
+  };
+}
+
+/**
+ * Amazon KDP is the largest ebook marketplace globally (90%+ of the ebook
+ * market) and the single most-requested destination by authors. It's also
+ * the most finicky UI of the platforms we automate:
+ *   - 3-step wizard (Kindle eBook Details → Content → Pricing)
+ *   - Hard caps: 7 keywords max, 2 categories max, 4000-char description
+ *   - Mandatory age range + reading grade level + BISAC category
+ *   - KDP Select enrollment is a trap toggle (90-day exclusivity) — MUST be
+ *     left OFF so the book can also publish on every other platform
+ *   - Royalty selection (35% vs 70%) depends on territories + price range
+ *   - MFA via authenticator app is common; we hand off via request_user_input
+ */
+function kdpRecipe({ metadata, credentials }: RecipeInput): Recipe {
+  const systemPrompt = `
+You are Penworth's publishing robot, operating a real web browser on behalf
+of an author. Your job is to publish one ebook to Amazon KDP (Kindle Direct
+Publishing).
+
+OPERATING PRINCIPLES:
+- Move deliberately. Take a screenshot and study the page before every click.
+- KDP's form is long and paginated (Kindle eBook Details → Content → Pricing
+  & Royalty). Do NOT click "Publish Your Kindle eBook" at the bottom until
+  every required field across all three pages is filled.
+- KDP marks required fields with a red asterisk. If you see any red error
+  text after clicking Next/Save, STOP and re-read — do not click past errors.
+- If you see a CAPTCHA, Amazon MFA code prompt, or email verification, call
+  request_user_input with a clear reason. Amazon sends MFA via authenticator
+  app OR SMS OR email — the author will know which.
+- Never navigate away from kdp.amazon.com or amazon.com account pages.
+- If the browser shows a cookie banner, accept essential cookies only.
+- When submission succeeds (page shows "In Review" or "Your book is now
+  being reviewed"), call report_completion with the book's KDP bookshelf URL.
+
+KDP-SPECIFIC TRAPS — READ CAREFULLY:
+- KDP SELECT: there is a checkbox near the start of the wizard labelled
+  "Enroll in KDP Select". This grants Amazon 90-day EXCLUSIVITY on the
+  ebook — meaning the book CANNOT be sold on any other platform during
+  that period. We publish to 17 platforms. Leave this checkbox UNCHECKED.
+- PRE-ORDER: leave OFF unless the metadata explicitly requests a preorder.
+- PUBLISHING RIGHTS: select "I own the copyright and I hold the necessary
+  publishing rights" (the author asserted ownership at signup).
+- KEYWORDS: KDP caps at 7. If our metadata has more, take the top 7.
+- CATEGORIES: KDP caps at 2 (sometimes 3 during promotional periods).
+- PRICE MATCHING: leave Amazon's default (enrolled) unless told otherwise.
+- TERRITORIES: select "All territories (worldwide)" unless metadata
+  specifies otherwise.
+- ROYALTY: select 70% if the list price is between $2.99 and $9.99 AND
+  the author wants maximum royalty; select 35% if the price is outside
+  that range OR the author wants broader territory coverage.
+
+TOOLS YOU HAVE:
+- computer: mouse + keyboard + scroll + screenshot.
+- upload_file: the CORRECT way to attach the manuscript (.docx or .epub)
+  and the cover (.jpg). DO NOT try to drag-and-drop or simulate clicking
+  "Choose file" — the browser has no visible filesystem. Instead, locate
+  the <input type="file"> element (KDP hides these behind styled "Upload
+  eBook manuscript" / "Upload cover" buttons) and call upload_file with
+  a CSS selector pointing at it plus the attachment_name.
+- request_user_input: pause for MFA codes, email verification, CAPTCHAs.
+- report_completion: call ONCE when the upload is fully submitted for
+  review.
+
+SAFETY:
+- Never change account settings, payout details, tax information, or
+  bank details. Those are set up separately by the author.
+- Never agree to new KDP Terms of Service updates — if you see a "you must
+  accept updated terms" modal, call request_user_input. The author must
+  read and accept those themselves.
+- If in doubt, hand off.
+`.trim();
+
+  // KDP caps keywords at 7 and categories vary — truncate in the prompt so
+  // Claude sees the exact subset to use rather than having to decide.
+  const kdpKeywords = (metadata.keywords || []).slice(0, 7);
+  const kdpBisac = (metadata.bisac_codes || []).slice(0, 2);
+
+  const userGoal = `
+Publish this book to Amazon KDP as a Kindle eBook (not paperback or hardcover).
+
+CREDENTIALS (login only):
+  Email: ${credentials.email}
+  Password: ${credentials.password}
+
+BOOK METADATA:
+  Title: ${metadata.title}
+  ${metadata.subtitle ? `Subtitle: ${metadata.subtitle}` : ''}
+  Author (primary): ${metadata.author_name}
+  Language: ${metadata.language || 'English'}
+  Publishing rights: I own the copyright
+  Description (paste into Description field, truncate at 4000 chars if needed):
+    ${metadata.long_description || metadata.short_description || ''}
+  Keywords (KDP allows max 7 — use these exactly): ${kdpKeywords.join(', ')}
+  Categories (BISAC, KDP allows max 2): ${kdpBisac.join(', ')}
+  Age range: ${metadata.audience === 'children' ? '5-12 years' : 'Adult (18+)'}
+  Contains explicit content: ${metadata.contains_explicit ? 'yes' : 'no'}
+  Price (USD list): ${metadata.is_free ? 'Free (use $0.99 — KDP does not allow $0)' : (metadata.price_usd || 2.99)}
+
+KDP-SELECT: LEAVE UNCHECKED (exclusivity would block our other 16 platforms).
+PRE-ORDER: LEAVE UNCHECKED.
+TERRITORIES: All territories (worldwide).
+ROYALTY TIER: 70% if price is $2.99–$9.99, else 35%.
+PRICE MATCHING: leave default (enrolled).
+BOOK LENDING: leave default (enrolled — required for 70% royalty anyway).
+
+ATTACHMENTS (use upload_file — do not click "Choose file"):
+  - attachment_name: "manuscript"  (DOCX of the full book)
+  - attachment_name: "cover"       (JPG cover image)
+
+STEPS (high-level; KDP UI shifts, adapt as needed):
+  1. Go to https://kdp.amazon.com and sign in with the email/password above.
+     If Amazon shows an MFA prompt, call request_user_input.
+  2. If this is the first time on KDP, Amazon may show a Tax Interview or
+     Payment Info setup screen — STOP and call request_user_input. Do not
+     fill in tax or payment info on the author's behalf.
+  3. From the Bookshelf, click "+ Create" and choose "Kindle eBook".
+  4. ---- Page 1: Kindle eBook Details ----
+     - Language: ${metadata.language || 'English'}
+     - Book Title: ${metadata.title}
+     ${metadata.subtitle ? `- Subtitle: ${metadata.subtitle}` : ''}
+     - Series: leave blank
+     - Edition number: leave blank
+     - Author: ${metadata.author_name}
+     - Contributors: leave blank
+     - Description: paste the description above
+     - Publishing Rights: choose "I own the copyright and I hold the
+       necessary publishing rights"
+     - Primary Audience: answer "No" to the "Is this book intended for
+       children ages 12 or under?" question unless metadata.audience is
+       "children"
+     - Keywords: enter each of the ${kdpKeywords.length} keywords in a
+       separate field (KDP has 7 keyword slots)
+     - Categories: click "Choose categories" — select up to 2 that best
+       match the BISAC codes above
+     - Pre-order: leave the default (No, I am ready to release my book now)
+     - Click "Save and Continue"
+  5. ---- Page 2: Kindle eBook Content ----
+     - Manuscript: call upload_file with attachment_name="manuscript" and
+       a selector for the file input under "Upload eBook manuscript"
+     - Book Cover: call upload_file with attachment_name="cover" and the
+       cover file input selector under "Upload your cover file"
+     - Kindle eBook Preview: skip if available, or click "Launch Previewer"
+       only to confirm files uploaded correctly
+     - ISBN: leave blank (KDP does not require an ISBN for ebook-only)
+     - Publisher: leave blank (KDP will list the author as publisher)
+     - Click "Save and Continue"
+  6. ---- Page 3: Kindle eBook Pricing ----
+     - KDP Select Enrollment: LEAVE UNCHECKED. This is critical.
+     - Territories: select "All territories (worldwide rights)"
+     - Primary Marketplace: Amazon.com
+     - Royalty and Pricing: choose 70% if price is $2.99–$9.99, else 35%.
+       Enter the list price ${metadata.is_free ? '0.99' : (metadata.price_usd || 2.99)}
+       in the USD field. Let KDP autofill other marketplaces.
+     - Book Lending: leave enabled (required for 70% royalty)
+     - Click "Publish Your Kindle eBook"
+  7. Wait for the confirmation page (usually says "Congratulations! Your
+     book is now being reviewed"). Extract the book's bookshelf URL.
+  8. Call report_completion with the book's KDP bookshelf URL.
+`.trim();
+
+  return {
+    systemPrompt,
+    userGoal,
+    loginUrl: 'https://kdp.amazon.com',
   };
 }

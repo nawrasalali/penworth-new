@@ -363,8 +363,8 @@ export default function PricingPage() {
             © 2026 Penworth. A product of A.C.N. 675 668 710 PTY LTD.
           </p>
           <div className="flex gap-6 text-sm">
-            <Link href="/privacy" className="hover:text-primary">Privacy</Link>
-            <Link href="/terms" className="hover:text-primary">Terms</Link>
+            <Link href="/legal/privacy" className="hover:text-primary">Privacy</Link>
+            <Link href="/legal/terms" className="hover:text-primary">Terms</Link>
             <Link href="mailto:support@penworth.ai" className="hover:text-primary">Support</Link>
           </div>
         </div>

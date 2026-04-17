@@ -30,7 +30,7 @@ import { ComputerSessionPanel } from './ComputerSessionPanel';
  * branch into the computer-use connect dialog (email + password) and
  * the live session panel.
  */
-const COMPUTER_USE_SLUGS = new Set(['kobo', 'google_play', 'publishdrive', 'streetlib']);
+const COMPUTER_USE_SLUGS = new Set(['kobo', 'google_play', 'publishdrive', 'streetlib', 'kdp']);
 
 interface ProjectRow {
   id: string;
@@ -961,6 +961,7 @@ const SHOWCASE_MARKETPLACE: ShowcasePlatform = {
 };
 
 const SHOWCASE_AUTO: ShowcasePlatform[] = [
+  { slug: 'kdp',           name: 'Amazon Kindle Direct Publishing', tagline: 'Largest ebook marketplace globally. Driven by Penworth Computer.', royalty: '35–70% depending on pricing', reach: '13 global marketplaces, 90%+ ebook market' },
   { slug: 'draft2digital', name: 'Draft2Digital', tagline: 'Distributes to Apple, Kobo, B&N, libraries, and more.', royalty: '60% (Apple/Kobo) + aggregator cut', reach: 'Aggregator — 10+ retailers in one click' },
   { slug: 'kobo',          name: 'Kobo Writing Life', tagline: 'Strong in Canada, Europe, Japan.', royalty: '70%', reach: 'Kobo readers + OverDrive libraries' },
   { slug: 'google_play',   name: 'Google Play Books', tagline: 'Worldwide via Penworth Computer.', royalty: '52% (Google share)', reach: 'Android + Google Play Books' },
@@ -971,7 +972,6 @@ const SHOWCASE_AUTO: ShowcasePlatform[] = [
 ];
 
 const SHOWCASE_GUIDED: ShowcasePlatform[] = [
-  { slug: 'kdp',          name: 'Amazon Kindle Direct Publishing', tagline: 'Largest ebook marketplace globally.', royalty: '35–70% depending on pricing', reach: '13 global marketplaces, 90%+ ebook market' },
   { slug: 'apple_books',  name: 'Apple Books', tagline: 'Apple Books global store.', royalty: '70%', reach: 'Apple Books in 50+ countries' },
   { slug: 'ingram_spark', name: 'IngramSpark', tagline: 'Distribution to libraries and bookstores.', royalty: 'Author sets price', reach: 'Global libraries + bookstore wholesale' },
   { slug: 'smashwords',   name: 'Smashwords', tagline: 'Large indie ebook distribution.', royalty: '60%', reach: 'Smashwords store + partner retailers' },
@@ -1027,15 +1027,15 @@ function PublishShowcase() {
           icon={<Globe className="h-5 w-5" />}
           title="Auto-publish"
           subtitle="We drive the keyboard."
-          body="Seven platforms published automatically — some via direct API, some via Penworth Computer (Claude drives a real browser). You connect once, we handle every submission."
-          count="7 platforms"
+          body="Eight platforms published automatically — including Amazon KDP. Some via direct API, some via Penworth Computer (Claude drives a real browser). You connect once, we handle every submission."
+          count="8 platforms"
         />
         <MechanismCard
           icon={<FileText className="h-5 w-5" />}
           title="Guided kits"
-          subtitle="KDP-ready everything."
-          body="For platforms that don't accept automation: we generate platform-specific files (KDP-formatted PDF, DOCX, cover) plus a step-by-step walkthrough so submission takes minutes, not hours."
-          count="9 platforms"
+          subtitle="Formatted files, step-by-step."
+          body="For platforms that don't accept automation: we generate platform-specific files (formatted PDF, DOCX, cover) plus a walkthrough so submission takes minutes, not hours."
+          count="8 platforms"
         />
       </div>
 
