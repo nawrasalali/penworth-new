@@ -8,6 +8,8 @@ import { buildRecipe } from '@/lib/publishing/computer-recipes';
 import { loadActiveCredential } from '@/lib/publishing/load-credential';
 import { ensurePublishingMetadata } from '@/lib/publishing/metadata';
 import { buildManuscriptDocx, loadProjectForPublish } from '@/lib/publishing/draft2digital';
+import { refundPublishingCredits } from '@/lib/publishing/credits';
+import { PUBLISHING_CREDIT_COSTS } from '@/lib/plans';
 
 export const runtime = 'nodejs';
 export const maxDuration = 600; // 10 minutes; Kobo uploads can take a while
@@ -116,6 +118,13 @@ export async function GET(
             ended_at: new Date().toISOString(),
           })
           .eq('id', sessionId);
+        // Session never actually ran — refund the credits debited at start
+        await refundPublishingCredits({
+          supabase: service,
+          userId: user.id,
+          amount: PUBLISHING_CREDIT_COSTS.computer_use,
+          reason: `Computer session boot failure (${slug})`,
+        });
         send('error', { message: msg });
         controller.close();
         return;
@@ -250,6 +259,22 @@ export async function GET(
             ended_at: new Date().toISOString(),
           })
           .eq('id', sessionId);
+
+        // Refund credits if the session truly failed (system error, not
+        // a user cancel — cancel keeps the charge as a "tried the feature"
+        // cost, since real API + browser time was burned).
+        if (terminalStatus === 'failed') {
+          try {
+            await refundPublishingCredits({
+              supabase: service,
+              userId: user.id,
+              amount: PUBLISHING_CREDIT_COSTS.computer_use,
+              reason: `Computer session failed (${slug})`,
+            });
+          } catch {
+            // non-fatal — admin can refund manually
+          }
+        }
 
         try {
           await runtimeHandle.dispose();

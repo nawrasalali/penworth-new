@@ -4,6 +4,8 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { ensurePublishingMetadata, validateForPublishing } from '@/lib/publishing/metadata';
 import { loadActiveCredential } from '@/lib/publishing/load-credential';
 import { buildRecipe } from '@/lib/publishing/computer-recipes';
+import { debitPublishingCredits } from '@/lib/publishing/credits';
+import { PUBLISHING_CREDIT_COSTS } from '@/lib/plans';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -28,19 +30,6 @@ export async function POST(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  // Admin gate during rollout
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_admin')
-    .eq('id', user.id)
-    .single();
-  if (!profile?.is_admin) {
-    return NextResponse.json(
-      { error: 'Penworth Computer is in limited preview. Contact support for early access.' },
-      { status: 402 },
-    );
-  }
 
   const { projectId } = await request.json();
   if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 });
@@ -99,6 +88,22 @@ export async function POST(
     );
   }
 
+  // All gates cleared — debit credits before creating the session row.
+  // Refund if the row insert fails. The stream endpoint handles its own
+  // refund on runtime boot failure (see /stream/route.ts).
+  const debit = await debitPublishingCredits({
+    supabase,
+    userId: user.id,
+    amount: PUBLISHING_CREDIT_COSTS.computer_use,
+    reason: `Penworth Computer: ${platform.name}`,
+  });
+  if (!debit.ok) {
+    return NextResponse.json(
+      { error: debit.error, code: debit.code, required: debit.required, available: debit.available },
+      { status: debit.status },
+    );
+  }
+
   // Use service client for session row creation so we bypass RLS on write;
   // RLS still protects reads at the user layer.
   const service = createServiceClient();
@@ -117,6 +122,8 @@ export async function POST(
     .single();
 
   if (error || !session) {
+    // Refund since the session never actually started
+    await debit.refund();
     return NextResponse.json({ error: error?.message || 'Failed to create session' }, { status: 500 });
   }
 

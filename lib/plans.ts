@@ -8,6 +8,19 @@ export const CREDIT_COSTS = {
   standardDocument: 1_000, // 1 document costs 1000 credits
 } as const;
 
+/**
+ * Credit costs for publishing operations. Tier 2 auto-publish burns
+ * small amounts (single API call, bounded cost). Penworth Computer
+ * sessions burn significantly more — a full Kobo publish uses
+ * ~30-60 Claude opus turns with screenshot vision inputs each turn.
+ */
+export const PUBLISHING_CREDIT_COSTS = {
+  /** Direct API auto-publish: D2D, Gumroad, Payhip */
+  tier2_api: 50,
+  /** Penworth Computer browser automation session (any platform) */
+  computer_use: 500,
+} as const;
+
 export const PLAN_LIMITS: Record<string, {
   monthlyCredits: number;
   // Document limit = monthlyCredits / CREDIT_COSTS.standardDocument

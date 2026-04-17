@@ -18,6 +18,7 @@ import {
   Clock,
   ChevronDown,
   Unlink,
+  Coins,
 } from 'lucide-react';
 import { MetadataEditor } from './MetadataEditor';
 import { KitPanel } from './KitPanel';
@@ -154,6 +155,12 @@ export function PublishClient({
         toast.error(`Connect your ${displayName} account first`);
         return;
       }
+      if (data.code === 'INSUFFICIENT_CREDITS') {
+        toast.error(
+          `Not enough credits — this publish costs ${data.required}. You have ${data.available}. Top up in Billing.`,
+        );
+        return;
+      }
       if (!resp.ok || data.error) {
         toast.error(data.error || 'Publishing failed');
         return;
@@ -272,6 +279,12 @@ export function PublishClient({
       if (resp.status === 428 || data.code === 'not_connected') {
         toast.error(`Connect your ${displayName} account first`);
         setComputerConnectDialog({ slug, displayName });
+        return;
+      }
+      if (data.code === 'INSUFFICIENT_CREDITS') {
+        toast.error(
+          `Not enough credits — Penworth Computer costs ${data.required}. You have ${data.available}. Top up in Billing.`,
+        );
         return;
       }
       if (!resp.ok || data.error) {
@@ -835,6 +848,21 @@ function PlatformCard({
         {platform.avg_publish_time_minutes && (
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />~{platform.avg_publish_time_minutes}min
+          </span>
+        )}
+        {platform.publish_tier === 'api_auto' && (
+          <span
+            className="flex items-center gap-1"
+            title={
+              platform.oauth_provider && COMPUTER_USE_SLUGS.has(platform.oauth_provider)
+                ? 'Penworth Computer session — Claude drives the browser for you.'
+                : 'One-click auto-publish via API.'
+            }
+          >
+            <Coins className="h-3 w-3" />
+            {platform.oauth_provider && COMPUTER_USE_SLUGS.has(platform.oauth_provider)
+              ? '500 credits'
+              : '50 credits'}
           </span>
         )}
       </div>

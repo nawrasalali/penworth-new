@@ -10,6 +10,8 @@ import {
 } from '@/lib/publishing/draft2digital';
 import { publishToGumroad, GumroadError } from '@/lib/publishing/gumroad';
 import { publishToPayhip, PayhipError } from '@/lib/publishing/payhip';
+import { debitPublishingCredits } from '@/lib/publishing/credits';
+import { PUBLISHING_CREDIT_COSTS } from '@/lib/plans';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -19,7 +21,7 @@ export const maxDuration = 120;
  * body: { projectId }
  *
  * Auto-publishes a project to a Tier 2 platform:
- *   1. Auth + admin gate (rollout)
+ *   1. Auth + credit debit (refunded on failure)
  *   2. Load metadata (422 if incomplete)
  *   3. Load active OAuth credential (428 if not connected)
  *   4. Build manuscript + cover buffers
@@ -34,19 +36,6 @@ export async function POST(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  // Admin gate for rollout — credit-metering comes later
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_admin')
-    .eq('id', user.id)
-    .single();
-  if (!profile?.is_admin) {
-    return NextResponse.json(
-      { error: 'Auto-publish is in limited preview. Contact support for early access.' },
-      { status: 402 },
-    );
-  }
 
   const { projectId } = await request.json();
   if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 });
@@ -96,6 +85,20 @@ export async function POST(
   const bundle = await loadProjectForPublish(supabase, projectId, user.id);
   if (!bundle) {
     return NextResponse.json({ error: 'No completed chapters to publish' }, { status: 400 });
+  }
+
+  // Debit credits up-front. Refund on any downstream failure.
+  const debit = await debitPublishingCredits({
+    supabase,
+    userId: user.id,
+    amount: PUBLISHING_CREDIT_COSTS.tier2_api,
+    reason: `Tier 2 auto-publish: ${platform.name}`,
+  });
+  if (!debit.ok) {
+    return NextResponse.json(
+      { error: debit.error, code: debit.code, required: debit.required, available: debit.available },
+      { status: debit.status },
+    );
   }
 
   // Mark in-progress
@@ -242,11 +245,15 @@ export async function POST(
     }
 
     // Other Tier 2 providers land here when their adapters ship
+    await debit.refund();
     return NextResponse.json(
       { error: `Auto-publish for ${platform.name} is not yet implemented` },
       { status: 501 },
     );
   } catch (err) {
+    // Refund credits since the publish didn't land
+    await debit.refund();
+
     const detail =
       err instanceof D2DError ? err.detail :
       err instanceof GumroadError ? err.detail :
