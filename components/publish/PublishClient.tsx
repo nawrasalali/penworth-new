@@ -40,6 +40,7 @@ interface Platform {
   avg_publish_time_minutes: number | null;
   submission_url: string | null;
   publish_tier: 'penworth_store' | 'api_auto' | 'guided_pdf';
+  oauth_provider: string | null;
   is_connected: boolean;
   publication: {
     status: string;
@@ -87,6 +88,42 @@ export function PublishClient({
   useEffect(() => {
     loadPlatforms();
   }, [loadPlatforms]);
+
+  // When returning from an OAuth round-trip, the callback redirects to
+  // /publish?connected=<slug> or /publish?oauth_error=<code>. Surface a
+  // toast for either and scrub the URL so refresh doesn't re-fire it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    const oauthError = params.get('oauth_error');
+    const provider = params.get('provider');
+
+    if (connected) {
+      toast.success(`Connected to ${prettyProvider(connected)}`);
+    } else if (oauthError) {
+      toast.error(oauthErrorMessage(oauthError, provider));
+    }
+    if (connected || oauthError) {
+      // Strip the query so a refresh doesn't re-toast
+      params.delete('connected');
+      params.delete('oauth_error');
+      params.delete('provider');
+      params.delete('detail');
+      const qs = params.toString();
+      router.replace(qs ? `/publish?${qs}` : '/publish');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Kick off the OAuth flow for a Tier 2 platform. The server-side start
+   * endpoint signs a state token and redirects to the provider; we use a
+   * full-page navigation because OAuth requires an HTTP redirect chain.
+   */
+  const connectPlatform = (slug: string) => {
+    const projectParam = selectedId ? `?projectId=${selectedId}` : '';
+    window.location.href = `/api/publishing/oauth/${slug}/start${projectParam}`;
+  };
 
   /**
    * Tier 1 — Penworth Store one-click publish.
@@ -316,8 +353,14 @@ export function PublishClient({
                 <PlatformCard
                   key={p.id}
                   platform={p}
-                  onPublish={() => toast.info(`${p.name}: auto-publish is in early access. Coming very soon.`)}
-                  onConnect={() => toast.info(`${p.name}: OAuth flow coming in the next release.`)}
+                  onPublish={() => toast.info(`${p.name}: auto-publish kicks in right after you connect. We'll ship this handler next.`)}
+                  onConnect={() => {
+                    if (!p.oauth_provider) {
+                      toast.info(`${p.name}: connector coming soon.`);
+                      return;
+                    }
+                    connectPlatform(p.oauth_provider);
+                  }}
                 />
               ))}
             </div>
@@ -468,4 +511,43 @@ function PlatformCard({
       </div>
     </div>
   );
+}
+
+// ============================================================================
+// OAuth UX helpers — translate internal slugs/errors into human-readable text
+// ============================================================================
+
+function prettyProvider(slug: string): string {
+  const map: Record<string, string> = {
+    draft2digital: 'Draft2Digital',
+    gumroad: 'Gumroad',
+    payhip: 'Payhip',
+    kobo: 'Kobo Writing Life',
+    google_play: 'Google Play Books',
+    publishdrive: 'PublishDrive',
+    streetlib: 'StreetLib',
+  };
+  return map[slug] || slug;
+}
+
+function oauthErrorMessage(code: string, provider?: string | null): string {
+  const who = provider ? prettyProvider(provider) : 'the platform';
+  switch (code) {
+    case 'preview_only':
+      return 'Account connections are in limited preview. Contact support for early access.';
+    case 'not_configured':
+      return `${who} connection is not yet configured on this server. Contact support.`;
+    case 'provider_denied':
+      return `${who} denied the connection request. You can try again.`;
+    case 'token_exchange_failed':
+      return `Could not finalise your ${who} connection. Please try again.`;
+    case 'invalid_state':
+    case 'slug_mismatch':
+    case 'session_mismatch':
+      return 'The connection attempt expired or was tampered with. Please try again.';
+    case 'encryption_unavailable':
+      return 'Secure credential storage is not available right now. Contact support.';
+    default:
+      return `${who} connection failed (${code}).`;
+  }
 }
