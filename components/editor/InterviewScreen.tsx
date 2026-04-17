@@ -116,6 +116,7 @@ export function InterviewScreen({
           projectId,
           chosenIdea,
           answers: answersSoFar,
+          contentType,
         }),
       });
       const data = await resp.json();
