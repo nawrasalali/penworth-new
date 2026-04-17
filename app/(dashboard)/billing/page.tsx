@@ -95,14 +95,18 @@ function BillingContent() {
   const supabase = createClient();
 
   useEffect(() => {
-    // Check for success messages from Stripe redirect
-    if (searchParams.get('success') === 'true') {
-      setSuccessMessage('Subscription activated! Welcome to your new plan.');
-    } else if (searchParams.get('credits') === 'success') {
-      setSuccessMessage('Credits added to your account!');
-    }
     loadBillingData();
   }, [searchParams]);
+
+  // Success banner — translated after locale is resolved from the profile.
+  useEffect(() => {
+    if (isLoading) return;
+    if (searchParams.get('success') === 'true') {
+      setSuccessMessage(t('billing.subActivated', locale));
+    } else if (searchParams.get('credits') === 'success') {
+      setSuccessMessage(t('billing.creditsAdded', locale));
+    }
+  }, [isLoading, locale, searchParams]);
 
   const loadBillingData = async () => {
     setIsLoading(true);
@@ -189,7 +193,7 @@ function BillingContent() {
       if (error) throw new Error(error);
       if (url) window.location.href = url;
     } catch (error) {
-      alert('Failed to start checkout. Please try again.');
+      alert(t('billing.checkoutFailed', locale));
     } finally {
       setIsProcessing(false);
     }
@@ -208,7 +212,7 @@ function BillingContent() {
       if (error) throw new Error(error);
       if (url) window.location.href = url;
     } catch (error) {
-      alert('Failed to start checkout. Please try again.');
+      alert(t('billing.checkoutFailed', locale));
     } finally {
       setIsProcessing(false);
     }
@@ -225,7 +229,7 @@ function BillingContent() {
       if (error) throw new Error(error);
       if (url) window.location.href = url;
     } catch (error) {
-      alert('Failed to open billing portal. Please try again.');
+      alert(t('billing.portalFailed', locale));
     } finally {
       setIsProcessing(false);
     }
@@ -260,15 +264,15 @@ function BillingContent() {
             <h2 className="text-xl font-semibold mb-1">{t('billing.currentPlan', locale)}: {currentPlan.name}</h2>
             <p className="text-muted-foreground">
               {subscription?.plan === 'free' 
-                ? 'Free forever' 
+                ? t('billing.freeForever', locale)
                 : `$${currentPlan.monthlyPrice}/month or $${currentPlan.annualPrice}/year`
               }
             </p>
             {subscription?.current_period_end && subscription.plan !== 'free' && (
               <p className="text-sm text-muted-foreground mt-2">
                 {subscription.cancel_at_period_end 
-                  ? `Cancels on ${new Date(subscription.current_period_end).toLocaleDateString()}`
-                  : `Renews on ${new Date(subscription.current_period_end).toLocaleDateString()}`
+                  ? `${t('billing.cancelsOn', locale)} ${new Date(subscription.current_period_end).toLocaleDateString()}`
+                  : `${t('billing.renewsOn', locale)} ${new Date(subscription.current_period_end).toLocaleDateString()}`
                 }
               </p>
             )}
@@ -285,7 +289,7 @@ function BillingContent() {
       {/* Usage */}
       {usage && (
         <div className="border rounded-lg p-4 bg-card mb-8">
-          <h3 className="text-sm font-medium text-muted-foreground mb-2">Credits Available</h3>
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">{t('billing.creditsAvailable', locale)}</h3>
           <p className="text-2xl font-bold">
             {((usage.credits_limit - usage.credits_used) + usage.credits_purchased).toLocaleString()}
           </p>
@@ -296,23 +300,23 @@ function BillingContent() {
             />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground mt-1">
-            <span>{usage.credits_used.toLocaleString()} of {usage.credits_limit.toLocaleString()} monthly credits used</span>
+            <span>{usage.credits_used.toLocaleString()} / {usage.credits_limit.toLocaleString()} {t('billing.creditsUsed', locale)}</span>
             <span>{usage.documents_this_month} document{usage.documents_this_month !== 1 ? 's' : ''} written</span>
           </div>
           {usage.credits_purchased > 0 && (
             <p className="text-xs text-green-600 mt-1">
-              Includes {usage.credits_purchased.toLocaleString()} purchased credits
+              + {usage.credits_purchased.toLocaleString()} {t('billing.credits', locale).toLowerCase()}
             </p>
           )}
           <p className="text-xs text-muted-foreground mt-2 border-t pt-2">
-            1,000 credits = 1 document
+            {t('billing.oneDocEqualsCredits', locale)}
           </p>
         </div>
       )}
 
       {/* Plans */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">Available Plans</h2>
+        <h2 className="text-xl font-semibold">{t('billing.availablePlans', locale)}</h2>
         <div className="inline-flex items-center gap-2 p-1 bg-muted rounded-lg">
           <button
             onClick={() => setBillingPeriod('monthly')}
@@ -329,7 +333,7 @@ function BillingContent() {
             }`}
           >
             {t('billing.annual', locale)}
-            <span className="ml-1 text-xs text-green-600">Save 17%</span>
+            <span className="ml-1 text-xs text-green-600">{t('billing.save17', locale)}</span>
           </button>
         </div>
       </div>
@@ -390,7 +394,7 @@ function BillingContent() {
                 onClick={() => handleUpgrade(plan.id)}
                 disabled={isProcessing || plan.monthlyPrice === 0}
               >
-                {plan.monthlyPrice === 0 ? 'Downgrade' : t('billing.upgrade', locale)}
+                {plan.monthlyPrice === 0 ? t('billing.downgrade', locale) : t('billing.upgrade', locale)}
               </Button>
             )}
           </div>
@@ -401,29 +405,36 @@ function BillingContent() {
       <div className="mb-12">
         <div className="flex items-center gap-2 mb-4">
           <Zap className="w-5 h-5 text-yellow-500" />
-          <h2 className="text-xl font-semibold">Credit Add-On Packs</h2>
+          <h2 className="text-xl font-semibold">{t('billing.creditPacksTitle', locale)}</h2>
         </div>
         <p className="text-muted-foreground mb-2">
-          Need more credits? Purchase add-on packs anytime. <strong>Available for ALL tiers!</strong>
+          {t('billing.creditPacksBody', locale)}
         </p>
         {subscription?.plan === 'free' && (
           <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
-            ✨ Free users who purchase credits automatically have the "by Penworth" watermark removed!
+            ✨ {t('billing.freeWatermarkRemoved', locale)}
           </p>
         )}
 
         <div className="grid gap-4 md:grid-cols-3">
-          {CREDIT_PACKS.map((pack) => (
+          {CREDIT_PACKS.map((pack) => {
+            // Pack name: translate by id, fall back to English if unknown
+            const packNameKey =
+              pack.id === 'v2_credits_1000' ? 'billing.creditPackSingle' :
+              pack.id === 'v2_credits_3000' ? 'billing.creditPackTriple' :
+              pack.id === 'v2_credits_10000' ? 'billing.creditPackBulk' : null;
+            const packName = packNameKey ? t(packNameKey, locale) : pack.name;
+            return (
             <div key={pack.id} className="border rounded-lg p-6 bg-card">
-              <h3 className="font-semibold mb-1">{pack.name}</h3>
+              <h3 className="font-semibold mb-1">{packName}</h3>
               <p className="text-3xl font-bold mb-1">${pack.price}</p>
               <p className="text-sm text-muted-foreground mb-3">
-                {pack.credits.toLocaleString()} credits
+                {pack.credits.toLocaleString()} {t('billing.credits', locale).toLowerCase()}
               </p>
               <p className="text-sm mb-4">
-                ${pack.perDoc}/document
+                ${pack.perDoc}/{t('billing.perDoc', locale)}
                 {pack.savings && (
-                  <span className="ml-2 text-green-600 font-medium">({pack.savings} off)</span>
+                  <span className="ml-2 text-green-600 font-medium">({pack.savings})</span>
                 )}
               </p>
               <Button 
@@ -432,10 +443,11 @@ function BillingContent() {
                 onClick={() => handleBuyCreditPack(pack.id)}
                 disabled={isProcessing}
               >
-                Buy Credits
+                {t('billing.buyCredits', locale)}
               </Button>
             </div>
-          ))}
+            );
+          })}
         </div>
         <p className="text-sm text-muted-foreground mt-4">
           Purchased credits never expire • Used after monthly credits are exhausted
