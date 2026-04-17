@@ -826,9 +826,28 @@ function EditorContentNew() {
     toast.info('Download starting...');
   };
 
-  // Handler: Publish
-  const handlePublish = () => {
-    router.push(`/projects/${projectId}/publish`);
+  // Handler: Publish — one-click publish to Penworth Store (the 17th platform
+  // Penworth owns fully). Creates a live marketplace listing at /marketplace/[id].
+  const handlePublish = async () => {
+    try {
+      toast.info('Publishing to Penworth Store...');
+      const resp = await fetch('/api/publishing/penworth-store', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, priceUsd: 0 }), // default: free listing
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) {
+        toast.error(data.error || 'Publishing failed');
+        return;
+      }
+      toast.success(`Live on Penworth Store — ${data.stats.chapterCount} chapters, ${data.stats.totalWords.toLocaleString()} words`);
+      // Take the author to their live listing so they can share it
+      router.push(data.externalUrl);
+    } catch (err) {
+      console.error('Publish failed:', err);
+      toast.error('Publishing failed. Please try again.');
+    }
   };
 
   // Advance to next agent
