@@ -1,9 +1,70 @@
+import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-// Server-side Stripe instance
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+/**
+ * Eager server-side Stripe instance. Kept for backward compat with the
+ * helpers below (createCheckoutSession / createBillingPortalSession). New
+ * routes should prefer getStripeOrError() — see the note on that function.
+ *
+ * If STRIPE_SECRET_KEY is missing at import time, this is an empty-string
+ * Stripe client that will reject with a clear Stripe-side error on first
+ * API call rather than crashing the whole route. Prefer the lazy helper.
+ */
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_missing', {
   apiVersion: '2025-02-24.acacia',
 });
+
+/**
+ * Lazy Stripe client with specific-missing-env diagnostics.
+ *
+ * Previously our Stripe routes did `new Stripe(process.env.STRIPE_SECRET_KEY!)`
+ * at module top level. That pattern crashes the entire route at first-import
+ * time when the secret is missing, and the user sees a generic 500 with no
+ * signal about what's broken. This helper defers instantiation to request
+ * time and returns a structured error identifying the exact missing var, so
+ * frontends can surface the exact missing env var in the network tab.
+ */
+export function getStripeOrError():
+  | { stripe: Stripe; error?: undefined }
+  | { stripe?: undefined; error: NextResponse } {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    return {
+      error: NextResponse.json(
+        {
+          error:
+            'Billing is not configured. STRIPE_SECRET_KEY is missing on the server. ' +
+            'Contact support@penworth.ai.',
+          code: 'missing_env:STRIPE_SECRET_KEY',
+        },
+        { status: 503 },
+      ),
+    };
+  }
+  return { stripe: new Stripe(key, { apiVersion: '2025-02-24.acacia' }) };
+}
+
+/**
+ * Same pattern for the webhook secret — resolved lazily so a missing secret
+ * doesn't take down module import, just returns a clear 503 at request time.
+ */
+export function getWebhookSecretOrError():
+  | { secret: string; error?: undefined }
+  | { secret?: undefined; error: NextResponse } {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secret) {
+    return {
+      error: NextResponse.json(
+        {
+          error: 'Webhook is not configured. STRIPE_WEBHOOK_SECRET is missing.',
+          code: 'missing_env:STRIPE_WEBHOOK_SECRET',
+        },
+        { status: 503 },
+      ),
+    };
+  }
+  return { secret };
+}
 
 // Price IDs
 export const PRICES = {

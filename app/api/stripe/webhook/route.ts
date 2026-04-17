@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { PLAN_LIMITS, CREDIT_PACKS } from '@/lib/plans';
+import { getStripeOrError, getWebhookSecretOrError } from '@/lib/stripe/client';
 import {
   recordFirstPayment,
   recordRenewalPayment,
@@ -9,27 +10,27 @@ import {
   handleRefund as guildHandleRefund,
 } from '@/lib/guild/commissions';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-02-24.acacia',
-});
-
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export async function POST(request: NextRequest) {
+  const stripeResult = getStripeOrError();
+  if (stripeResult.error) return stripeResult.error;
+  const stripe = stripeResult.stripe;
+
+  const secretResult = getWebhookSecretOrError();
+  if (secretResult.error) return secretResult.error;
+  const webhookSecret = secretResult.secret;
+
   const body = await request.text();
   const signature = request.headers.get('stripe-signature')!;
 
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    );
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err: any) {
     console.error('Webhook signature verification failed:', err.message);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
   try {
     switch (event.type) {
       case 'checkout.session.completed':
-        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+        await handleCheckoutCompleted(stripe, event.data.object as Stripe.Checkout.Session);
         break;
 
       case 'customer.subscription.updated':
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
         break;
 
       case 'charge.dispute.created':
-        await handleChargeDispute(event.data.object as Stripe.Dispute);
+        await handleChargeDispute(stripe, event.data.object as Stripe.Dispute);
         break;
 
       default:
@@ -114,7 +115,7 @@ async function findOrgByCustomerId(customerId: string): Promise<string | null> {
 /**
  * Handle successful checkout - activate subscription or add credits
  */
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.Session) {
   const userId = session.metadata?.userId;
   if (!userId) {
     console.error('No userId in checkout session metadata');
@@ -507,7 +508,7 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
 /**
  * Handle chargeback — claw back entire referral's commissions + mark as refunded.
  */
-async function handleChargeDispute(dispute: Stripe.Dispute) {
+async function handleChargeDispute(stripe: Stripe, dispute: Stripe.Dispute) {
   const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge?.id;
   if (!chargeId) return;
 

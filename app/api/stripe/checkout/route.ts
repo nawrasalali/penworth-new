@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@/lib/supabase/server';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-02-24.acacia',
-});
+import { getStripeOrError } from '@/lib/stripe/client';
 
 // v2 Pricing: Free / Pro / Max (no Starter, Publisher, Agency)
 const PRICE_IDS: Record<string, { monthly: string; annual: string }> = {
@@ -27,6 +24,10 @@ const CREDIT_PACK_PRICES: Record<string, string> = {
 
 export async function POST(request: NextRequest) {
   try {
+    const stripeResult = getStripeOrError();
+    if (stripeResult.error) return stripeResult.error;
+    const stripe = stripeResult.stripe;
+
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     // Handle credit pack purchase
     if (creditPackId) {
-      return handleCreditPackPurchase(user.id, creditPackId, supabase, user.email!);
+      return handleCreditPackPurchase(stripe, user.id, creditPackId, supabase, user.email!);
     }
 
     // Handle subscription
@@ -114,11 +115,22 @@ export async function POST(request: NextRequest) {
 
     // Create checkout session
     const priceId = PRICE_IDS[planId][billingPeriod as 'monthly' | 'annual'];
-    
+
     if (!priceId) {
+      const envVarName =
+        planId === 'pro' && billingPeriod === 'monthly'
+          ? 'STRIPE_PRICE_PRO_MONTHLY'
+          : planId === 'pro'
+            ? 'STRIPE_PRICE_PRO_ANNUAL'
+            : billingPeriod === 'monthly'
+              ? 'STRIPE_PRICE_MAX_MONTHLY'
+              : 'STRIPE_PRICE_MAX_ANNUAL';
       return NextResponse.json(
-        { error: 'Price not configured. Please contact support.' },
-        { status: 500 }
+        {
+          error: `Pricing for ${planId} ${billingPeriod} is not configured. Missing ${envVarName}.`,
+          code: `missing_env:${envVarName}`,
+        },
+        { status: 503 },
       );
     }
 
@@ -152,15 +164,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
+    // Surface the underlying Stripe error message so misconfigured prices,
+    // invalid customer IDs, etc. become diagnosable instead of a blank 500.
+    const message =
+      error instanceof Error ? error.message : 'Failed to create checkout session';
     console.error('Checkout error:', error);
-    return NextResponse.json(
-      { error: 'Failed to create checkout session' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
 async function handleCreditPackPurchase(
+  stripe: Stripe,
   userId: string,
   creditPackId: string,
   supabase: any,
@@ -169,7 +183,23 @@ async function handleCreditPackPurchase(
   // All tiers can now buy credit packs (including free)
   const priceId = CREDIT_PACK_PRICES[creditPackId];
   if (!priceId) {
-    return NextResponse.json({ error: 'Invalid credit pack' }, { status: 400 });
+    const envVarName =
+      creditPackId === 'v2_credits_1000'
+        ? 'STRIPE_PRICE_CREDITS_1000'
+        : creditPackId === 'v2_credits_3000'
+          ? 'STRIPE_PRICE_CREDITS_3000'
+          : creditPackId === 'v2_credits_10000'
+            ? 'STRIPE_PRICE_CREDITS_10000'
+            : null;
+    return NextResponse.json(
+      {
+        error: envVarName
+          ? `Credit pack pricing is not configured. Missing ${envVarName}.`
+          : 'Invalid credit pack',
+        code: envVarName ? `missing_env:${envVarName}` : 'invalid_credit_pack',
+      },
+      { status: envVarName ? 503 : 400 },
+    );
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
@@ -201,7 +231,6 @@ async function handleCreditPackPurchase(
     customerId = customer.id;
 
     // Save to organization (create one if needed)
-    let orgId: string | null = null;
     const { data: existingOrg } = await supabase
       .from('org_members')
       .select('org_id')
