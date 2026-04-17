@@ -198,7 +198,8 @@ export interface InterviewQuestion {
   helpText?: string;
 }
 
-export const INTERVIEW_QUESTIONS: Record<ContentType, InterviewQuestion[]> = {
+// Record is Partial — missing entries fall back to DEFAULT_QUESTIONS below.
+export const INTERVIEW_QUESTIONS: Partial<Record<ContentType, InterviewQuestion[]>> = {
   'non-fiction': [
     // FOUNDATION PHASE
     {
@@ -682,7 +683,8 @@ const DEFAULT_QUESTIONS: InterviewQuestion[] = [
 
 // Apply default questions to empty content types
 Object.keys(INTERVIEW_QUESTIONS).forEach(key => {
-  if (INTERVIEW_QUESTIONS[key as ContentType].length === 0) {
+  const entry = INTERVIEW_QUESTIONS[key as ContentType];
+  if (!entry || entry.length === 0) {
     INTERVIEW_QUESTIONS[key as ContentType] = DEFAULT_QUESTIONS;
   }
 });

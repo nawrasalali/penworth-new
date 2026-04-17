@@ -29,15 +29,38 @@ export type ContentType =
   | 'cookbook'
   | 'travel'
   | 'biography'
-  // Legacy content types (for backwards compatibility)
-  | 'book'
-  | 'paper'
+  // Business
   | 'business_plan'
+  | 'proposal'
+  | 'white_paper'
+  | 'pitch_deck'
   | 'financial_model'
-  | 'educational'
-  | 'policy'
-  | 'technical_doc'
   | 'report'
+  // Academic
+  | 'paper'
+  | 'thesis'
+  | 'dissertation'
+  | 'research_paper'
+  | 'educational'
+  // Legal
+  | 'contract'
+  | 'nda'
+  | 'terms_of_service'
+  | 'privacy_policy'
+  | 'policy_document'
+  | 'policy'
+  | 'legal_brief'
+  // Technical
+  | 'technical_doc'
+  | 'api_docs'
+  | 'user_manual'
+  | 'specification'
+  // Creative
+  | 'screenplay'
+  | 'short_story'
+  | 'essay_collection'
+  // Legacy
+  | 'book'
   | 'other';
 
 // Project status

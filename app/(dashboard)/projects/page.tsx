@@ -81,7 +81,7 @@ async function ProjectsList({ searchParams }: ProjectsPageProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {projects.map((project) => (
-        <Link key={project.id} href={`/projects/${project.id}`}>
+        <Link key={project.id} href={`/projects/${project.id}/editor`}>
           <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-4">

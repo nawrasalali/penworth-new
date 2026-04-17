@@ -186,7 +186,7 @@ export default async function DashboardPage() {
                 {recentProjects.map((project) => (
                   <Link
                     key={project.id}
-                    href={`/projects/${project.id}`}
+                    href={`/projects/${project.id}/editor`}
                     className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">

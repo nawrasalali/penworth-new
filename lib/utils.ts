@@ -51,18 +51,51 @@ export function formatRelativeTime(date: string | Date): string {
 
 // Content type labels for projects
 export const CONTENT_TYPE_LABELS: Record<string, string> = {
+  // Books
   'non-fiction': 'Non-Fiction',
   'fiction': 'Fiction',
   'memoir': 'Memoir',
   'self-help': 'Self-Help',
-  'business': 'Business',
-  'technical': 'Technical',
-  'academic': 'Academic',
+  'biography': 'Biography',
   'children': "Children's Book",
   'poetry': 'Poetry',
   'cookbook': 'Cookbook',
   'travel': 'Travel Guide',
-  'biography': 'Biography',
+  'book': 'Book',
+  // Business
+  'business': 'Business Book',
+  'business_plan': 'Business Plan',
+  'proposal': 'Proposal',
+  'white_paper': 'White Paper',
+  'pitch_deck': 'Pitch Deck',
+  'financial_model': 'Financial Model',
+  'report': 'Report',
+  // Academic
+  'academic': 'Academic Book',
+  'paper': 'Academic Paper',
+  'thesis': 'Thesis',
+  'dissertation': 'Dissertation',
+  'research_paper': 'Research Paper',
+  'educational': 'Educational Material',
+  // Legal
+  'contract': 'Contract',
+  'nda': 'NDA',
+  'terms_of_service': 'Terms of Service',
+  'privacy_policy': 'Privacy Policy',
+  'policy_document': 'Policy Document',
+  'policy': 'Policy',
+  'legal_brief': 'Legal Brief',
+  // Technical
+  'technical': 'Technical Book',
+  'technical_doc': 'Technical Documentation',
+  'api_docs': 'API Documentation',
+  'user_manual': 'User Manual',
+  'specification': 'Specification',
+  // Creative
+  'screenplay': 'Screenplay',
+  'short_story': 'Short Story',
+  'essay_collection': 'Essay Collection',
+  // Fallback
   'other': 'Other',
 };
 

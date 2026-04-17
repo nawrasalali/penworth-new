@@ -4,82 +4,192 @@ import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import {
   BookOpen,
-  FileText,
   Briefcase,
   GraduationCap,
-  Landmark,
+  Scale,
   Code,
-  FileSpreadsheet,
-  File,
+  Sparkles,
+  MoreHorizontal,
   ArrowLeft,
-  ArrowRight,
   Loader2,
+  FileText,
+  Presentation,
+  LineChart,
+  BookMarked,
+  FileCheck2,
+  ShieldCheck,
+  Gavel,
+  Wrench,
+  BookType,
+  Feather,
+  PenLine,
+  Coffee,
+  Map,
+  Heart,
+  User,
+  Baby,
+  DollarSign,
+  Notebook,
+  FileSearch,
+  Target,
 } from 'lucide-react';
-import { CONTENT_TYPE_LABELS, INDUSTRY_LABELS } from '@/lib/utils';
-import type { ContentType, Visibility } from '@/types';
+import type { ContentType } from '@/types';
 
-const contentTypeIcons: Record<string, any> = {
-  book: BookOpen,
-  paper: FileText,
-  business_plan: Briefcase,
-  financial_model: FileSpreadsheet,
-  educational: GraduationCap,
-  policy: Landmark,
-  technical_doc: Code,
-  report: FileText,
-  other: File,
-};
+// =============================================================================
+// CATEGORY DEFINITIONS
+// Each category groups specific content types that share an author intent.
+// =============================================================================
 
-const contentTypeDescriptions: Record<string, string> = {
-  book: 'Write a complete book with chapters, outlines, and professional formatting.',
-  paper: 'Create academic papers with proper citations and research methodology.',
-  business_plan: 'Develop comprehensive business plans for investors or internal use.',
-  financial_model: 'Build financial projections and analysis documents.',
-  educational: 'Design curriculum materials, lesson plans, and learning content.',
-  policy: 'Draft policy documents, procedures, and governance materials.',
-  technical_doc: 'Create API documentation, technical guides, and specifications.',
-  report: 'Generate reports, analyses, and summaries.',
-  other: 'Custom content that doesn\'t fit other categories.',
-};
+type CategoryId = 'books' | 'business' | 'academic' | 'legal' | 'technical' | 'creative' | 'other';
+
+interface ContentOption {
+  id: ContentType;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+interface Category {
+  id: CategoryId;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: string; // tailwind colour class on the card accent
+  options: ContentOption[];
+}
+
+const CATEGORIES: Category[] = [
+  {
+    id: 'books',
+    label: 'Books',
+    description: 'Full-length manuscripts, memoirs, and narrative non-fiction',
+    icon: BookOpen,
+    accent: 'text-blue-600',
+    options: [
+      { id: 'non-fiction',  label: 'Non-Fiction',        description: 'Expert guides, frameworks, or how-to books', icon: BookOpen },
+      { id: 'fiction',      label: 'Fiction',            description: 'Novels and narrative storytelling',          icon: PenLine },
+      { id: 'self-help',    label: 'Self-Help',          description: 'Personal growth and transformation',          icon: Heart },
+      { id: 'memoir',       label: 'Memoir',             description: 'Your life story or a specific chapter',       icon: User },
+      { id: 'biography',    label: 'Biography',          description: "Someone else's life story",                    icon: BookMarked },
+      { id: 'children',     label: "Children's Book",    description: 'Illustrated or chapter books for kids',       icon: Baby },
+      { id: 'cookbook',     label: 'Cookbook',           description: 'Recipes and culinary storytelling',            icon: Coffee },
+      { id: 'travel',       label: 'Travel Guide',       description: 'Destination guides and travel narratives',    icon: Map },
+    ],
+  },
+  {
+    id: 'business',
+    label: 'Business',
+    description: 'Plans, proposals, reports, and business books',
+    icon: Briefcase,
+    accent: 'text-emerald-600',
+    options: [
+      { id: 'business_plan',    label: 'Business Plan',    description: 'For investors, lenders, or internal use',        icon: Target },
+      { id: 'proposal',         label: 'Proposal',         description: 'Client, grant, or project proposals',            icon: FileCheck2 },
+      { id: 'white_paper',      label: 'White Paper',      description: 'Industry research or thought-leadership',        icon: FileSearch },
+      { id: 'pitch_deck',       label: 'Pitch Deck',       description: 'Fundraising or sales presentation',              icon: Presentation },
+      { id: 'financial_model',  label: 'Financial Model',  description: 'Projections, forecasts, and analysis',           icon: LineChart },
+      { id: 'report',           label: 'Report',           description: 'Market analysis, earnings, or strategy reports', icon: FileText },
+      { id: 'business',         label: 'Business Book',    description: 'A full-length business or leadership book',       icon: DollarSign },
+    ],
+  },
+  {
+    id: 'academic',
+    label: 'Academic',
+    description: 'Theses, papers, research, and educational material',
+    icon: GraduationCap,
+    accent: 'text-violet-600',
+    options: [
+      { id: 'thesis',          label: 'Thesis',            description: "Master's thesis with full methodology",         icon: GraduationCap },
+      { id: 'dissertation',    label: 'Dissertation',      description: 'Doctoral dissertation with original research',   icon: BookType },
+      { id: 'research_paper',  label: 'Research Paper',    description: 'Peer-reviewed or journal-style paper',           icon: FileSearch },
+      { id: 'paper',           label: 'Academic Paper',    description: 'Course paper, essay, or short-form scholarship', icon: Notebook },
+      { id: 'educational',     label: 'Educational Material', description: 'Curriculum, lesson plans, or courseware',    icon: BookMarked },
+      { id: 'academic',        label: 'Academic Book',     description: 'Full-length scholarly or textbook',               icon: BookOpen },
+    ],
+  },
+  {
+    id: 'legal',
+    label: 'Legal',
+    description: 'Contracts, policies, briefs, and governance documents',
+    icon: Scale,
+    accent: 'text-amber-600',
+    options: [
+      { id: 'contract',          label: 'Contract',           description: 'Service agreements, employment, freelance',  icon: FileCheck2 },
+      { id: 'nda',               label: 'NDA',                description: 'Non-disclosure / confidentiality agreement', icon: ShieldCheck },
+      { id: 'terms_of_service',  label: 'Terms of Service',   description: 'Product or SaaS terms of use',                icon: Gavel },
+      { id: 'privacy_policy',    label: 'Privacy Policy',     description: 'Data collection and privacy disclosures',     icon: ShieldCheck },
+      { id: 'policy_document',   label: 'Policy Document',    description: 'HR, internal, or corporate policy',           icon: FileText },
+      { id: 'legal_brief',       label: 'Legal Brief',        description: 'Memoranda, briefs, or legal analysis',        icon: Scale },
+    ],
+  },
+  {
+    id: 'technical',
+    label: 'Technical',
+    description: 'Documentation, specifications, and technical books',
+    icon: Code,
+    accent: 'text-sky-600',
+    options: [
+      { id: 'technical_doc',  label: 'Technical Documentation', description: 'Engineering or systems documentation', icon: FileText },
+      { id: 'api_docs',       label: 'API Documentation',       description: 'Reference docs for developers',          icon: Code },
+      { id: 'user_manual',    label: 'User Manual',             description: 'Product or software manual',             icon: Notebook },
+      { id: 'specification',  label: 'Specification',           description: 'Technical spec or RFC-style document',   icon: Wrench },
+      { id: 'technical',      label: 'Technical Book',          description: 'Full-length technical book',             icon: BookOpen },
+    ],
+  },
+  {
+    id: 'creative',
+    label: 'Creative',
+    description: 'Poetry, short fiction, screenplays, and essays',
+    icon: Sparkles,
+    accent: 'text-rose-600',
+    options: [
+      { id: 'poetry',            label: 'Poetry Collection', description: 'Curated volume of poems',            icon: Feather },
+      { id: 'short_story',       label: 'Short Story',       description: 'Single short story or novelette',    icon: PenLine },
+      { id: 'screenplay',        label: 'Screenplay',        description: 'Film or TV screenplay',              icon: Presentation },
+      { id: 'essay_collection',  label: 'Essay Collection',  description: 'Collection of personal essays',      icon: BookType },
+    ],
+  },
+  {
+    id: 'other',
+    label: 'Other',
+    description: 'Custom content that doesn\'t fit the categories above',
+    icon: MoreHorizontal,
+    accent: 'text-slate-600',
+    options: [
+      { id: 'other', label: 'Custom Document', description: 'Describe what you want to write', icon: FileText },
+    ],
+  },
+];
+
+// =============================================================================
+// PAGE
+// =============================================================================
 
 function NewProjectContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const preselectedType = searchParams.get('type') as ContentType | null;
 
-  const [step, setStep] = useState(preselectedType ? 2 : 1);
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    content_type: preselectedType || '' as ContentType,
-    visibility: 'private' as Visibility,
-  });
+  const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(
+    (searchParams.get('cat') as CategoryId) || null
+  );
+  const [creatingType, setCreatingType] = useState<ContentType | null>(null);
 
-  const handleTypeSelect = (type: ContentType) => {
-    setFormData({ ...formData, content_type: type });
-    setStep(2);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.title || !formData.content_type) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-
-    setLoading(true);
+  /**
+   * On subtype click: create a draft project immediately, then route straight
+   * to the editor (the Validate agent). No title/description form in between.
+   */
+  const handleSelectType = async (type: ContentType, label: string) => {
+    if (creatingType) return;
+    setCreatingType(type);
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-
       if (!user) {
         toast.error('Please log in to create a project');
+        router.push('/auth/login');
         return;
       }
 
@@ -87,188 +197,146 @@ function NewProjectContent() {
         .from('projects')
         .insert({
           user_id: user.id,
-          title: formData.title,
-          description: formData.description,
-          content_type: formData.content_type,
-          visibility: formData.visibility,
+          title: `Untitled ${label}`,        // Validate agent overrides this when idea is chosen
+          description: '',
+          content_type: type,
+          visibility: 'private',
           status: 'draft',
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error || !project) {
+        console.error('Project creation error:', error);
+        toast.error(error?.message || 'Failed to create project');
+        setCreatingType(null);
+        return;
+      }
 
-      toast.success('Project created successfully!');
-      router.push(`/projects/${project.id}`);
-    } catch (error) {
-      console.error('Error creating project:', error);
+      // Jump straight into the Validate agent — skip the detail page entirely.
+      router.push(`/projects/${project.id}/editor`);
+    } catch (err) {
+      console.error(err);
       toast.error('Failed to create project. Please try again.');
-    } finally {
-      setLoading(false);
+      setCreatingType(null);
     }
   };
 
-  return (
-    <div className="p-8 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </button>
-        <h1 className="text-3xl font-bold tracking-tight">Create New Project</h1>
-        <p className="text-muted-foreground mt-1">
-          {step === 1 ? 'Choose the type of content you want to create' : 'Enter your project details'}
-        </p>
-      </div>
+  // ============== STEP 1: Category cards ==============
+  if (!selectedCategory) {
+    return (
+      <div className="p-8 max-w-6xl mx-auto">
+        <div className="mb-8">
+          <button
+            onClick={() => router.push('/projects')}
+            className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Projects
+          </button>
+          <h1 className="text-3xl font-bold tracking-tight">Create New Project</h1>
+          <p className="text-muted-foreground mt-1">What kind of document are you writing?</p>
+        </div>
 
-      {/* Step 1: Select Content Type */}
-      {step === 1 && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Object.entries(CONTENT_TYPE_LABELS).map(([type, label]) => {
-            const Icon = contentTypeIcons[type] || File;
+          {CATEGORIES.map((cat) => {
+            const Icon = cat.icon;
             return (
-              <Card
-                key={type}
-                className="cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={() => handleTypeSelect(type as ContentType)}
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className="group text-left rounded-xl border bg-card p-6 hover:border-primary hover:shadow-md transition-all"
               >
-                <CardContent className="p-6">
-                  <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                    <Icon className="h-6 w-6 text-primary" />
+                <div className="flex items-start gap-4">
+                  <div className={`h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors`}>
+                    <Icon className={`h-6 w-6 ${cat.accent}`} />
                   </div>
-                  <h3 className="font-semibold mb-2">{label}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {contentTypeDescriptions[type]}
-                  </p>
-                </CardContent>
-              </Card>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-lg mb-1">{cat.label}</h3>
+                    <p className="text-sm text-muted-foreground mb-3">{cat.description}</p>
+                    <p className="text-xs text-muted-foreground/80">
+                      {cat.options.length} type{cat.options.length === 1 ? '' : 's'} inside →
+                    </p>
+                  </div>
+                </div>
+              </button>
             );
           })}
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {/* Step 2: Project Details */}
-      {step === 2 && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3 mb-2">
-              {formData.content_type && (
-                <>
-                  {(() => {
-                    const Icon = contentTypeIcons[formData.content_type] || File;
-                    return (
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Icon className="h-5 w-5 text-primary" />
-                      </div>
-                    );
-                  })()}
-                  <div>
-                    <CardTitle>{CONTENT_TYPE_LABELS[formData.content_type]}</CardTitle>
-                    <CardDescription>
-                      <button
-                        onClick={() => setStep(1)}
-                        className="text-primary hover:underline"
-                      >
-                        Change type
-                      </button>
-                    </CardDescription>
-                  </div>
-                </>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <label htmlFor="title" className="text-sm font-medium">
-                  Project Title <span className="text-destructive">*</span>
-                </label>
-                <Input
-                  id="title"
-                  placeholder="Enter a title for your project"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  required
-                />
-              </div>
+  // ============== STEP 2: Content subtype cards ==============
+  const category = CATEGORIES.find((c) => c.id === selectedCategory)!;
+  const CategoryIcon = category.icon;
 
-              <div className="space-y-2">
-                <label htmlFor="description" className="text-sm font-medium">
-                  Description
-                </label>
-                <textarea
-                  id="description"
-                  placeholder="Briefly describe what this project is about..."
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </div>
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <div className="mb-8">
+        <button
+          onClick={() => setSelectedCategory(null)}
+          className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to categories
+        </button>
+        <div className="flex items-center gap-3">
+          <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
+            <CategoryIcon className={`h-6 w-6 ${category.accent}`} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{category.label}</h1>
+            <p className="text-muted-foreground">{category.description}</p>
+          </div>
+        </div>
+      </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Visibility</label>
-                <div className="flex gap-4">
-                  {(['private', 'org', 'public'] as Visibility[]).map((v) => (
-                    <label
-                      key={v}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-colors ${
-                        formData.visibility === v
-                          ? 'border-primary bg-primary/5'
-                          : 'hover:bg-muted'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="visibility"
-                        value={v}
-                        checked={formData.visibility === v}
-                        onChange={(e) => setFormData({ ...formData, visibility: e.target.value as Visibility })}
-                        className="sr-only"
-                      />
-                      <span className="capitalize">{v === 'org' ? 'Organization' : v}</span>
-                    </label>
-                  ))}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {category.options.map((opt) => {
+          const Icon = opt.icon;
+          const isCreatingThis = creatingType === opt.id;
+          return (
+            <button
+              key={opt.id}
+              onClick={() => handleSelectType(opt.id, opt.label)}
+              disabled={!!creatingType}
+              className="group text-left rounded-xl border bg-card p-5 hover:border-primary hover:shadow-sm transition-all disabled:opacity-50 disabled:cursor-wait"
+            >
+              <div className="flex items-start gap-3">
+                <div className={`h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors`}>
+                  {isCreatingThis ? (
+                    <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                  ) : (
+                    <Icon className={`h-5 w-5 ${category.accent}`} />
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {formData.visibility === 'private' && 'Only you can see this project'}
-                  {formData.visibility === 'org' && 'All members of your organization can see this project'}
-                  {formData.visibility === 'public' && 'Anyone can see this project'}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold mb-1">{opt.label}</h3>
+                  <p className="text-xs text-muted-foreground">{opt.description}</p>
+                </div>
               </div>
+            </button>
+          );
+        })}
+      </div>
 
-              <div className="flex justify-end gap-4 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setStep(1)}
-                >
-                  Back
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Create Project
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+      <p className="mt-6 text-center text-xs text-muted-foreground">
+        Don&apos;t worry about the title yet — you&apos;ll refine your idea with the Validate agent on the next screen.
+      </p>
     </div>
   );
 }
 
 export default function NewProjectPage() {
   return (
-    <Suspense fallback={
-      <div className="p-8 max-w-4xl mx-auto flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="p-8 max-w-4xl mx-auto flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
       <NewProjectContent />
     </Suspense>
   );
