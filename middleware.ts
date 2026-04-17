@@ -12,12 +12,12 @@ function routeByHost(request: NextRequest): NextResponse | null {
   const host = (request.headers.get('host') || '').toLowerCase();
   const { pathname, search } = request.nextUrl;
 
-  // Skip rewriting for assets, internal next routes, and api routes we want to share
+  // Skip rewriting for assets, internal next routes, and all api routes.
+  // API routes live at /api/* and are shared across every host — they must
+  // never be rewritten to /guild/api/* (which doesn't exist) regardless of host.
   const shouldSkip =
     pathname.startsWith('/_next') ||
-    pathname.startsWith('/api/auth') ||
-    pathname.startsWith('/api/stripe/webhook') ||
-    pathname.startsWith('/api/inngest') ||
+    pathname.startsWith('/api/') ||
     pathname.match(/\.(svg|png|jpg|jpeg|gif|webp|ico)$/);
 
   if (shouldSkip) return null;
