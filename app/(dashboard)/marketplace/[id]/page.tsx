@@ -26,19 +26,19 @@ interface MarketplaceListing {
   title: string;
   description: string;
   long_description: string;
-  author_name: string;
-  author_id: string;
+  seller_id: string;
   cover_url: string | null;
-  price: number;
-  currency: string;
-  category: string;
-  tags: string[];
-  rating: number;
+  front_cover_url: string | null;
+  price_cents: number;
+  license_type: string;
+  tags: string[] | null;
+  rating: number | null;
   reviews_count: number;
   downloads_count: number;
   word_count: number;
   chapter_count: number;
   sample_content: string;
+  is_free_tier: boolean;
   created_at: string;
   profiles?: {
     full_name: string;
@@ -102,6 +102,10 @@ export default function ListingDetailPage() {
     }
   };
 
+  const priceUsd = listing ? (listing.price_cents || 0) / 100 : 0;
+  const isFree = priceUsd === 0;
+  const authorName = listing?.profiles?.full_name || 'Penworth author';
+
   const handlePurchase = async () => {
     if (!user) {
       router.push(`/login?redirect=/marketplace/${listingId}`);
@@ -112,7 +116,7 @@ export default function ListingDetailPage() {
 
     setPurchasing(true);
     try {
-      if (listing.price === 0) {
+      if (isFree) {
         // Free download - just record the purchase
         const supabase = createClient();
         await supabase.from('marketplace_purchases').insert({
@@ -120,13 +124,13 @@ export default function ListingDetailPage() {
           listing_id: listing.id,
           price_paid: 0,
         });
-        
+
         // Increment downloads count
         await supabase
           .from('marketplace_listings')
           .update({ downloads_count: (listing.downloads_count || 0) + 1 })
           .eq('id', listing.id);
-        
+
         setPurchased(true);
       } else {
         // Paid - redirect to checkout
@@ -135,7 +139,7 @@ export default function ListingDetailPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ listingId: listing.id }),
         });
-        
+
         const { url } = await res.json();
         if (url) {
           window.location.href = url;
@@ -197,9 +201,9 @@ export default function ListingDetailPage() {
           <div className="flex gap-6">
             {/* Cover Image */}
             <div className="w-48 h-64 flex-shrink-0 bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg overflow-hidden shadow-lg">
-              {listing.cover_url ? (
+              {(listing.cover_url || listing.front_cover_url) ? (
                 <img
-                  src={listing.cover_url}
+                  src={listing.cover_url || listing.front_cover_url || ''}
                   alt={listing.title}
                   className="w-full h-full object-cover"
                 />
@@ -212,21 +216,21 @@ export default function ListingDetailPage() {
 
             {/* Title & Meta */}
             <div className="flex-1">
-              <Badge variant="outline" className="mb-2">{listing.category}</Badge>
+              <Badge variant="outline" className="mb-2">{listing.license_type || 'personal'}</Badge>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{listing.title}</h1>
               <div className="flex items-center gap-2 mb-4">
                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                   {listing.profiles?.avatar_url ? (
                     <img
                       src={listing.profiles.avatar_url}
-                      alt={listing.author_name}
+                      alt={authorName}
                       className="h-8 w-8 rounded-full"
                     />
                   ) : (
                     <User className="h-4 w-4 text-primary" />
                   )}
                 </div>
-                <span className="font-medium">{listing.author_name}</span>
+                <span className="font-medium">{authorName}</span>
               </div>
 
               <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
@@ -311,9 +315,9 @@ export default function ListingDetailPage() {
             <CardContent className="p-6 space-y-4">
               <div className="text-center">
                 <p className="text-4xl font-bold text-primary">
-                  {listing.price === 0 ? 'Free' : `$${listing.price.toFixed(2)}`}
+                  {isFree ? 'Free' : `$${priceUsd.toFixed(2)}`}
                 </p>
-                {listing.price > 0 && (
+                {!isFree && (
                   <p className="text-sm text-gray-500">One-time purchase</p>
                 )}
               </div>
@@ -330,18 +334,18 @@ export default function ListingDetailPage() {
                   </div>
                 </div>
               ) : (
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="w-full"
                   size="lg"
                   onClick={handlePurchase}
                   disabled={purchasing}
                 >
                   {purchasing ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : listing.price === 0 ? (
+                  ) : isFree ? (
                     <Download className="h-4 w-4 mr-2" />
                   ) : null}
-                  {listing.price === 0 ? 'Get Free' : 'Buy Now'}
+                  {isFree ? 'Get Free' : 'Buy Now'}
                 </Button>
               )}
 
