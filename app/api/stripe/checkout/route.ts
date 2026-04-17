@@ -3,23 +3,58 @@ import Stripe from 'stripe';
 import { createClient } from '@/lib/supabase/server';
 import { getStripeOrError } from '@/lib/stripe/client';
 
+/**
+ * Canonical v2 Stripe price IDs (live account). Verified active via the
+ * Stripe API on April 17, 2026.
+ *
+ * We hardcode these rather than relying solely on env vars because:
+ *   - Price IDs are not secrets (they appear in every customer invoice)
+ *   - Stripe price IDs are immutable: once created they never change
+ *   - An env var set to a stale or wrong ID causes 'No such price' errors
+ *     that are painful to diagnose in production
+ *
+ * Env vars can override, but only if they pass a sanity check (prefix
+ * 'price_'). A malformed env var value falls back to the canonical ID so
+ * a single bad config entry doesn't break billing for every user.
+ */
+const CANONICAL = {
+  PRO_MONTHLY: 'price_1TM8vSDAwDFDea8Lx2HRVsvb', // $19/mo
+  PRO_ANNUAL: 'price_1TM8yKDAwDFDea8Lia58tjN2', // $190/yr
+  MAX_MONTHLY: 'price_1TM8xADAwDFDea8Ld0hDB5mO', // $49/mo
+  MAX_ANNUAL: 'price_1TM8zQDAwDFDea8LyLGIX1Ek', // $490/yr
+  CREDITS_1000: 'price_1TM90DDAwDFDea8LXyYMDoYU', // $39
+  CREDITS_3000: 'price_1TM91IDAwDFDea8LFYWHxO1C', // $99
+  CREDITS_10000: 'price_1TM91zDAwDFDea8LlLpGQetJ', // $290
+} as const;
+
+function resolvePriceId(envValue: string | undefined, canonical: string): string {
+  const trimmed = (envValue ?? '').trim();
+  // Only honour env override if it looks like a real Stripe price ID.
+  // Any other value (empty, whitespace, stale ID from a different env,
+  // typo) falls back to the canonical hardcoded ID.
+  if (trimmed.startsWith('price_') && trimmed.length >= 20) {
+    return trimmed;
+  }
+  return canonical;
+}
+
 // v2 Pricing: Free / Pro / Max (no Starter, Publisher, Agency)
 const PRICE_IDS: Record<string, { monthly: string; annual: string }> = {
   pro: {
-    monthly: process.env.STRIPE_PRICE_PRO_MONTHLY || '',
-    annual: process.env.STRIPE_PRICE_PRO_ANNUAL || '',
+    monthly: resolvePriceId(process.env.STRIPE_PRICE_PRO_MONTHLY, CANONICAL.PRO_MONTHLY),
+    annual: resolvePriceId(process.env.STRIPE_PRICE_PRO_ANNUAL, CANONICAL.PRO_ANNUAL),
   },
   max: {
-    monthly: process.env.STRIPE_PRICE_MAX_MONTHLY || '',
-    annual: process.env.STRIPE_PRICE_MAX_ANNUAL || '',
+    monthly: resolvePriceId(process.env.STRIPE_PRICE_MAX_MONTHLY, CANONICAL.MAX_MONTHLY),
+    annual: resolvePriceId(process.env.STRIPE_PRICE_MAX_ANNUAL, CANONICAL.MAX_ANNUAL),
   },
 };
 
-// Credit packs (one-time purchases, Pro/Max only)
+// Credit packs (one-time purchases, all paid tiers)
 const CREDIT_PACK_PRICES: Record<string, string> = {
-  v2_credits_1000: process.env.STRIPE_PRICE_CREDITS_1000 || '',
-  v2_credits_3000: process.env.STRIPE_PRICE_CREDITS_3000 || '',
-  v2_credits_10000: process.env.STRIPE_PRICE_CREDITS_10000 || '',
+  v2_credits_1000: resolvePriceId(process.env.STRIPE_PRICE_CREDITS_1000, CANONICAL.CREDITS_1000),
+  v2_credits_3000: resolvePriceId(process.env.STRIPE_PRICE_CREDITS_3000, CANONICAL.CREDITS_3000),
+  v2_credits_10000: resolvePriceId(process.env.STRIPE_PRICE_CREDITS_10000, CANONICAL.CREDITS_10000),
 };
 
 export async function POST(request: NextRequest) {

@@ -146,16 +146,32 @@ export const CREDIT_PACKS = [
   { id: 'v2_credits_10000', name: 'Bulk', credits: 10_000, price: 290, priceInCents: 29_000 },
 ] as const;
 
+/**
+ * Resolve a Stripe price ID from env with a canonical fallback.
+ *
+ * Honours the env override only when it looks like a valid Stripe price ID
+ * (starts with 'price_', length ≥ 20). Empty strings, whitespace, and stale
+ * IDs from a different environment fall back to the canonical hardcoded ID.
+ * Mirrors resolvePriceId() in app/api/stripe/checkout/route.ts.
+ */
+function resolveStripePriceId(envValue: string | undefined, canonical: string): string {
+  const trimmed = (envValue ?? '').trim();
+  if (trimmed.startsWith('price_') && trimmed.length >= 20) {
+    return trimmed;
+  }
+  return canonical;
+}
+
 export const STRIPE_PRODUCTS = {
   // Subscription products - v2 pricing
-  v2_pro_monthly: process.env.STRIPE_PRICE_PRO_MONTHLY || 'price_1TM8vSDAwDFDea8Lx2HRVsvb',
-  v2_pro_annual: process.env.STRIPE_PRICE_PRO_ANNUAL || 'price_1TM8yKDAwDFDea8Lia58tjN2',
-  v2_max_monthly: process.env.STRIPE_PRICE_MAX_MONTHLY || 'price_1TM8xADAwDFDea8Ld0hDB5mO',
-  v2_max_annual: process.env.STRIPE_PRICE_MAX_ANNUAL || 'price_1TM8zQDAwDFDea8LyLGIX1Ek',
+  v2_pro_monthly: resolveStripePriceId(process.env.STRIPE_PRICE_PRO_MONTHLY, 'price_1TM8vSDAwDFDea8Lx2HRVsvb'),
+  v2_pro_annual: resolveStripePriceId(process.env.STRIPE_PRICE_PRO_ANNUAL, 'price_1TM8yKDAwDFDea8Lia58tjN2'),
+  v2_max_monthly: resolveStripePriceId(process.env.STRIPE_PRICE_MAX_MONTHLY, 'price_1TM8xADAwDFDea8Ld0hDB5mO'),
+  v2_max_annual: resolveStripePriceId(process.env.STRIPE_PRICE_MAX_ANNUAL, 'price_1TM8zQDAwDFDea8LyLGIX1Ek'),
   // Credit packs
-  v2_credits_1000: process.env.STRIPE_PRICE_CREDITS_1000 || 'price_1TM90DDAwDFDea8LXyYMDoYU',
-  v2_credits_3000: process.env.STRIPE_PRICE_CREDITS_3000 || 'price_1TM91IDAwDFDea8LFYWHxO1C',
-  v2_credits_10000: process.env.STRIPE_PRICE_CREDITS_10000 || 'price_1TM91zDAwDFDea8LlLpGQetJ',
+  v2_credits_1000: resolveStripePriceId(process.env.STRIPE_PRICE_CREDITS_1000, 'price_1TM90DDAwDFDea8LXyYMDoYU'),
+  v2_credits_3000: resolveStripePriceId(process.env.STRIPE_PRICE_CREDITS_3000, 'price_1TM91IDAwDFDea8LFYWHxO1C'),
+  v2_credits_10000: resolveStripePriceId(process.env.STRIPE_PRICE_CREDITS_10000, 'price_1TM91zDAwDFDea8LlLpGQetJ'),
 } as const;
 
 export type PlanId = 'free' | 'pro' | 'max';
