@@ -1142,6 +1142,7 @@ function EditorContentNew() {
           onSharePreview={() => toast.info(t('editor.shareSoon', locale))}
           onInviteCollaborator={() => toast.info(t('editor.collabSoon', locale))}
           onTopUp={() => router.push('/billing')}
+          locale={locale}
         />
       </div>
     </div>

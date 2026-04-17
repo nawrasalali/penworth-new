@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { CoverConfig } from '@/types/agent-workflow';
 import { cn } from '@/lib/utils';
+import { t, type Locale } from '@/lib/i18n/strings';
 import {
   FileText,
   Eye,
@@ -34,6 +35,7 @@ interface DocumentPreviewProps {
   onSharePreview?: () => void;
   onInviteCollaborator?: () => void;
   onTopUp?: () => void;
+  locale?: Locale;
 }
 
 export function DocumentPreview({
@@ -53,7 +55,8 @@ export function DocumentPreview({
   onExportDraft,
   onSharePreview,
   onInviteCollaborator,
-  onTopUp
+  onTopUp,
+  locale = 'en',
 }: DocumentPreviewProps) {
   const isBook = ['fiction', 'non-fiction', 'memoir', 'self-help', 'children', 'poetry', 'cookbook', 'travel', 'biography'].includes(contentType);
   
@@ -62,7 +65,7 @@ export function DocumentPreview({
       {/* Document Preview */}
       <div className="mb-4">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-          Document Preview
+          {t('preview.title', locale)}
         </h3>
         
         {/* Mini Cover/Document Preview */}
@@ -77,10 +80,10 @@ export function DocumentPreview({
             <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center">
               <BookOpen className="h-12 w-12 text-muted-foreground/30 mb-3" />
               <h4 className="font-semibold text-sm line-clamp-2">
-                {bookTitle || 'Untitled Document'}
+                {bookTitle || t('preview.untitledDoc', locale)}
               </h4>
               <p className="text-xs text-muted-foreground mt-1">
-                by {authorName || 'Author'}
+                {t('preview.byAuthor', locale)} {authorName || t('editor.author', locale)}
               </p>
             </div>
           )}
@@ -89,7 +92,7 @@ export function DocumentPreview({
           {isFreeTier && (
             <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-2">
               <p className="text-[10px] text-white/80 text-center">
-                by penworth.ai
+                {t('preview.byPenworth', locale)}
               </p>
             </div>
           )}
@@ -103,7 +106,7 @@ export function DocumentPreview({
             onClick={onViewPDF}
           >
             <Eye className="mr-2 h-3 w-3" />
-            Preview PDF
+            {t('preview.previewPdf', locale)}
           </Button>
         )}
       </div>
@@ -111,14 +114,14 @@ export function DocumentPreview({
       {/* Progress Stats */}
       <div className="mb-4">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-          Progress Stats
+          {t('preview.progressStats', locale)}
         </h3>
         
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground flex items-center gap-1.5">
               <FileText className="h-3.5 w-3.5" />
-              Words
+              {t('preview.words', locale)}
             </span>
             <span className="font-medium">{wordCount.toLocaleString()}</span>
           </div>
@@ -126,7 +129,7 @@ export function DocumentPreview({
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground flex items-center gap-1.5">
               <BookOpen className="h-3.5 w-3.5" />
-              Pages
+              {t('preview.pages', locale)}
             </span>
             <span className="font-medium">{pageCount}</span>
           </div>
@@ -134,7 +137,7 @@ export function DocumentPreview({
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground flex items-center gap-1.5">
               <TrendingUp className="h-3.5 w-3.5" />
-              Chapters
+              {t('preview.chapters', locale)}
             </span>
             <span className="font-medium">{chapterCount}</span>
           </div>
@@ -144,16 +147,16 @@ export function DocumentPreview({
       {/* Credits */}
       <div className="mb-4">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-          Credits
+          {t('preview.credits', locale)}
         </h3>
         
         <div className="rounded-lg border bg-card p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">Used</span>
+            <span className="text-sm text-muted-foreground">{t('preview.used', locale)}</span>
             <span className="text-sm font-medium">{creditsUsed}</span>
           </div>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm text-muted-foreground">Remaining</span>
+            <span className="text-sm text-muted-foreground">{t('preview.remaining', locale)}</span>
             <span className={cn(
               'text-sm font-medium',
               creditsRemaining < 500 && 'text-amber-500',
@@ -186,7 +189,7 @@ export function DocumentPreview({
               onClick={onTopUp}
             >
               <Plus className="mr-2 h-3 w-3" />
-              Top Up Credits
+              {t('preview.topUp', locale)}
             </Button>
           )}
         </div>
@@ -198,7 +201,7 @@ export function DocumentPreview({
           <div className="rounded-lg border bg-primary/5 p-3">
             <div className="flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4 text-primary" />
-              <span className="text-muted-foreground">Est. time remaining:</span>
+              <span className="text-muted-foreground">{t('preview.estTimeRemaining', locale)}</span>
             </div>
             <div className="text-lg font-semibold mt-1">
               {estimatedTimeRemaining}
@@ -210,7 +213,7 @@ export function DocumentPreview({
       {/* Quick Actions */}
       <div className="mt-auto">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-          Quick Actions
+          {t('preview.quickActions', locale)}
         </h3>
         
         <div className="space-y-2">
@@ -222,7 +225,7 @@ export function DocumentPreview({
               onClick={onExportDraft}
             >
               <Download className="mr-2 h-3.5 w-3.5" />
-              Export Draft
+              {t('preview.exportDraft', locale)}
             </Button>
           )}
           
@@ -234,7 +237,7 @@ export function DocumentPreview({
               onClick={onSharePreview}
             >
               <Share2 className="mr-2 h-3.5 w-3.5" />
-              Share Preview
+              {t('preview.sharePreview', locale)}
             </Button>
           )}
           
@@ -246,7 +249,7 @@ export function DocumentPreview({
               onClick={onInviteCollaborator}
             >
               <Users className="mr-2 h-3.5 w-3.5" />
-              Invite Collaborator
+              {t('preview.inviteCollab', locale)}
             </Button>
           )}
         </div>
