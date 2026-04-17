@@ -1012,6 +1012,7 @@ function EditorContentNew() {
             userCredits={userCredits}
             onEditChapter={handleEditChapter}
             onRegenerateChapter={handleRegenerateChapter}
+            locale={locale}
           />
         );
 

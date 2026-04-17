@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { OutlineSection, CREDIT_COSTS } from '@/types/agent-workflow';
 import { cn } from '@/lib/utils';
+import { t, type Locale } from '@/lib/i18n/strings';
 import {
   PenTool,
   CheckCircle2,
@@ -24,6 +25,7 @@ interface WritingScreenProps {
   userCredits: number;
   onEditChapter: (chapterId: string, content: string) => void;
   onRegenerateChapter: (chapterId: string, instructions?: string) => void;
+  locale?: Locale;
 }
 
 export function WritingScreen({
@@ -34,7 +36,8 @@ export function WritingScreen({
   isWriting,
   userCredits,
   onEditChapter,
-  onRegenerateChapter
+  onRegenerateChapter,
+  locale = 'en',
 }: WritingScreenProps) {
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
@@ -81,10 +84,10 @@ export function WritingScreen({
       <div className="mb-4">
         <div className="flex items-center gap-2 mb-2">
           <PenTool className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-bold">Writing Your Book</h1>
+          <h1 className="text-xl font-bold">{t('writing.title', locale)}</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Watch the magic happen chapter by chapter
+          {t('writing.subtitle', locale)}
         </p>
       </div>
       
@@ -92,10 +95,10 @@ export function WritingScreen({
       <div className="mb-4">
         <div className="flex items-center justify-between text-sm mb-2">
           <span>
-            Currently writing: Chapter {currentChapterIndex + 1} of {chapters.length}
+            {t('writing.currentlyWriting', locale)} {currentChapterIndex + 1} / {chapters.length}
           </span>
           <span className="text-muted-foreground">
-            {totalWords.toLocaleString()} words
+            {totalWords.toLocaleString()} {t('writing.words', locale)}
           </span>
         </div>
         <div className="h-3 bg-muted rounded-full overflow-hidden">
@@ -105,7 +108,7 @@ export function WritingScreen({
           />
         </div>
         <div className="text-right text-xs text-muted-foreground mt-1">
-          {Math.round(progress)}% complete
+          {Math.round(progress)}% {t('writing.complete', locale)}
         </div>
       </div>
       
@@ -117,7 +120,7 @@ export function WritingScreen({
             {/* Chapter Header */}
             <div className="p-4 border-b">
               <h2 className="text-lg font-semibold">
-                {currentChapter?.title || 'Writing...'}
+                {currentChapter?.title || t('writing.writing', locale)}
               </h2>
             </div>
             
@@ -128,7 +131,7 @@ export function WritingScreen({
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                   className="w-full h-full min-h-[300px] resize-none focus:outline-none text-base leading-relaxed"
-                  placeholder="Edit chapter content..."
+                  placeholder={t('writing.editPlaceholder', locale)}
                 />
               ) : (
                 <div className="prose dark:prose-invert max-w-none">
@@ -142,7 +145,7 @@ export function WritingScreen({
                   ) : (
                     <div className="flex items-center justify-center h-32 text-muted-foreground">
                       <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                      Generating content...
+                      {t('writing.generating', locale)}
                     </div>
                   )}
                 </div>
@@ -159,29 +162,29 @@ export function WritingScreen({
                       size="sm"
                       onClick={() => setEditingChapterId(null)}
                     >
-                      Cancel
+                      {t('writing.cancel', locale)}
                     </Button>
                     <Button size="sm" onClick={handleSaveEdit}>
-                      Save Changes (Free)
+                      {t('writing.saveFree', locale)}
                     </Button>
                   </>
                 ) : regenChapterId === currentChapter.id ? (
                   <div className="w-full space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-medium text-muted-foreground">
-                        Optional: tell the AI how to rewrite this chapter
+                        {t('writing.rewriteHint', locale)}
                       </label>
                       <button
                         onClick={() => setRegenChapterId(null)}
                         className="text-xs text-muted-foreground hover:text-foreground"
                       >
-                        Cancel
+                        {t('writing.cancel', locale)}
                       </button>
                     </div>
                     <Textarea
                       value={regenInstructions}
                       onChange={(e) => setRegenInstructions(e.target.value)}
-                      placeholder="e.g. 'make it more conversational', 'shorten by 30%', 'add more real-world examples'. Leave empty for a general rewrite."
+                      placeholder={t('writing.rewritePlaceholder', locale)}
                       className="min-h-[60px] text-sm"
                     />
                     <div className="flex gap-2">
@@ -191,7 +194,7 @@ export function WritingScreen({
                         disabled={!canRegenerate}
                       >
                         <RefreshCw className="mr-2 h-3 w-3" />
-                        Regenerate ({CREDIT_COSTS.CHAPTER_REGENERATE} credits)
+                        {t('writing.regenerate', locale)} ({CREDIT_COSTS.CHAPTER_REGENERATE} {t('writing.credits', locale)})
                       </Button>
                     </div>
                   </div>
@@ -203,7 +206,7 @@ export function WritingScreen({
                       onClick={() => handleStartEdit(currentChapter)}
                     >
                       <Edit3 className="mr-2 h-3 w-3" />
-                      Manual Edit (Free)
+                      {t('writing.manualEditFree', locale)}
                     </Button>
                     <Button
                       variant="outline"
@@ -212,9 +215,9 @@ export function WritingScreen({
                       disabled={!canRegenerate}
                     >
                       <RefreshCw className="mr-2 h-3 w-3" />
-                      Regenerate
+                      {t('writing.regenerate', locale)}
                       <span className="ml-1 text-xs opacity-70">
-                        ({CREDIT_COSTS.CHAPTER_REGENERATE} credits)
+                        ({CREDIT_COSTS.CHAPTER_REGENERATE} {t('writing.credits', locale)})
                       </span>
                     </Button>
                   </>
@@ -226,7 +229,7 @@ export function WritingScreen({
         
         {/* Chapter List Sidebar */}
         <div className="w-64 overflow-y-auto">
-          <h3 className="font-semibold mb-3 text-sm">Chapter Progress</h3>
+          <h3 className="font-semibold mb-3 text-sm">{t('writing.chapterProgress', locale)}</h3>
           <div className="space-y-2">
             {chapters.map((chapter, idx) => (
               <div
@@ -249,12 +252,12 @@ export function WritingScreen({
                     'text-sm truncate',
                     chapter.status === 'pending' && 'text-muted-foreground'
                   )}>
-                    Ch {idx + 1}: {chapter.title}
+                    {t('writing.chapterPrefix', locale)} {idx + 1}: {chapter.title}
                   </span>
                 </div>
                 {chapter.wordCount && (
                   <div className="text-xs text-muted-foreground mt-1 ml-6">
-                    {chapter.wordCount.toLocaleString()} words
+                    {chapter.wordCount.toLocaleString()} {t('writing.wordsSuffix', locale)}
                   </div>
                 )}
               </div>
@@ -268,7 +271,7 @@ export function WritingScreen({
         <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center gap-2">
           <Coins className="h-4 w-4 text-amber-500" />
           <span className="text-sm">
-            Low credits ({userCredits} remaining). Manual editing is always free!
+            {t('writing.lowCredits', locale)} ({userCredits})
           </span>
         </div>
       )}
