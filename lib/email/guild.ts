@@ -154,7 +154,7 @@ function wrapEmail(body: string): string {
 }
 
 function applicationReceivedTemplate(fullName: string, applicationId: string): string {
-  const firstName = fullName.split(' ')[0] || fullName;
+  const firstName = extractFirstName(fullName);
   return wrapEmail(`
     <h1 class="serif" style="font-size: 32px; line-height: 1.2; margin: 0 0 16px;">
       Your application is with the Guild Council, ${escape(firstName)}.
@@ -185,7 +185,7 @@ function applicationReceivedTemplate(fullName: string, applicationId: string): s
 }
 
 function autoDeclinedTemplate(fullName: string): string {
-  const firstName = fullName.split(' ')[0] || fullName;
+  const firstName = extractFirstName(fullName);
   return wrapEmail(`
     <h1 class="serif" style="font-size: 32px; line-height: 1.2; margin: 0 0 16px;">
       Thank you for your interest, ${escape(firstName)}.
@@ -206,7 +206,7 @@ function autoDeclinedTemplate(fullName: string): string {
 }
 
 function interviewInviteTemplate(fullName: string, bookingUrl: string, language: string): string {
-  const firstName = fullName.split(' ')[0] || fullName;
+  const firstName = extractFirstName(fullName);
   const languageName = LANGUAGE_NAMES[language] || 'your native language';
   return wrapEmail(`
     <h1 class="serif" style="font-size: 32px; line-height: 1.2; margin: 0 0 16px;">
@@ -236,7 +236,7 @@ function interviewInviteTemplate(fullName: string, bookingUrl: string, language:
 }
 
 function acceptanceTemplate(fullName: string, referralCode: string, dashboardUrl: string): string {
-  const firstName = fullName.split(' ')[0] || fullName;
+  const firstName = extractFirstName(fullName);
   return wrapEmail(`
     <h1 class="serif" style="font-size: 36px; line-height: 1.2; margin: 0 0 16px;">
       Welcome to the Guild, <span class="gold">${escape(firstName)}</span>.
@@ -276,7 +276,7 @@ function acceptanceTemplate(fullName: string, referralCode: string, dashboardUrl
 }
 
 function declineTemplate(fullName: string): string {
-  const firstName = fullName.split(' ')[0] || fullName;
+  const firstName = extractFirstName(fullName);
   return wrapEmail(`
     <h1 class="serif" style="font-size: 32px; line-height: 1.2; margin: 0 0 16px;">
       Thank you for speaking with us, ${escape(firstName)}.
@@ -312,6 +312,34 @@ const LANGUAGE_NAMES: Record<string, string> = {
   ru: 'Russian',
   zh: 'Chinese',
 };
+
+/**
+ * Extract the applicant's actual first name, skipping common title prefixes
+ * like "Mr.", "Mrs.", "Dr.", etc. Falls back to the full name if nothing
+ * useful can be extracted.
+ */
+function extractFirstName(fullName: string): string {
+  const TITLES = new Set([
+    'mr', 'mrs', 'ms', 'mx', 'miss',
+    'dr', 'prof', 'professor',
+    'sir', 'madam', 'lord', 'lady',
+    'rev', 'reverend', 'fr', 'father', 'sr', 'sister', 'br', 'brother',
+    'hon', 'honourable', 'honorable',
+    'sheikh', 'sayyid', 'sayed', 'hajji', 'hajj',
+  ]);
+  const cleaned = (fullName || '').trim();
+  if (!cleaned) return 'there';
+  const parts = cleaned.split(/\s+/);
+  for (const part of parts) {
+    const stripped = part.replace(/[.,]/g, '').toLowerCase();
+    if (!TITLES.has(stripped) && part.length > 0) {
+      // Strip trailing punctuation on the actual name word
+      return part.replace(/[.,;:]+$/, '');
+    }
+  }
+  // Entire name was titles only — fall back to cleaned full name
+  return cleaned.replace(/[.,;:]+$/, '');
+}
 
 function escape(s: string): string {
   return String(s)

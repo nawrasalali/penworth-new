@@ -152,6 +152,21 @@ function validateApplication(p: Partial<ApplicationPayload>): { ok: true } | { o
   if (p.full_name.length > 120) {
     return { ok: false, error: 'Name is too long.' };
   }
+  // Reject submissions where the entire name is just a title (Mr., Dr., etc.)
+  const TITLES = new Set([
+    'mr', 'mrs', 'ms', 'mx', 'miss', 'dr', 'prof', 'professor',
+    'sir', 'madam', 'lord', 'lady', 'rev', 'reverend', 'fr', 'father',
+    'sr', 'sister', 'br', 'brother', 'hon', 'honourable', 'honorable',
+    'sheikh', 'sayyid', 'sayed', 'hajji', 'hajj',
+  ]);
+  const nameParts = p.full_name.trim().split(/\s+/);
+  const hasRealNamePart = nameParts.some((part) => {
+    const stripped = part.replace(/[.,]/g, '').toLowerCase();
+    return stripped.length >= 2 && !TITLES.has(stripped);
+  });
+  if (!hasRealNamePart) {
+    return { ok: false, error: 'Please enter your first and last name (not just a title).' };
+  }
   if (!p.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email)) {
     return { ok: false, error: 'A valid email address is required.' };
   }

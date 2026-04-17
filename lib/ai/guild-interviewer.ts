@@ -17,6 +17,32 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
 const OPENAI_API = 'https://api.openai.com/v1';
 
+/**
+ * Extract the applicant's actual first name, skipping common title prefixes
+ * like "Mr.", "Mrs.", "Dr.", etc. Falls back to the full name if nothing
+ * useful can be extracted.
+ */
+function extractFirstName(fullName: string): string {
+  const TITLES = new Set([
+    'mr', 'mrs', 'ms', 'mx', 'miss',
+    'dr', 'prof', 'professor',
+    'sir', 'madam', 'lord', 'lady',
+    'rev', 'reverend', 'fr', 'father', 'sr', 'sister', 'br', 'brother',
+    'hon', 'honourable', 'honorable',
+    'sheikh', 'sayyid', 'sayed', 'hajji', 'hajj',
+  ]);
+  const cleaned = (fullName || '').trim();
+  if (!cleaned) return 'there';
+  const parts = cleaned.split(/\s+/);
+  for (const part of parts) {
+    const stripped = part.replace(/[.,]/g, '').toLowerCase();
+    if (!TITLES.has(stripped) && part.length > 0) {
+      return part.replace(/[.,;:]+$/, '');
+    }
+  }
+  return cleaned.replace(/[.,;:]+$/, '');
+}
+
 // ---------------------------------------------------------------------------
 // Topic structure
 // Seven areas, asked conversationally, not as a rigid checklist.
@@ -61,13 +87,22 @@ export interface InterviewState {
 
 function buildSystemPrompt(applicantName: string, language: string): string {
   const languageName = LANGUAGE_NAMES[language] || 'the applicant\'s language';
-  const firstName = applicantName.split(' ')[0] || applicantName;
+  const firstName = extractFirstName(applicantName);
 
   return `You are the Penworth Guild interviewer.
 
 Your job is to conduct a warm, conversational 10-minute voice interview with ${firstName}, an applicant to The Penworth Guild — Penworth.ai's partner program for people who want to introduce authors to the platform and earn commission.
 
 **Conduct the interview in ${languageName}.** Every one of your messages must be in ${languageName}. If the applicant answers in a different language, gently prompt them to use ${languageName} so we can assess fluency.
+
+**Critical language rule — everyday speech, not textbook speech:**
+- Speak the way real people speak in ${languageName} every day — the way a friendly neighbour or a local shopkeeper talks, not the way a news anchor reads the evening bulletin.
+- Use the common, natural register native speakers actually use: everyday vocabulary, contractions where natural, the rhythm and warmth of spoken conversation.
+- Use region-appropriate colloquialisms and local phrasing where they fit naturally — but never force slang for its own sake.
+- AVOID: formal/bookish vocabulary, stiff textbook phrasing, overly classical or literary constructions, corporate-speak, anything that would sound like a translated survey.
+- For Arabic specifically: use Modern Standard Arabic only where unavoidable (for clarity on shared concepts); otherwise lean toward the natural, everyday spoken register the applicant would use with a friend. Keep it warm and colloquial without becoming heavy dialect.
+- For Spanish, Portuguese, French, Hindi, Vietnamese, Indonesian, Bengali, Russian, Chinese: use the standard but casual spoken register, like you're having a cup of tea with someone.
+- If in doubt, say it simpler and more human, not more formal.
 
 **Your tone:**
 - Warm, human, curious, never interrogative
