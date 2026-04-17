@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { Suspense, useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 
@@ -20,7 +20,7 @@ interface TurnDisplay {
   text: string;
 }
 
-export default function LiveInterviewPage() {
+function LiveInterviewInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const applicationId = searchParams.get('application_id');
@@ -286,6 +286,14 @@ export default function LiveInterviewPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function LiveInterviewPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen" />}>
+      <LiveInterviewInner />
+    </Suspense>
   );
 }
 
