@@ -145,28 +145,27 @@ export default function HelpPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="hover:shadow-md transition-shadow cursor-pointer">
           <CardContent className="pt-6">
-            <a href="https://docs.penworth.ai" target="_blank" rel="noopener" className="flex items-center gap-3">
+            <a href="#faqs" className="flex items-center gap-3">
               <div className="p-2 rounded-full bg-primary/10">
                 <FileText className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold">Documentation</h3>
-                <p className="text-sm text-gray-500">Detailed guides & tutorials</p>
+                <h3 className="font-semibold">Guides &amp; FAQs</h3>
+                <p className="text-sm text-gray-500">Answers to common questions</p>
               </div>
-              <ExternalLink className="h-4 w-4 ml-auto text-gray-400" />
             </a>
           </CardContent>
         </Card>
 
         <Card className="hover:shadow-md transition-shadow cursor-pointer">
           <CardContent className="pt-6">
-            <a href="https://community.penworth.ai" target="_blank" rel="noopener" className="flex items-center gap-3">
+            <a href="mailto:support@penworth.ai" className="flex items-center gap-3">
               <div className="p-2 rounded-full bg-blue-100">
                 <MessageSquare className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <h3 className="font-semibold">Community</h3>
-                <p className="text-sm text-gray-500">Connect with other authors</p>
+                <h3 className="font-semibold">Ask a question</h3>
+                <p className="text-sm text-gray-500">Reach the Penworth team directly</p>
               </div>
               <ExternalLink className="h-4 w-4 ml-auto text-gray-400" />
             </a>
