@@ -20,7 +20,8 @@ import {
   FileText,
   ArrowRight,
   Check,
-  Linkedin
+  Linkedin,
+  Globe,
 } from 'lucide-react';
 
 interface PublishScreenProps {
@@ -522,24 +523,47 @@ export function PublishScreen({
             </div>
           )}
           
-          {/* Action Buttons */}
-          <div className="flex flex-wrap justify-center gap-3">
-            <Button variant="outline" onClick={onViewPDF}>
-              <Eye className="mr-2 h-4 w-4" />
+          {/* ==========================================================
+               PRIMARY ACTION — One-click publish to Penworth Store.
+               This is the moment the book goes live worldwide.
+             ========================================================== */}
+          <div className="rounded-xl border-2 border-primary bg-primary/5 p-5 mb-4 max-w-md mx-auto">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="h-10 w-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+                <Globe className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-left flex-1 min-w-0">
+                <h3 className="font-semibold">Publish to Penworth Store</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Your book goes live instantly at penworth.ai/marketplace.
+                  Free, worldwide, one click.
+                </p>
+              </div>
+            </div>
+            <Button onClick={onPublish} size="lg" className="w-full">
+              <Rocket className="mr-2 h-4 w-4" />
+              Publish Now
+            </Button>
+            <p className="text-[10px] text-muted-foreground text-center mt-2">
+              Published listings can be edited or unpublished from your dashboard
+            </p>
+          </div>
+
+          {/* Secondary — preview + download for author review or external use */}
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button variant="outline" size="sm" onClick={onViewPDF}>
+              <Eye className="mr-2 h-3.5 w-3.5" />
               View PDF
             </Button>
-            <Button variant="outline" onClick={onDownload}>
-              <Download className="mr-2 h-4 w-4" />
+            <Button variant="outline" size="sm" onClick={onDownload}>
+              <Download className="mr-2 h-3.5 w-3.5" />
               Download
             </Button>
-            <Button onClick={onPublish}>
-              <Rocket className="mr-2 h-4 w-4" />
-              Publish to Platforms
-            </Button>
           </div>
-          
-          <p className="mt-4 text-sm text-muted-foreground">
-            Your document is ready to view. Click to preview the final formatted PDF with all KDP specifications.
+
+          <p className="mt-4 text-xs text-muted-foreground">
+            External platforms (Amazon KDP, IngramSpark, Draft2Digital, +13 more)
+            — use Download to submit manually for now.
           </p>
         </div>
       </div>

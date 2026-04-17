@@ -70,7 +70,7 @@ export default function ListingDetailPage() {
         .from('marketplace_listings')
         .select(`
           *,
-          profiles:author_id (full_name, avatar_url)
+          profiles:seller_id (full_name, avatar_url)
         `)
         .eq('id', listingId)
         .single();
