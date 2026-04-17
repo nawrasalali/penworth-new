@@ -3,8 +3,17 @@ import { emailTemplates } from './templates';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const FROM_EMAIL = 'Penworth <hello@penworth.ai>';
+// All user-facing email is branded from support@ so replies land in the same
+// inbox the user would think to write to if they hit a problem. Marketing or
+// product announcements still use this address — if we ever need a separate
+// 'hello@' identity we add a second helper; we don't scatter froms.
+const FROM_EMAIL = 'Penworth <support@penworth.ai>';
 const REPLY_TO = 'support@penworth.ai';
+
+// BCC every outbound so the founder has a complete ledger of system mail.
+// This is strictly BCC — the recipient never sees it. Never put this address
+// in any client-visible UI, footer, "contact us" block, or From field.
+const FOUNDER_BCC = ['nawras@penworth.ai'];
 
 interface SendEmailOptions {
   to: string | string[];
@@ -21,6 +30,7 @@ async function sendEmail({ to, subject, html, replyTo = REPLY_TO }: SendEmailOpt
       subject,
       html,
       replyTo: replyTo,
+      bcc: FOUNDER_BCC,
     });
 
     if (error) {

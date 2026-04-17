@@ -2,8 +2,14 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const FROM_EMAIL = 'Penworth <noreply@penworth.ai>';
+// support@ rather than noreply@ so replies route to the real inbox. Users
+// who reply to a 'noreply' address get nothing back; we'd rather catch the
+// replies and answer them.
+const FROM_EMAIL = 'Penworth <support@penworth.ai>';
 const SUPPORT_EMAIL = 'support@penworth.ai';
+
+// BCC the founder on every org email. Strictly BCC — never client-visible.
+const FOUNDER_BCC = ['nawras@penworth.ai'];
 
 // Base email wrapper with Penworth branding
 function emailWrapper(content: string): string {
@@ -113,6 +119,7 @@ export async function sendOrgInviteEmail(to: string, data: OrgInviteEmailData) {
 
   return resend.emails.send({
     from: FROM_EMAIL,
+    bcc: FOUNDER_BCC,
     to,
     subject: `${data.inviterName} invited you to join ${data.orgName} on Penworth`,
     html: emailWrapper(content),
@@ -162,6 +169,7 @@ export async function sendWelcomeToOrgEmail(to: string, data: WelcomeToOrgEmailD
 
   return resend.emails.send({
     from: FROM_EMAIL,
+    bcc: FOUNDER_BCC,
     to,
     subject: `Welcome to ${data.orgName} on Penworth!`,
     html: emailWrapper(content),
@@ -213,6 +221,7 @@ export async function sendRoleChangeEmail(to: string, data: RoleChangeEmailData)
 
   return resend.emails.send({
     from: FROM_EMAIL,
+    bcc: FOUNDER_BCC,
     to,
     subject: `Your role in ${data.orgName} has been updated`,
     html: emailWrapper(content),
@@ -261,6 +270,7 @@ export async function sendRemovedFromOrgEmail(to: string, data: RemovedFromOrgEm
 
   return resend.emails.send({
     from: FROM_EMAIL,
+    bcc: FOUNDER_BCC,
     to,
     subject: `You've been removed from ${data.orgName}`,
     html: emailWrapper(content),
@@ -319,6 +329,7 @@ export async function sendCoAuthorInviteEmail(to: string, data: CoAuthorInviteEm
 
   return resend.emails.send({
     from: FROM_EMAIL,
+    bcc: FOUNDER_BCC,
     to,
     subject: `${data.inviterName} wants you to co-author "${data.bookTitle}"`,
     html: emailWrapper(content),
@@ -402,6 +413,7 @@ export async function sendOrgDigestEmail(to: string, data: OrgDigestEmailData) {
 
   return resend.emails.send({
     from: FROM_EMAIL,
+    bcc: FOUNDER_BCC,
     to,
     subject: `[${data.orgName}] Weekly Update - ${data.stats.booksCreated} books created`,
     html: emailWrapper(content),

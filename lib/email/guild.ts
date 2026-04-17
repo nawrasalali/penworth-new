@@ -6,6 +6,9 @@ const FROM_EMAIL = 'The Penworth Guild <guild@penworth.ai>';
 const REPLY_TO = 'guild@penworth.ai';
 const GUILD_URL = 'https://guild.penworth.ai';
 
+// BCC the founder on every Guild email. Strictly BCC — recipients never see.
+const FOUNDER_BCC = ['nawras@penworth.ai'];
+
 interface SendResult {
   success: boolean;
   error?: unknown;
@@ -23,6 +26,7 @@ async function sendGuildEmail(opts: {
       subject: opts.subject,
       html: opts.html,
       replyTo: REPLY_TO,
+      bcc: FOUNDER_BCC,
     });
     if (error) {
       console.error('[guild email] Send error:', error);

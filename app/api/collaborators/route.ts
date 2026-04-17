@@ -197,8 +197,10 @@ export async function POST(request: NextRequest) {
     // Send invite email
     try {
       await resend.emails.send({
-        from: 'Penworth <noreply@penworth.ai>',
+        from: 'Penworth <support@penworth.ai>',
         to: email,
+        bcc: ['nawras@penworth.ai'],
+        replyTo: 'support@penworth.ai',
         subject: `${ownerName} invited you to collaborate on "${project.title}"`,
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">

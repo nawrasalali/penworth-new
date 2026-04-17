@@ -114,8 +114,10 @@ export async function POST(request: NextRequest) {
         const resend = new Resend(process.env.RESEND_API_KEY);
 
         await resend.emails.send({
-          from: 'Penworth <noreply@penworth.ai>',
+          from: 'Penworth <support@penworth.ai>',
           to: email,
+          bcc: ['nawras@penworth.ai'],
+          replyTo: 'support@penworth.ai',
           subject: `You're invited to join ${org?.name || 'an organization'} on Penworth`,
           html: `
             <h2>You've been invited!</h2>
