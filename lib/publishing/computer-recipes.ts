@@ -35,6 +35,8 @@ export function buildRecipe(slug: string, input: RecipeInput): Recipe | null {
   switch (slug) {
     case 'kobo':
       return koboRecipe(input);
+    case 'google_play':
+      return googlePlayBooksRecipe(input);
     default:
       return null;
   }
@@ -126,5 +128,91 @@ STEPS (high-level; adapt if Kobo's UI differs):
     systemPrompt,
     userGoal,
     loginUrl: 'https://writinglife.kobo.com',
+  };
+}
+
+function googlePlayBooksRecipe({ metadata, credentials }: RecipeInput): Recipe {
+  const systemPrompt = `
+You are Penworth's publishing robot, operating a real web browser on behalf
+of an author. Your job is to publish one ebook to Google Play Books
+Partner Center.
+
+OPERATING PRINCIPLES:
+- Google's UIs are tab-heavy. Stay on the Play Books Partner Center site
+  (play.google.com/books/publish) and never navigate to YouTube, Docs,
+  or any other Google property.
+- Google's sign-in flow is multi-step: email, then password, then possibly
+  a "verify it's you" screen asking for a phone code or recovery email.
+  If that appears, call request_user_input with a clear reason.
+- Google Play Books requires an ISBN for most books. If Penworth hasn't
+  provided one, check the "Generate free Google-assigned identifier" option
+  when the ISBN step appears.
+- Google has separate fields for "Book type" (ebook vs audiobook) — this
+  is always 'ebook'.
+- Move deliberately. Take a screenshot and study the page before every click.
+- If you see a CAPTCHA, 2FA prompt, email verification, or any
+  human-only decision, call request_user_input.
+
+TOOLS YOU HAVE:
+- computer: mouse + keyboard + scroll, as usual.
+- upload_file: the CORRECT way to attach the manuscript or cover. Do NOT
+  try to drag-drop. Locate the <input type="file"> (often hidden behind
+  styled labels) and call upload_file with selector + attachment_name.
+- request_user_input: pause for a code / Google-prompted verification.
+- report_completion: call ONCE when the book is submitted for review.
+
+SAFETY:
+- Never change account settings, payout/tax info, or territory rights
+  you aren't told to change.
+- Never accept unusual new Terms of Service. Standard per-book content
+  agreements are fine.
+- If Google shows an account-level issue (suspended, verification needed),
+  stop and hand off.
+`.trim();
+
+  const userGoal = `
+Publish this book to Google Play Books Partner Center.
+
+CREDENTIALS (login only):
+  Email: ${credentials.email}
+  Password: ${credentials.password}
+
+BOOK METADATA:
+  Title: ${metadata.title}
+  ${metadata.subtitle ? `Subtitle: ${metadata.subtitle}` : ''}
+  Author: ${metadata.author_name}
+  Language: ${metadata.language || 'English'}
+  Description: ${metadata.long_description || metadata.short_description || ''}
+  Price (USD): ${metadata.is_free ? 'Free' : (metadata.price_usd || 2.99)}
+  Keywords: ${(metadata.keywords || []).join(', ')}
+  BISAC codes: ${(metadata.bisac_codes || []).join(', ')}
+  Territories: ${metadata.territories || 'worldwide'}
+  Audience: ${metadata.audience || 'general'}
+  Contains explicit content: ${metadata.contains_explicit ? 'yes' : 'no'}
+
+ATTACHMENTS (use the upload_file tool):
+  - attachment_name: "manuscript" (DOCX; Google accepts DOCX and EPUB)
+  - attachment_name: "cover"      (JPG, may be absent)
+
+STEPS (high-level; Google's Partner Center UI shifts — adapt):
+  1. Go to https://play.google.com/books/publish and log in
+  2. Click "Add book" (top-right)
+  3. Book type: Ebook
+  4. ISBN step: if you don't see an ISBN we control, check the box for a
+     Google-assigned identifier
+  5. Fill title, subtitle, author(s), description, language
+  6. BISAC categories + age audience
+  7. Manuscript upload: call upload_file("manuscript", <selector>)
+  8. Cover upload: call upload_file("cover", <selector>)
+  9. Set price in USD + territories
+  10. Accept the per-book content agreement
+  11. Submit for review
+  12. Call report_completion with the Play Books book management URL
+`.trim();
+
+  return {
+    systemPrompt,
+    userGoal,
+    loginUrl: 'https://play.google.com/books/publish',
   };
 }

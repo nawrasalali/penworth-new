@@ -16,7 +16,7 @@ import { encryptCredential } from '@/lib/publishing/credentials';
  */
 
 // Platforms allowed to use computer-use auth. Add entries as recipes ship.
-const COMPUTER_USE_PLATFORMS = new Set(['kobo']);
+const COMPUTER_USE_PLATFORMS = new Set(['kobo', 'google_play']);
 
 export async function POST(
   request: NextRequest,
