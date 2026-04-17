@@ -190,12 +190,21 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     const invoiceId = typeof subscription.latest_invoice === 'string'
       ? subscription.latest_invoice
       : subscription.latest_invoice?.id || null;
+
+    // Use the actual amount on the Stripe price, not the monthly table value —
+    // critical for annual plans where unit_amount is the full annual price
+    // (e.g. $190 for Pro Annual) rather than $19/month.
+    const unitAmountCents = subscription.items.data[0]?.price.unit_amount;
+    const priceOverrideUsd =
+      typeof unitAmountCents === 'number' ? unitAmountCents / 100 : undefined;
+
     await recordFirstPayment({
       admin: supabase,
       referredUserId: userId,
       plan,
       stripeInvoiceId: invoiceId,
       stripePaymentIntentId: null,
+      priceOverrideUsd,
     });
   } catch (err) {
     console.error('[guild] recordFirstPayment failed:', err);
@@ -407,6 +416,14 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   // Guild commission hook — renewal payment from a referred user
   // ---------------------------------------------------------------------
   try {
+    // Use invoice.amount_paid (cents) as the authoritative renewal amount —
+    // correct for annual renewals ($190/$490 invoices), mid-cycle proration,
+    // and any future price changes.
+    const priceOverrideUsd =
+      typeof invoice.amount_paid === 'number' && invoice.amount_paid > 0
+        ? invoice.amount_paid / 100
+        : undefined;
+
     await recordRenewalPayment({
       admin: supabase,
       referredUserId: userId,
@@ -414,6 +431,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
       stripePaymentIntentId: typeof invoice.payment_intent === 'string'
         ? invoice.payment_intent
         : invoice.payment_intent?.id || null,
+      priceOverrideUsd,
     });
   } catch (err) {
     console.error('[guild] recordRenewalPayment failed:', err);

@@ -182,10 +182,24 @@ interface FirstPaymentParams {
   plan: string;
   stripeInvoiceId?: string | null;
   stripePaymentIntentId?: string | null;
+  /**
+   * Actual amount paid in USD for this billing period, taken from Stripe.
+   * REQUIRED for correct annual-plan commissions. For a Pro Annual subscription
+   * ($190 paid upfront), this must be 190 — NOT the $19/month table price.
+   * If omitted, falls back to planPriceUsd(plan) which assumes monthly.
+   */
+  priceOverrideUsd?: number;
 }
 
 export async function recordFirstPayment(params: FirstPaymentParams) {
-  const { admin, referredUserId, plan, stripeInvoiceId, stripePaymentIntentId } = params;
+  const {
+    admin,
+    referredUserId,
+    plan,
+    stripeInvoiceId,
+    stripePaymentIntentId,
+    priceOverrideUsd,
+  } = params;
 
   // Load referral (if any)
   const { data: referral } = await admin
@@ -204,7 +218,14 @@ export async function recordFirstPayment(params: FirstPaymentParams) {
     return referral;
   }
 
-  const price = planPriceUsd(plan);
+  // Prefer the actual Stripe-paid amount (handles annual plans, promos, tax).
+  // Fall back to the monthly price table only if no override is passed — this
+  // preserves legacy behaviour but is NOT correct for annual subscriptions.
+  const price =
+    typeof priceOverrideUsd === 'number' && priceOverrideUsd > 0
+      ? priceOverrideUsd
+      : planPriceUsd(plan);
+
   if (price <= 0) {
     console.warn(`[commissions] Unknown plan "${plan}" for referral ${referral.id}`);
     return null;
@@ -249,10 +270,23 @@ interface RenewalParams {
   referredUserId: string;
   stripeInvoiceId?: string | null;
   stripePaymentIntentId?: string | null;
+  /**
+   * Actual amount paid in USD for this renewal cycle, taken from
+   * Stripe's invoice.amount_paid. REQUIRED for correct annual-plan commissions —
+   * an annual renewal is a single $190 or $490 invoice, not $19/$49.
+   * If omitted, falls back to referral.first_plan_price_usd.
+   */
+  priceOverrideUsd?: number;
 }
 
 export async function recordRenewalPayment(params: RenewalParams) {
-  const { admin, referredUserId, stripeInvoiceId, stripePaymentIntentId } = params;
+  const {
+    admin,
+    referredUserId,
+    stripeInvoiceId,
+    stripePaymentIntentId,
+    priceOverrideUsd,
+  } = params;
 
   const { data: referral } = await admin
     .from('guild_referrals')
@@ -290,12 +324,19 @@ export async function recordRenewalPayment(params: RenewalParams) {
     }
   }
 
+  // Prefer the actual Stripe-paid amount (handles annual plans, proration,
+  // mid-cycle plan changes). Fall back to the stored first-plan price.
+  const basePrice =
+    typeof priceOverrideUsd === 'number' && priceOverrideUsd > 0
+      ? priceOverrideUsd
+      : Number(referral.first_plan_price_usd);
+
   const now = new Date();
   return await createCommissionEvent({
     admin,
     referralId: referral.id,
     guildmemberId: referral.guildmember_id,
-    subscriptionPriceUsd: Number(referral.first_plan_price_usd),
+    subscriptionPriceUsd: basePrice,
     commissionRate: Number(referral.commission_rate_locked),
     stripeInvoiceId: stripeInvoiceId ?? null,
     stripePaymentIntentId: stripePaymentIntentId ?? null,
