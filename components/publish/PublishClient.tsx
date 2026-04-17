@@ -21,6 +21,15 @@ import {
 } from 'lucide-react';
 import { MetadataEditor } from './MetadataEditor';
 import { KitPanel } from './KitPanel';
+import { ComputerSessionPanel } from './ComputerSessionPanel';
+
+/**
+ * Platforms whose Tier 2 auto-publish is powered by Penworth Computer
+ * (Claude drives a real browser) rather than a direct API call. These
+ * branch into the computer-use connect dialog (email + password) and
+ * the live session panel.
+ */
+const COMPUTER_USE_SLUGS = new Set(['kobo']);
 
 interface ProjectRow {
   id: string;
@@ -162,6 +171,19 @@ export function PublishClient({
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [apiKeyBusy, setApiKeyBusy] = useState(false);
 
+  // Computer-use (email+password) connect dialog
+  const [computerConnectDialog, setComputerConnectDialog] = useState<{ slug: string; displayName: string } | null>(null);
+  const [computerEmail, setComputerEmail] = useState('');
+  const [computerPassword, setComputerPassword] = useState('');
+  const [computerConnectBusy, setComputerConnectBusy] = useState(false);
+
+  // Active Penworth Computer session (live panel)
+  const [activeComputerSession, setActiveComputerSession] = useState<{
+    sessionId: string;
+    slug: string;
+    displayName: string;
+  } | null>(null);
+
   const connectPlatform = (slug: string) => {
     const projectParam = selectedId ? `?projectId=${selectedId}` : '';
     window.location.href = `/api/publishing/oauth/${slug}/start${projectParam}`;
@@ -193,6 +215,72 @@ export function PublishClient({
       toast.error('Connect failed');
     } finally {
       setApiKeyBusy(false);
+    }
+  };
+
+  /**
+   * Submit email + password for a computer-use platform (Kobo, etc.).
+   * Stored encrypted under auth_type='computer_use'. Decrypted only in
+   * agent memory at login time.
+   */
+  const submitComputerConnect = async () => {
+    if (!computerConnectDialog || !computerEmail.trim() || !computerPassword) return;
+    setComputerConnectBusy(true);
+    try {
+      const resp = await fetch(`/api/publishing/computer/${computerConnectDialog.slug}/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: computerEmail.trim(), password: computerPassword }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) {
+        toast.error(data.error || 'Connect failed');
+        return;
+      }
+      toast.success(`Connected to ${computerConnectDialog.displayName}`);
+      setComputerConnectDialog(null);
+      setComputerEmail('');
+      setComputerPassword('');
+      loadPlatforms();
+    } catch {
+      toast.error('Connect failed');
+    } finally {
+      setComputerConnectBusy(false);
+    }
+  };
+
+  /**
+   * Kick off a Penworth Computer session — Claude drives a real browser to
+   * publish the book. Returns immediately with a sessionId; the UI then
+   * opens the live panel which subscribes to the SSE stream to actually
+   * run the agent.
+   */
+  const launchComputer = async (slug: string, displayName: string) => {
+    if (!selectedId) return;
+    try {
+      const resp = await fetch(`/api/publishing/computer/${slug}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: selectedId }),
+      });
+      const data = await resp.json();
+      if (resp.status === 422 && data.missing) {
+        toast.error(`Complete publishing details first: ${data.missing.join(', ')}`);
+        setMetadataOpen(true);
+        return;
+      }
+      if (resp.status === 428 || data.code === 'not_connected') {
+        toast.error(`Connect your ${displayName} account first`);
+        setComputerConnectDialog({ slug, displayName });
+        return;
+      }
+      if (!resp.ok || data.error) {
+        toast.error(data.error || 'Failed to launch');
+        return;
+      }
+      setActiveComputerSession({ sessionId: data.sessionId, slug, displayName });
+    } catch {
+      toast.error('Failed to launch');
     }
   };
 
@@ -461,6 +549,12 @@ export function PublishClient({
                       return;
                     }
                     if (!p.oauth_provider) return;
+                    // Computer-use platforms launch a live session instead of
+                    // the request/response Tier 2 adapter
+                    if (COMPUTER_USE_SLUGS.has(p.oauth_provider)) {
+                      launchComputer(p.oauth_provider, p.name);
+                      return;
+                    }
                     publishTier2(p.oauth_provider, p.name);
                   }}
                   onConnect={() => {
@@ -471,6 +565,11 @@ export function PublishClient({
                     // Payhip uses an API-key paste rather than OAuth round-trip
                     if (p.oauth_provider === 'payhip') {
                       setApiKeyDialog({ slug: 'payhip', displayName: p.name });
+                      return;
+                    }
+                    // Kobo/etc use Penworth Computer with email+password
+                    if (COMPUTER_USE_SLUGS.has(p.oauth_provider)) {
+                      setComputerConnectDialog({ slug: p.oauth_provider, displayName: p.name });
                       return;
                     }
                     connectPlatform(p.oauth_provider);
@@ -580,6 +679,87 @@ export function PublishClient({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Computer-use connect dialog — email + password for platforms
+          Penworth Computer drives via browser automation (Kobo, etc.) */}
+      {computerConnectDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-background rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div>
+              <h2 className="text-lg font-bold">Connect {computerConnectDialog.displayName}</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {computerConnectDialog.displayName} doesn't have a public API, so Penworth Computer
+                (our Claude-powered agent) will log in on your behalf and fill in the publishing form.
+                Credentials are encrypted with AES-256 and only decrypted in memory during a session.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground">Email</label>
+                <input
+                  type="email"
+                  value={computerEmail}
+                  onChange={(e) => setComputerEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="mt-1 w-full px-3 py-2 border rounded-lg bg-background text-sm"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground">Password</label>
+                <input
+                  type="password"
+                  value={computerPassword}
+                  onChange={(e) => setComputerPassword(e.target.value)}
+                  placeholder="Account password"
+                  className="mt-1 w-full px-3 py-2 border rounded-lg bg-background text-sm"
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === 'Enter' &&
+                      computerEmail.trim() &&
+                      computerPassword &&
+                      !computerConnectBusy
+                    ) {
+                      submitComputerConnect();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                onClick={() => {
+                  setComputerConnectDialog(null);
+                  setComputerEmail('');
+                  setComputerPassword('');
+                }}
+                className="px-4 py-2 rounded-lg text-sm hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitComputerConnect}
+                disabled={computerConnectBusy || !computerEmail.trim() || !computerPassword}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {computerConnectBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {computerConnectBusy ? 'Connecting...' : 'Connect securely'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Live Penworth Computer session panel */}
+      {activeComputerSession && (
+        <ComputerSessionPanel
+          sessionId={activeComputerSession.sessionId}
+          slug={activeComputerSession.slug}
+          platformName={activeComputerSession.displayName}
+          onClose={() => setActiveComputerSession(null)}
+          onComplete={loadPlatforms}
+        />
       )}
     </div>
   );
