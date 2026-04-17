@@ -67,7 +67,12 @@ export type AITask =
   // Cover & publishing
   | 'cover_prompt_generate'  // Build Ideogram prompt from book metadata
   | 'publishing_metadata'    // Generate KDP description, keywords, categories
-  | 'publishing_guide';      // Per-platform submission guide
+  | 'publishing_guide'       // Per-platform submission guide
+  // Guild agents (member-facing coaching/analysis/strategy)
+  | 'guild_mentor_turn'      // Conversational reply in weekly check-in
+  | 'guild_mentor_summary'   // Distil session into journal entry
+  | 'guild_analyst_report'   // Analyse referral performance → insights
+  | 'guild_strategist_plan'; // Recommend next-period actions
 
 export const TASK_MODEL: Record<AITask, ModelTier> = {
   // Sonnet: reasoning + structure, not prose
@@ -94,6 +99,12 @@ export const TASK_MODEL: Record<AITask, ModelTier> = {
   cover_prompt_generate:   'haiku',
   publishing_metadata:     'haiku',
   publishing_guide:        'haiku',
+
+  // Guild agents: sonnet — reasoning + empathy over member data, not prose art
+  guild_mentor_turn:       'sonnet',
+  guild_mentor_summary:    'sonnet',
+  guild_analyst_report:    'sonnet',
+  guild_strategist_plan:   'sonnet',
 };
 
 /**
@@ -119,6 +130,11 @@ export const TASK_MAX_TOKENS: Record<AITask, number> = {
   cover_prompt_generate:    512,
   publishing_metadata:     1024,
   publishing_guide:        1536,
+  // Guild agents
+  guild_mentor_turn:        768,   // one conversational reply
+  guild_mentor_summary:    1536,   // structured journal entry at session end
+  guild_analyst_report:    2048,   // structured insights
+  guild_strategist_plan:   2560,   // week plan JSON
 };
 
 export function modelFor(task: AITask): string {
