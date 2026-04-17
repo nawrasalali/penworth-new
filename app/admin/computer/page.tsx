@@ -46,14 +46,22 @@ export default async function AdminComputerPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-      <div>
-        <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-          Admin · Penworth Computer
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+            Admin · Penworth Computer
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight mt-1">Automation sessions</h1>
+          <p className="text-muted-foreground mt-1">
+            Every browser session the agent has opened on behalf of an author.
+          </p>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight mt-1">Automation sessions</h1>
-        <p className="text-muted-foreground mt-1">
-          Every browser session the agent has opened on behalf of an author.
-        </p>
+        <Link
+          href="/admin/computer/test"
+          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted"
+        >
+          Test harness
+        </Link>
       </div>
 
       {/* Summary */}
