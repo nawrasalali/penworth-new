@@ -88,6 +88,11 @@ export default async function GuildAdminPage({
           <p className="mt-2 text-sm text-muted-foreground">
             Review and decide on Penworth Guild applications.
           </p>
+          <div className="mt-3 flex gap-4 text-sm">
+            <Link href="/admin/guild/payouts" className="text-[#d4af37] hover:underline">
+              Payouts queue →
+            </Link>
+          </div>
         </div>
         <div className="text-right text-sm text-muted-foreground">
           <div className="font-serif text-3xl text-foreground">{statusCounts.all}</div>

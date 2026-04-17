@@ -24,6 +24,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import { maskPayoutDestinationSafe } from './payout-encryption';
 
 // ---------------------------------------------------------------------------
 // Tier → commission rate mapping
@@ -604,7 +605,7 @@ export async function runMonthlyClose(admin: SupabaseClient, closeMonth: string)
     const method = member?.payout_method || 'pending';
     if (method === 'pending') continue; // can't queue without payout method set
 
-    const masked = maskDestination(member?.payout_details_encrypted, method);
+    const masked = maskPayoutDestinationSafe(method, guildmemberId, member?.payout_details_encrypted);
 
     await admin.from('guild_payouts').upsert(
       {
@@ -623,10 +624,4 @@ export async function runMonthlyClose(admin: SupabaseClient, closeMonth: string)
   }
 
   return { locked: ids.length, queued_payouts: queuedCount };
-}
-
-function maskDestination(encrypted: string | null | undefined, method: string): string {
-  if (!encrypted) return method === 'wise' ? '****@****.***' : '0x…';
-  // For now, we don't actually decrypt — just show a generic mask
-  return method === 'wise' ? '****@****.***' : '0x…';
 }
