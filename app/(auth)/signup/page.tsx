@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { BookOpen, Check } from 'lucide-react';
 import { ConsentCheckbox } from '@/components/auth/ConsentCheckbox';
 import { LEGAL_DOCUMENT_KEYS } from '@/lib/legal/documents';
+import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
 function SignupForm() {
   const [fullName, setFullName] = useState('');
@@ -20,6 +21,8 @@ function SignupForm() {
   const plan = searchParams.get('plan');
   // Language passed from the landing page subdomain (e.g. ar.penworth.ai/signup?lang=ar)
   const lang = searchParams.get('lang') || 'en';
+  // Resolved locale for t() — defaults to 'en' for any unsupported value.
+  const locale: Locale = isSupportedLocale(lang) ? lang : 'en';
   const qs = new URLSearchParams();
   if (plan) qs.set('plan', plan);
   if (lang && lang !== 'en') qs.set('lang', lang);
@@ -28,7 +31,7 @@ function SignupForm() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!consentAccepted) {
-      setError('Please accept all three agreements to continue.');
+      setError(t('auth.consentRequired', locale));
       return;
     }
     setLoading(true);
@@ -76,9 +79,9 @@ function SignupForm() {
         });
       }
 
-      router.push('/login?message=Check your email to confirm your account');
+      router.push(`/login?lang=${lang}&message=${encodeURIComponent(t('auth.checkEmailForConfirm', locale))}`);
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      setError(t('auth.genericError', locale));
     } finally {
       setLoading(false);
     }
@@ -86,7 +89,7 @@ function SignupForm() {
 
   const handleGoogleSignup = async () => {
     if (!consentAccepted) {
-      setError('Please accept all three agreements to continue.');
+      setError(t('auth.consentRequired', locale));
       return;
     }
     const supabase = createClient();
@@ -116,22 +119,22 @@ function SignupForm() {
         {/* Card */}
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-8 shadow-xl">
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold mb-2">Create your account</h1>
-            <p className="text-neutral-600 dark:text-neutral-400">Start writing your book with AI</p>
+            <h1 className="text-2xl font-bold mb-2">{t('auth.signupTitle', locale)}</h1>
+            <p className="text-neutral-600 dark:text-neutral-400">{t('auth.signupSubtitle', locale)}</p>
           </div>
 
           {/* What you get */}
           <div className="mb-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">Your free account includes:</p>
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">{t('auth.freeAccountTitle', locale)}</p>
             <div className="space-y-1">
               <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-2">
-                <Check className="h-3 w-3" />1,000 credits (1 full book)
+                <Check className="h-3 w-3" />{t('auth.freeAccountBullet1', locale)}
               </p>
               <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-2">
-                <Check className="h-3 w-3" />AI interview & writing
+                <Check className="h-3 w-3" />{t('auth.freeAccountBullet2', locale)}
               </p>
               <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-2">
-                <Check className="h-3 w-3" />Publish to Amazon KDP
+                <Check className="h-3 w-3" />{t('auth.freeAccountBullet3', locale)}
               </p>
             </div>
           </div>
@@ -144,11 +147,10 @@ function SignupForm() {
 
           <form onSubmit={handleSignup} className="space-y-4">
             <div>
-              <label htmlFor="fullName" className="block text-sm font-medium mb-2">Full Name</label>
+              <label htmlFor="fullName" className="block text-sm font-medium mb-2">{t('auth.fullName', locale)}</label>
               <input
                 id="fullName"
                 type="text"
-                placeholder="John Doe"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
@@ -156,7 +158,7 @@ function SignupForm() {
               />
             </div>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-2">Email</label>
+              <label htmlFor="email" className="block text-sm font-medium mb-2">{t('auth.email', locale)}</label>
               <input
                 id="email"
                 type="email"
@@ -168,7 +170,7 @@ function SignupForm() {
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium mb-2">Password</label>
+              <label htmlFor="password" className="block text-sm font-medium mb-2">{t('auth.password', locale)}</label>
               <input
                 id="password"
                 type="password"
@@ -179,17 +181,17 @@ function SignupForm() {
                 minLength={8}
                 className="w-full rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
               />
-              <p className="text-xs text-neutral-500 mt-1.5">Must be at least 8 characters</p>
+              <p className="text-xs text-neutral-500 mt-1.5">{t('auth.passwordMin', locale)}</p>
             </div>
 
-            <ConsentCheckbox onChange={setConsentAccepted} disabled={loading} />
+            <ConsentCheckbox locale={locale} onChange={setConsentAccepted} disabled={loading} />
 
             <button
               type="submit"
               disabled={loading || !consentAccepted}
               className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 py-3 text-sm font-semibold text-white hover:shadow-lg hover:shadow-amber-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {loading ? 'Creating account...' : 'Create account'}
+              {loading ? t('auth.creatingAccount', locale) : t('auth.createAccount', locale)}
             </button>
           </form>
 
@@ -198,7 +200,7 @@ function SignupForm() {
               <div className="w-full border-t border-neutral-200 dark:border-neutral-800" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white dark:bg-neutral-900 px-3 text-neutral-500">Or continue with</span>
+              <span className="bg-white dark:bg-neutral-900 px-3 text-neutral-500">{t('auth.orContinueWith', locale)}</span>
             </div>
           </div>
 
@@ -218,19 +220,19 @@ function SignupForm() {
           </button>
 
           <p className="mt-6 text-center text-sm text-neutral-600 dark:text-neutral-400">
-            Already have an account?{' '}
-            <Link href="/login" className="text-amber-600 dark:text-amber-400 hover:underline font-medium">
-              Sign in
+            {t('auth.alreadyHaveAccount', locale)}{' '}
+            <Link href={lang !== 'en' ? `/login?lang=${lang}` : '/login'} className="text-amber-600 dark:text-amber-400 hover:underline font-medium">
+              {t('auth.signIn', locale)}
             </Link>
           </p>
 
           <p className="mt-4 text-center text-xs text-neutral-500">
-            By creating an account, you agree to our{' '}
-            <Link href="/legal/terms" className="underline hover:text-neutral-900 dark:hover:text-white">Terms</Link>
+            {t('auth.termsPreamble', locale)}{' '}
+            <Link href="/legal/terms" className="underline hover:text-neutral-900 dark:hover:text-white">{t('auth.terms', locale)}</Link>
             ,{' '}
-            <Link href="/legal/privacy" className="underline hover:text-neutral-900 dark:hover:text-white">Privacy Policy</Link>
-            , and{' '}
-            <Link href="/legal/acceptable-use" className="underline hover:text-neutral-900 dark:hover:text-white">Acceptable Use Policy</Link>
+            <Link href="/legal/privacy" className="underline hover:text-neutral-900 dark:hover:text-white">{t('auth.privacyPolicy', locale)}</Link>
+            ,{' '}
+            <Link href="/legal/acceptable-use" className="underline hover:text-neutral-900 dark:hover:text-white">{t('auth.acceptableUsePolicy', locale)}</Link>
           </p>
         </div>
       </div>
@@ -242,7 +244,7 @@ export default function SignupPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-neutral-950">
-        <div className="animate-pulse text-neutral-500">Loading...</div>
+        <div className="animate-pulse text-neutral-500">…</div>
       </div>
     }>
       <SignupForm />

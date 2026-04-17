@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { BookOpen } from 'lucide-react';
+import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
 function LoginForm() {
   const [email, setEmail] = useState('');
@@ -17,6 +18,10 @@ function LoginForm() {
   // Language passed from a landing page subdomain (e.g. ar.penworth.ai/login?lang=ar).
   // Carries through OAuth so returning users land back on their language subdomain.
   const lang = searchParams.get('lang');
+  const locale: Locale = isSupportedLocale(lang ?? 'en') ? (lang ?? 'en') as Locale : 'en';
+  // ?message=... is set by /signup after a successful submit so we can confirm
+  // "check your email". Value is URL-encoded and may already be translated.
+  const message = searchParams.get('message');
 
   const callbackQuery = (() => {
     const qs = new URLSearchParams();
@@ -68,7 +73,7 @@ function LoginForm() {
       router.push(redirect);
       router.refresh();
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      setError(t('auth.genericError', locale));
     } finally {
       setLoading(false);
     }
@@ -102,9 +107,15 @@ function LoginForm() {
         {/* Card */}
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-8 shadow-xl">
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold mb-2">Welcome back</h1>
-            <p className="text-neutral-600 dark:text-neutral-400">Sign in to your Penworth account</p>
+            <h1 className="text-2xl font-bold mb-2">{t('auth.welcomeBack', locale)}</h1>
+            <p className="text-neutral-600 dark:text-neutral-400">{t('auth.welcomeBackSubtitle', locale)}</p>
           </div>
+
+          {message && (
+            <div className="mb-4 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-sm">
+              {message}
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
@@ -114,7 +125,7 @@ function LoginForm() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-2">Email</label>
+              <label htmlFor="email" className="block text-sm font-medium mb-2">{t('auth.email', locale)}</label>
               <input
                 id="email"
                 type="email"
@@ -127,9 +138,9 @@ function LoginForm() {
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label htmlFor="password" className="text-sm font-medium">Password</label>
+                <label htmlFor="password" className="text-sm font-medium">{t('auth.password', locale)}</label>
                 <Link href="/forgot-password" className="text-sm text-amber-600 dark:text-amber-400 hover:underline">
-                  Forgot password?
+                  {t('auth.forgotPassword', locale)}
                 </Link>
               </div>
               <input
@@ -147,7 +158,7 @@ function LoginForm() {
               disabled={loading}
               className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 py-3 text-sm font-semibold text-white hover:shadow-lg hover:shadow-amber-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? t('auth.signingIn', locale) : t('auth.signIn', locale)}
             </button>
           </form>
 
@@ -156,7 +167,7 @@ function LoginForm() {
               <div className="w-full border-t border-neutral-200 dark:border-neutral-800" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white dark:bg-neutral-900 px-3 text-neutral-500">Or continue with</span>
+              <span className="bg-white dark:bg-neutral-900 px-3 text-neutral-500">{t('auth.orContinueWith', locale)}</span>
             </div>
           </div>
 
@@ -175,9 +186,9 @@ function LoginForm() {
           </button>
 
           <p className="mt-6 text-center text-sm text-neutral-600 dark:text-neutral-400">
-            Don't have an account?{' '}
-            <Link href="/signup" className="text-amber-600 dark:text-amber-400 hover:underline font-medium">
-              Sign up
+            {t('auth.noAccount', locale)}{' '}
+            <Link href={lang && lang !== 'en' ? `/signup?lang=${lang}` : '/signup'} className="text-amber-600 dark:text-amber-400 hover:underline font-medium">
+              {t('auth.signUp', locale)}
             </Link>
           </p>
         </div>
@@ -188,7 +199,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white dark:bg-neutral-950">Loading...</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white dark:bg-neutral-950">…</div>}>
       <LoginForm />
     </Suspense>
   );

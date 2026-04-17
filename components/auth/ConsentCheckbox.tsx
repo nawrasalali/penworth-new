@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { LEGAL_DOCUMENTS } from '@/lib/legal/documents';
+import { t, type Locale } from '@/lib/i18n/strings';
 
 /**
  * Three mandatory consent checkboxes for signup. The parent form owns the
@@ -15,9 +16,11 @@ import { LEGAL_DOCUMENTS } from '@/lib/legal/documents';
 export function ConsentCheckbox({
   onChange,
   disabled,
+  locale = 'en',
 }: {
   onChange: (allAccepted: boolean) => void;
   disabled?: boolean;
+  locale?: Locale;
 }) {
   const [accepted, setAccepted] = useState<Record<string, boolean>>({
     terms: false,
@@ -40,16 +43,13 @@ export function ConsentCheckbox({
         disabled={disabled}
         onToggle={() => toggle('terms')}
         label={
-          <>
-            I agree to the{' '}
-            <Link
-              href={LEGAL_DOCUMENTS.terms.path}
-              target="_blank"
-              className="text-primary hover:underline"
-            >
-              Terms of Service
-            </Link>
-          </>
+          <Link
+            href={LEGAL_DOCUMENTS.terms.path}
+            target="_blank"
+            className="text-primary hover:underline"
+          >
+            {t('auth.consentTerms', locale)}
+          </Link>
         }
       />
       <ConsentRow
@@ -58,16 +58,13 @@ export function ConsentCheckbox({
         disabled={disabled}
         onToggle={() => toggle('privacy')}
         label={
-          <>
-            I have read the{' '}
-            <Link
-              href={LEGAL_DOCUMENTS.privacy.path}
-              target="_blank"
-              className="text-primary hover:underline"
-            >
-              Privacy Policy
-            </Link>
-          </>
+          <Link
+            href={LEGAL_DOCUMENTS.privacy.path}
+            target="_blank"
+            className="text-primary hover:underline"
+          >
+            {t('auth.consentPrivacy', locale)}
+          </Link>
         }
       />
       <ConsentRow
@@ -76,16 +73,13 @@ export function ConsentCheckbox({
         disabled={disabled}
         onToggle={() => toggle('acceptable_use')}
         label={
-          <>
-            I agree to the{' '}
-            <Link
-              href={LEGAL_DOCUMENTS.acceptable_use.path}
-              target="_blank"
-              className="text-primary hover:underline"
-            >
-              Acceptable Use Policy
-            </Link>
-          </>
+          <Link
+            href={LEGAL_DOCUMENTS.acceptable_use.path}
+            target="_blank"
+            className="text-primary hover:underline"
+          >
+            {t('auth.consentAup', locale)}
+          </Link>
         }
       />
     </div>
