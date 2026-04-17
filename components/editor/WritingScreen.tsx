@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { OutlineSection, CREDIT_COSTS } from '@/types/agent-workflow';
 import { cn } from '@/lib/utils';
 import {
@@ -37,17 +38,31 @@ export function WritingScreen({
 }: WritingScreenProps) {
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
-  
+  const [regenChapterId, setRegenChapterId] = useState<string | null>(null);
+  const [regenInstructions, setRegenInstructions] = useState('');
+
   const completedChapters = chapters.filter(c => c.status === 'complete').length;
   const progress = (completedChapters / chapters.length) * 100;
   const totalWords = chapters.reduce((sum, c) => sum + (c.wordCount || 0), 0);
-  
+
   const currentChapter = chapters[currentChapterIndex];
-  
+
   const handleStartEdit = (chapter: OutlineSection) => {
     setEditingChapterId(chapter.id);
     // In real implementation, load the chapter content
     setEditContent(currentChapterContent);
+  };
+
+  const handleStartRegenerate = (chapterId: string) => {
+    setRegenChapterId(chapterId);
+    setRegenInstructions('');
+  };
+
+  const handleConfirmRegenerate = () => {
+    if (!regenChapterId) return;
+    onRegenerateChapter(regenChapterId, regenInstructions.trim() || undefined);
+    setRegenChapterId(null);
+    setRegenInstructions('');
   };
   
   const handleSaveEdit = () => {
@@ -150,20 +165,50 @@ export function WritingScreen({
                       Save Changes (Free)
                     </Button>
                   </>
+                ) : regenChapterId === currentChapter.id ? (
+                  <div className="w-full space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Optional: tell the AI how to rewrite this chapter
+                      </label>
+                      <button
+                        onClick={() => setRegenChapterId(null)}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <Textarea
+                      value={regenInstructions}
+                      onChange={(e) => setRegenInstructions(e.target.value)}
+                      placeholder="e.g. 'make it more conversational', 'shorten by 30%', 'add more real-world examples'. Leave empty for a general rewrite."
+                      className="min-h-[60px] text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={handleConfirmRegenerate}
+                        disabled={!canRegenerate}
+                      >
+                        <RefreshCw className="mr-2 h-3 w-3" />
+                        Regenerate ({CREDIT_COSTS.CHAPTER_REGENERATE} credits)
+                      </Button>
+                    </div>
+                  </div>
                 ) : (
                   <>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => handleStartEdit(currentChapter)}
                     >
                       <Edit3 className="mr-2 h-3 w-3" />
                       Manual Edit (Free)
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
-                      onClick={() => onRegenerateChapter(currentChapter.id)}
+                      onClick={() => handleStartRegenerate(currentChapter.id)}
                       disabled={!canRegenerate}
                     >
                       <RefreshCw className="mr-2 h-3 w-3" />
