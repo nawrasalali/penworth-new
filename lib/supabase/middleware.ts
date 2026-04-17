@@ -58,13 +58,15 @@ export async function updateSession(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   // Protected routes
-  const protectedPaths = ['/dashboard', '/projects', '/organization', '/settings', '/marketplace'];
+  const protectedPaths = ['/dashboard', '/projects', '/organization', '/settings', '/marketplace', '/guild/dashboard'];
   const isProtectedPath = protectedPaths.some(path => 
     request.nextUrl.pathname.startsWith(path)
   );
 
   if (isProtectedPath && !user) {
-    const redirectUrl = new URL('/login', request.url);
+    // Guild paths use their own login entry that preserves context
+    const isGuildPath = request.nextUrl.pathname.startsWith('/guild/');
+    const redirectUrl = new URL(isGuildPath ? '/guild/login' : '/login', request.url);
     redirectUrl.searchParams.set('redirect', request.nextUrl.pathname);
     return NextResponse.redirect(redirectUrl);
   }
