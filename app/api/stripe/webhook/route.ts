@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { PLAN_LIMITS, CREDIT_PACKS } from '@/lib/plans';
+import {
+  recordFirstPayment,
+  recordRenewalPayment,
+  handleSubscriptionCancelled as guildHandleCancellation,
+  handleRefund as guildHandleRefund,
+} from '@/lib/guild/commissions';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia',
@@ -49,6 +55,14 @@ export async function POST(request: NextRequest) {
 
       case 'invoice.payment_failed':
         await handlePaymentFailed(event.data.object as Stripe.Invoice);
+        break;
+
+      case 'charge.refunded':
+        await handleChargeRefunded(event.data.object as Stripe.Charge);
+        break;
+
+      case 'charge.dispute.created':
+        await handleChargeDispute(event.data.object as Stripe.Dispute);
         break;
 
       default:
@@ -168,6 +182,25 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   });
 
   console.log(`Subscription activated: ${userId} -> ${plan}`);
+
+  // ---------------------------------------------------------------------
+  // Guild commission hook — first payment from a referred user
+  // ---------------------------------------------------------------------
+  try {
+    const invoiceId = typeof subscription.latest_invoice === 'string'
+      ? subscription.latest_invoice
+      : subscription.latest_invoice?.id || null;
+    await recordFirstPayment({
+      admin: supabase,
+      referredUserId: userId,
+      plan,
+      stripeInvoiceId: invoiceId,
+      stripePaymentIntentId: null,
+    });
+  } catch (err) {
+    console.error('[guild] recordFirstPayment failed:', err);
+    // Non-fatal — don't break subscription activation
+  }
 }
 
 /**
@@ -308,6 +341,15 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   });
 
   console.log(`Subscription canceled: ${userId} -> free`);
+
+  // ---------------------------------------------------------------------
+  // Guild cancellation hook
+  // ---------------------------------------------------------------------
+  try {
+    await guildHandleCancellation({ admin: supabase, referredUserId: userId });
+  } catch (err) {
+    console.error('[guild] handleSubscriptionCancelled failed:', err);
+  }
 }
 
 /**
@@ -360,6 +402,22 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   });
 
   console.log(`Billing cycle reset: ${userId} credits=${newCredits}`);
+
+  // ---------------------------------------------------------------------
+  // Guild commission hook — renewal payment from a referred user
+  // ---------------------------------------------------------------------
+  try {
+    await recordRenewalPayment({
+      admin: supabase,
+      referredUserId: userId,
+      stripeInvoiceId: invoice.id,
+      stripePaymentIntentId: typeof invoice.payment_intent === 'string'
+        ? invoice.payment_intent
+        : invoice.payment_intent?.id || null,
+    });
+  } catch (err) {
+    console.error('[guild] recordRenewalPayment failed:', err);
+  }
 }
 
 /**
@@ -402,4 +460,54 @@ function getPlanFromPriceId(priceId: string): 'pro' | 'max' | null {
 function getPlanRank(plan: string): number {
   const ranks: Record<string, number> = { free: 0, pro: 1, max: 2 };
   return ranks[plan] || 0;
+}
+
+/**
+ * Handle refund — Guild commission clawback for the refunded invoice.
+ */
+async function handleChargeRefunded(charge: Stripe.Charge) {
+  const invoiceId = typeof charge.invoice === 'string' ? charge.invoice : charge.invoice?.id;
+  if (!invoiceId) {
+    console.log('[guild] Refund without linked invoice, skipping');
+    return;
+  }
+
+  try {
+    const result = await guildHandleRefund({
+      admin: supabase,
+      stripeInvoiceId: invoiceId,
+      clawbackAll: false,
+    });
+    if (result) {
+      console.log(`[guild] Refund clawback processed for invoice ${invoiceId}`);
+    }
+  } catch (err) {
+    console.error('[guild] Refund clawback failed:', err);
+  }
+}
+
+/**
+ * Handle chargeback — claw back entire referral's commissions + mark as refunded.
+ */
+async function handleChargeDispute(dispute: Stripe.Dispute) {
+  const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge?.id;
+  if (!chargeId) return;
+
+  try {
+    // Find the invoice this charge is tied to
+    const charge = await stripe.charges.retrieve(chargeId);
+    const invoiceId = typeof charge.invoice === 'string' ? charge.invoice : charge.invoice?.id;
+    if (!invoiceId) return;
+
+    const result = await guildHandleRefund({
+      admin: supabase,
+      stripeInvoiceId: invoiceId,
+      clawbackAll: true,
+    });
+    if (result) {
+      console.log(`[guild] Chargeback clawback processed for invoice ${invoiceId}`);
+    }
+  } catch (err) {
+    console.error('[guild] Dispute clawback failed:', err);
+  }
 }

@@ -1,6 +1,8 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { originForLanguage, isSupportedLang } from '@/lib/lang-routing';
+import { createReferralOnSignup } from '@/lib/guild/commissions';
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -34,6 +36,10 @@ export async function GET(request: Request) {
         lang = profile?.preferred_language ?? 'en';
       }
 
+      // Try to attach a Guild referral if a code was captured prior to signup.
+      // Only runs on signup (not every login) — idempotent on duplicate attempts.
+      await attachGuildReferralIfAny(data.user.id);
+
       const targetOrigin = originForLanguage(origin, lang);
       return NextResponse.redirect(`${targetOrigin}${redirect}`);
     }
@@ -53,10 +59,48 @@ export async function GET(request: Request) {
           .single();
         lang = profile?.preferred_language ?? 'en';
       }
+
+      // Best-effort referral attachment on first authenticated callback
+      await attachGuildReferralIfAny(user.id);
+
       const targetOrigin = originForLanguage(origin, lang);
       return NextResponse.redirect(`${targetOrigin}${redirect}`);
     }
   }
 
   return NextResponse.redirect(`${origin}/login?error=Could not authenticate`);
+}
+
+/**
+ * Reads the penworth_ref cookie and attempts to create a guild_referrals row.
+ * No-op if no cookie, code is invalid, or referral already exists.
+ * The cookie is cleared after the attachment attempt (success or not) so we
+ * never try to double-attach a stale code.
+ */
+async function attachGuildReferralIfAny(userId: string) {
+  try {
+    const cookieStore = await cookies();
+    const refCookie = cookieStore.get('penworth_ref');
+    if (!refCookie?.value) return;
+
+    const code = decodeURIComponent(refCookie.value).trim().toUpperCase();
+    if (!code.startsWith('GUILD-')) return;
+
+    const admin = createAdminClient();
+    await createReferralOnSignup({
+      admin,
+      referralCode: code,
+      referredUserId: userId,
+    });
+
+    // Clear the cookie so we don't keep trying on future logins
+    cookieStore.set('penworth_ref', '', {
+      path: '/',
+      maxAge: 0,
+      sameSite: 'lax',
+    });
+  } catch (err) {
+    // Non-fatal — never block auth on referral attachment
+    console.error('[auth/callback] Guild referral attach failed:', err);
+  }
 }
