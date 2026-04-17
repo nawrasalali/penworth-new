@@ -101,7 +101,7 @@ export function Sidebar({ user, organization, locale = 'en' }: SidebarProps) {
           <Link href="/projects/new">
             <Button className="w-full justify-start">
               <Plus className="mr-2 h-4 w-4" />
-              New Project
+              {t('nav.newProject', locale)}
             </Button>
           </Link>
         </div>
@@ -222,7 +222,7 @@ export function Sidebar({ user, organization, locale = 'en' }: SidebarProps) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">
-                {user.full_name || 'User'}
+                {user.full_name || t('nav.userFallback', locale)}
               </p>
               <p className="text-xs text-muted-foreground truncate">
                 {user.email}
@@ -231,7 +231,7 @@ export function Sidebar({ user, organization, locale = 'en' }: SidebarProps) {
             <button
               onClick={handleSignOut}
               className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              title="Sign out"
+              title={t('nav.signOut', locale)}
             >
               <LogOut className="h-4 w-4" />
             </button>

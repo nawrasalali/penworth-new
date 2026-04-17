@@ -23,6 +23,7 @@ import {
 import { MetadataEditor } from './MetadataEditor';
 import { KitPanel } from './KitPanel';
 import { ComputerSessionPanel } from './ComputerSessionPanel';
+import { t, type Locale } from '@/lib/i18n/strings';
 
 /**
  * Platforms whose Tier 2 auto-publish is powered by Penworth Computer
@@ -63,9 +64,11 @@ interface Platform {
 export function PublishClient({
   projects,
   initialProjectId,
+  locale = 'en',
 }: {
   projects: ProjectRow[];
   initialProjectId: string | null;
+  locale?: Locale;
 }) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(initialProjectId);
@@ -355,7 +358,7 @@ export function PublishClient({
 
   // --- Layout ---
   if (projects.length === 0) {
-    return <PublishShowcase />;
+    return <PublishShowcase locale={locale} />;
   }
 
   const store = platforms.find((p) => p.publish_tier === 'penworth_store');
@@ -982,34 +985,34 @@ const SHOWCASE_GUIDED: ShowcasePlatform[] = [
   { slug: 'wattpad',      name: 'Wattpad Paid Stories', tagline: 'Serialised paid fiction audience.', royalty: 'Revenue share', reach: 'Wattpad Paid Stories readers' },
 ];
 
-function PublishShowcase() {
+function PublishShowcase({ locale = 'en' }: { locale?: Locale }) {
   return (
     <div className="max-w-6xl mx-auto px-6 py-10 space-y-10">
       {/* Hero */}
       <div className="text-center space-y-4 max-w-3xl mx-auto">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
           <Sparkles className="h-3.5 w-3.5" />
-          Publishing Preview
+          {t('publish.showcase.badge', locale)}
         </div>
         <h1 className="text-4xl font-bold tracking-tight">
-          Publish to 17 platforms. One click.
+          {t('publish.showcase.hero', locale)}
         </h1>
         <p className="text-lg text-muted-foreground">
-          Finish your first document and you unlock every marketplace below — from Amazon KDP to your own direct-sales storefront — without filling out a single form yourself.
+          {t('publish.showcase.subhero', locale)}
         </p>
         <div className="flex items-center justify-center gap-3 pt-2">
           <Link
             href="/projects"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90"
           >
-            Start my first document
+            {t('publish.startFirstDoc', locale)}
             <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
             href="/pricing"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border bg-background font-medium hover:bg-muted"
           >
-            See pricing
+            {t('publish.showcase.seePricing', locale)}
           </Link>
         </div>
       </div>
@@ -1018,24 +1021,24 @@ function PublishShowcase() {
       <div className="grid md:grid-cols-3 gap-4">
         <MechanismCard
           icon={<Zap className="h-5 w-5" />}
-          title="1-click marketplace"
-          subtitle="Free. Global. Instant."
+          title={t('publish.showcase.mech1Title', locale)}
+          subtitle={t('publish.showcase.mech1Subtitle', locale)}
           body="Penworth's own storefront publishes your ebook and AI-narrated audiobook the moment you're done. 70% royalty, no gatekeeper."
-          count="1 platform"
+          count={t('publish.showcase.mech1Count', locale)}
         />
         <MechanismCard
           icon={<Globe className="h-5 w-5" />}
-          title="Auto-publish"
-          subtitle="We drive the keyboard."
+          title={t('publish.showcase.mech2Title', locale)}
+          subtitle={t('publish.showcase.mech2Subtitle', locale)}
           body="Eight platforms published automatically — including Amazon KDP. Some via direct API, some via Penworth Computer (Claude drives a real browser). You connect once, we handle every submission."
-          count="8 platforms"
+          count={t('publish.showcase.mech2Count', locale)}
         />
         <MechanismCard
           icon={<FileText className="h-5 w-5" />}
-          title="Guided kits"
-          subtitle="Formatted files, step-by-step."
+          title={t('publish.showcase.mech3Title', locale)}
+          subtitle={t('publish.showcase.mech3Subtitle', locale)}
           body="For platforms that don't accept automation: we generate platform-specific files (formatted PDF, DOCX, cover) plus a walkthrough so submission takes minutes, not hours."
-          count="8 platforms"
+          count={t('publish.showcase.mech3Count', locale)}
         />
       </div>
 
@@ -1043,9 +1046,9 @@ function PublishShowcase() {
       <section className="space-y-4">
         <div className="flex items-center gap-3">
           <Zap className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-semibold">Penworth Marketplace</h2>
+          <h2 className="text-xl font-semibold">{t('publish.showcase.marketplace', locale)}</h2>
           <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-            Free · Included with every document
+            {t('publish.showcase.marketplaceTag', locale)}
           </span>
         </div>
         <div className="rounded-xl border bg-gradient-to-br from-primary/5 to-background p-6 md:p-8">
@@ -1070,8 +1073,8 @@ function PublishShowcase() {
       <section className="space-y-4">
         <div className="flex items-center gap-3">
           <Globe className="h-5 w-5 text-blue-500" />
-          <h2 className="text-xl font-semibold">Auto-publish</h2>
-          <span className="text-xs text-muted-foreground">Connect once, publish on every book after.</span>
+          <h2 className="text-xl font-semibold">{t('publish.showcase.autoPublish', locale)}</h2>
+          <span className="text-xs text-muted-foreground">{t('publish.showcase.autoPublishTag', locale)}</span>
         </div>
         <div className="grid md:grid-cols-2 gap-3">
           {SHOWCASE_AUTO.map((p) => (
@@ -1084,8 +1087,8 @@ function PublishShowcase() {
       <section className="space-y-4">
         <div className="flex items-center gap-3">
           <FileText className="h-5 w-5 text-amber-500" />
-          <h2 className="text-xl font-semibold">Guided publishing kits</h2>
-          <span className="text-xs text-muted-foreground">We generate the files; you click submit.</span>
+          <h2 className="text-xl font-semibold">{t('publish.showcase.guidedKits', locale)}</h2>
+          <span className="text-xs text-muted-foreground">{t('publish.showcase.guidedKitsTag', locale)}</span>
         </div>
         <div className="grid md:grid-cols-3 gap-3">
           {SHOWCASE_GUIDED.map((p) => (
@@ -1096,15 +1099,15 @@ function PublishShowcase() {
 
       {/* CTA footer */}
       <div className="rounded-xl border-2 border-dashed p-8 text-center space-y-3">
-        <h3 className="text-xl font-semibold">Ready when your first document is.</h3>
+        <h3 className="text-xl font-semibold">{t('publish.showcase.footerTitle', locale)}</h3>
         <p className="text-sm text-muted-foreground max-w-xl mx-auto">
-          Start in the editor, answer a few interview questions, and this page turns into your personal publishing command centre.
+          {t('publish.noDocsBody', locale)}
         </p>
         <Link
           href="/projects"
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 mt-2"
         >
-          Start my first document
+          {t('publish.startFirstDoc', locale)}
           <ArrowRight className="h-4 w-4" />
         </Link>
       </div>

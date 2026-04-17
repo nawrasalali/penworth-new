@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { LANGUAGE_NAMES } from '@/lib/ai/user-language';
 import { Loader2 } from 'lucide-react';
+import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
 interface Profile {
   id: string;
@@ -39,6 +40,10 @@ export default function SettingsPage() {
   const [isChangingLanguage, setIsChangingLanguage] = useState(false);
 
   const supabase = createClient();
+
+  // Resolve the effective locale for t(). Falls back to 'en' for any legacy
+  // row or unsupported code so a bad value can't crash the render.
+  const locale: Locale = isSupportedLocale(language) ? language : 'en';
 
   useEffect(() => {
     loadProfile();
@@ -169,7 +174,7 @@ export default function SettingsPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8">Settings</h1>
+      <h1 className="text-3xl font-bold mb-8">{t('settings.title', locale)}</h1>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b mb-8">
@@ -177,13 +182,13 @@ export default function SettingsPage() {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 font-medium capitalize transition-colors ${
+            className={`px-4 py-2 font-medium transition-colors ${
               activeTab === tab
                 ? 'border-b-2 border-primary text-primary'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            {tab}
+            {t(`settings.tabs.${tab}` as const, locale)}
           </button>
         ))}
       </div>
@@ -196,38 +201,37 @@ export default function SettingsPage() {
               {fullName ? fullName[0].toUpperCase() : '👤'}
             </div>
             <div>
-              <h2 className="text-xl font-semibold">{fullName || 'Your Name'}</h2>
+              <h2 className="text-xl font-semibold">{fullName || t('nav.userFallback', locale)}</h2>
               <p className="text-muted-foreground">{email}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Member since {profile ? new Date(profile.created_at).toLocaleDateString() : ''}
+                {t('settings.profile.memberSince', locale)} {profile ? new Date(profile.created_at).toLocaleDateString() : ''}
               </p>
             </div>
           </div>
 
           <div className="grid gap-6 max-w-lg">
             <div>
-              <label className="block text-sm font-medium mb-2">Full Name</label>
+              <label className="block text-sm font-medium mb-2">{t('settings.profile.fullName', locale)}</label>
               <Input
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Enter your full name"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Email Address</label>
+              <label className="block text-sm font-medium mb-2">{t('settings.profile.email', locale)}</label>
               <Input
                 value={email}
                 disabled
                 className="bg-muted"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Email cannot be changed. Contact support if needed.
+                {t('settings.profile.emailReadOnly', locale)}
               </p>
             </div>
 
             <Button onClick={saveProfile} disabled={isSaving}>
-              {isSaving ? 'Saving...' : 'Save Changes'}
+              {isSaving ? t('action.saving', locale) : t('action.save', locale)}
             </Button>
           </div>
         </div>
@@ -240,7 +244,7 @@ export default function SettingsPage() {
               user to their language subdomain so SEO, AI writing, and the
               shell all stay aligned. */}
           <div>
-            <label className="block text-sm font-medium mb-2">Language</label>
+            <label className="block text-sm font-medium mb-2">{t('settings.prefs.language', locale)}</label>
             <div className="relative">
               <select
                 value={language}
@@ -261,21 +265,20 @@ export default function SettingsPage() {
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Changes the entire Penworth interface and AI writing language.
-              You'll be redirected to your language's subdomain (e.g. ar.penworth.ai for Arabic).
+              {t('settings.prefs.languageHelp', locale)}
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Theme</label>
+            <label className="block text-sm font-medium mb-2">{t('settings.prefs.theme', locale)}</label>
             <select
               value={theme}
               onChange={(e) => setTheme(e.target.value)}
               className="w-full px-3 py-2 border rounded-md bg-background"
             >
-              <option value="system">System</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
+              <option value="system">{t('settings.prefs.themeSystem', locale)}</option>
+              <option value="light">{t('settings.prefs.themeLight', locale)}</option>
+              <option value="dark">{t('settings.prefs.themeDark', locale)}</option>
             </select>
           </div>
 

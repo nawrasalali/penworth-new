@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PublishClient } from '@/components/publish/PublishClient';
+import { isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
 /**
  * /publish — the second flagship. Author picks a completed document and
@@ -30,6 +31,16 @@ export default async function PublishPage({
     .eq('status', 'complete')
     .order('updated_at', { ascending: false });
 
+  // Resolve the user's language so the empty-state marketing showcase and
+  // chrome render in their locale, not English.
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('preferred_language')
+    .eq('id', user.id)
+    .single();
+  const rawLang = (profile?.preferred_language || 'en').toLowerCase();
+  const locale: Locale = isSupportedLocale(rawLang) ? rawLang : 'en';
+
   const params = await searchParams;
 
   // Cover thumbnail lookup from interview_sessions
@@ -52,6 +63,7 @@ export default async function PublishPage({
     <PublishClient
       projects={projectsWithCovers}
       initialProjectId={params.project || projectsWithCovers[0]?.id || null}
+      locale={locale}
     />
   );
 }

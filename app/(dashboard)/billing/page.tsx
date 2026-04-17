@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Check, CreditCard, Zap } from 'lucide-react';
+import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
 interface Subscription {
   plan: 'free' | 'pro' | 'max';
@@ -89,6 +90,7 @@ function BillingContent() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('annual');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [locale, setLocale] = useState<Locale>('en');
 
   const supabase = createClient();
 
@@ -114,11 +116,13 @@ function BillingContent() {
     // Load profile with plan info
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan, credits_balance, credits_purchased')
+      .select('plan, credits_balance, credits_purchased, preferred_language')
       .eq('id', user.id)
       .single();
 
     const plan = (profile?.plan as 'free' | 'pro' | 'max') || 'free';
+    const rawLang = (profile?.preferred_language || 'en').toLowerCase();
+    setLocale(isSupportedLocale(rawLang) ? rawLang : 'en');
 
     // Get subscription status from org
     const { data: orgMember } = await supabase
@@ -239,7 +243,7 @@ function BillingContent() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8">Billing & Subscription</h1>
+      <h1 className="text-3xl font-bold mb-8">{t('billing.title', locale)}</h1>
 
       {/* Success Message */}
       {successMessage && (
@@ -253,7 +257,7 @@ function BillingContent() {
       <div className="border rounded-lg p-6 mb-8 bg-card">
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-xl font-semibold mb-1">Current Plan: {currentPlan.name}</h2>
+            <h2 className="text-xl font-semibold mb-1">{t('billing.currentPlan', locale)}: {currentPlan.name}</h2>
             <p className="text-muted-foreground">
               {subscription?.plan === 'free' 
                 ? 'Free forever' 
@@ -272,7 +276,7 @@ function BillingContent() {
           {subscription?.plan !== 'free' && (
             <Button variant="outline" onClick={handleManageBilling} disabled={isProcessing}>
               <CreditCard className="w-4 h-4 mr-2" />
-              Manage Billing
+              {t('billing.manageBilling', locale)}
             </Button>
           )}
         </div>
@@ -316,7 +320,7 @@ function BillingContent() {
               billingPeriod === 'monthly' ? 'bg-background shadow' : ''
             }`}
           >
-            Monthly
+            {t('billing.monthly', locale)}
           </button>
           <button
             onClick={() => setBillingPeriod('annual')}
@@ -324,7 +328,7 @@ function BillingContent() {
               billingPeriod === 'annual' ? 'bg-background shadow' : ''
             }`}
           >
-            Annual
+            {t('billing.annual', locale)}
             <span className="ml-1 text-xs text-green-600">Save 17%</span>
           </button>
         </div>
@@ -377,7 +381,7 @@ function BillingContent() {
 
             {subscription?.plan === plan.id ? (
               <Button variant="outline" className="w-full" disabled>
-                Current Plan
+                {t('billing.currentPlan', locale)}
               </Button>
             ) : (
               <Button 
@@ -386,7 +390,7 @@ function BillingContent() {
                 onClick={() => handleUpgrade(plan.id)}
                 disabled={isProcessing || plan.monthlyPrice === 0}
               >
-                {plan.monthlyPrice === 0 ? 'Downgrade' : 'Upgrade'}
+                {plan.monthlyPrice === 0 ? 'Downgrade' : t('billing.upgrade', locale)}
               </Button>
             )}
           </div>
