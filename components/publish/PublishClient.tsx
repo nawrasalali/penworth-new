@@ -158,9 +158,42 @@ export function PublishClient({
     }
   };
 
+  const [apiKeyDialog, setApiKeyDialog] = useState<{ slug: string; displayName: string } | null>(null);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [apiKeyBusy, setApiKeyBusy] = useState(false);
+
   const connectPlatform = (slug: string) => {
     const projectParam = selectedId ? `?projectId=${selectedId}` : '';
     window.location.href = `/api/publishing/oauth/${slug}/start${projectParam}`;
+  };
+
+  /**
+   * Submit an API key for a platform that uses api_key auth (Payhip).
+   * Encrypted server-side, never logged.
+   */
+  const submitApiKey = async () => {
+    if (!apiKeyDialog || !apiKeyInput.trim()) return;
+    setApiKeyBusy(true);
+    try {
+      const resp = await fetch(`/api/publishing/apikey/${apiKeyDialog.slug}/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: apiKeyInput.trim() }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) {
+        toast.error(data.error || 'Connect failed');
+        return;
+      }
+      toast.success(`Connected to ${apiKeyDialog.displayName}`);
+      setApiKeyDialog(null);
+      setApiKeyInput('');
+      loadPlatforms();
+    } catch {
+      toast.error('Connect failed');
+    } finally {
+      setApiKeyBusy(false);
+    }
   };
 
   /**
@@ -435,6 +468,11 @@ export function PublishClient({
                       toast.info(`${p.name}: connector coming soon.`);
                       return;
                     }
+                    // Payhip uses an API-key paste rather than OAuth round-trip
+                    if (p.oauth_provider === 'payhip') {
+                      setApiKeyDialog({ slug: 'payhip', displayName: p.name });
+                      return;
+                    }
                     connectPlatform(p.oauth_provider);
                   }}
                   onDisconnect={() => {
@@ -493,6 +531,55 @@ export function PublishClient({
             loadPlatforms();
           }}
         />
+      )}
+
+      {/* API-key connect dialog (Payhip and other api_key platforms) */}
+      {apiKeyDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-background rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div>
+              <h2 className="text-lg font-bold">Connect {apiKeyDialog.displayName}</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {apiKeyDialog.slug === 'payhip'
+                  ? 'Get your API key from Payhip → Account Settings → API.'
+                  : 'Paste your API key from your account settings.'}
+                {' '}We encrypt it with AES-256 and never log it.
+              </p>
+            </div>
+            <input
+              type="password"
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              placeholder="Paste API key"
+              className="w-full px-3 py-2 border rounded-lg bg-background text-sm font-mono"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && apiKeyInput.trim() && !apiKeyBusy) {
+                  submitApiKey();
+                }
+              }}
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => {
+                  setApiKeyDialog(null);
+                  setApiKeyInput('');
+                }}
+                className="px-4 py-2 rounded-lg text-sm hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitApiKey}
+                disabled={apiKeyBusy || !apiKeyInput.trim()}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {apiKeyBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {apiKeyBusy ? 'Connecting...' : 'Connect'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

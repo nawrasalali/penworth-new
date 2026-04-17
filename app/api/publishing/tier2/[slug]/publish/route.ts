@@ -9,6 +9,7 @@ import {
   D2DError,
 } from '@/lib/publishing/draft2digital';
 import { publishToGumroad, GumroadError } from '@/lib/publishing/gumroad';
+import { publishToPayhip, PayhipError } from '@/lib/publishing/payhip';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -75,15 +76,15 @@ export async function POST(
     );
   }
 
-  // Credential gate
-  const oauthProvider = platform.oauth_provider;
-  if (!oauthProvider) {
+  // Credential gate — Payhip uses api_key slug directly; others use oauth_provider
+  const authSlug = platform.oauth_provider || (slug === 'payhip' ? 'payhip' : null);
+  if (!authSlug) {
     return NextResponse.json(
-      { error: `No OAuth provider configured for ${platform.name}` },
+      { error: `No auth provider configured for ${platform.name}` },
       { status: 501 },
     );
   }
-  const credential = await loadActiveCredential(supabase, user.id, oauthProvider);
+  const credential = await loadActiveCredential(supabase, user.id, authSlug);
   if (!credential) {
     return NextResponse.json(
       { error: `Connect your ${platform.name} account first`, code: 'not_connected' },
@@ -146,7 +147,7 @@ export async function POST(
 
   // Dispatch to the platform-specific adapter
   try {
-    if (oauthProvider === 'draft2digital') {
+    if (authSlug === 'draft2digital') {
       const result = await publishToDraft2Digital({
         token: credential.token,
         metadata,
@@ -178,7 +179,7 @@ export async function POST(
       });
     }
 
-    if (oauthProvider === 'gumroad') {
+    if (authSlug === 'gumroad') {
       const result = await publishToGumroad({
         token: credential.token,
         metadata,
@@ -209,6 +210,37 @@ export async function POST(
       });
     }
 
+    if (authSlug === 'payhip') {
+      const result = await publishToPayhip({
+        token: credential.token,
+        metadata,
+        manuscriptBuffer,
+        manuscriptFilename: 'manuscript.docx',
+        coverBuffer,
+      });
+
+      await supabase
+        .from('project_publications')
+        .update({
+          status: 'published',
+          external_url: result.productUrl,
+          published_at: new Date().toISOString(),
+          automation_log: { productLink: result.productLink },
+          error_message: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('project_id', projectId)
+        .eq('platform_id', platform.id)
+        .eq('user_id', user.id);
+
+      return NextResponse.json({
+        success: true,
+        platform: platform.slug,
+        productLink: result.productLink,
+        externalUrl: result.productUrl,
+      });
+    }
+
     // Other Tier 2 providers land here when their adapters ship
     return NextResponse.json(
       { error: `Auto-publish for ${platform.name} is not yet implemented` },
@@ -218,9 +250,10 @@ export async function POST(
     const detail =
       err instanceof D2DError ? err.detail :
       err instanceof GumroadError ? err.detail :
+      err instanceof PayhipError ? err.detail :
       undefined;
     const message = err instanceof Error ? err.message : 'Publish failed';
-    console.error(`Tier 2 publish failed [${oauthProvider}]:`, message, detail);
+    console.error(`Tier 2 publish failed [${authSlug}]:`, message, detail);
 
     await supabase
       .from('project_publications')
