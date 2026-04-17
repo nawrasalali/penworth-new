@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { t, type Locale } from '@/lib/i18n/strings';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -17,31 +18,31 @@ interface QAScreenProps {
   qaChecks: { name: string; status: 'pending' | 'checking' | 'passed' | 'warning' | 'failed'; detail?: string }[];
   isChecking: boolean;
   onAcknowledge: () => void;
+  locale?: Locale;
 }
 
-const LEGAL_CHECKBOXES = [
-  {
-    id: 'sole_responsibility',
-    text: 'I acknowledge that I am solely responsible for all content in this document.',
-  },
-  {
-    id: 'no_liability',
-    text: 'I understand that Penworth provides AI-assisted writing tools only and bears no legal responsibility for the content, accuracy, or any claims made.',
-  },
-  {
-    id: 'no_infringement',
-    text: 'I confirm this content does not infringe on any copyrights, trademarks, or third-party rights.',
-  },
-];
+// Legal acknowledgement text is pulled live from the i18n bundle rather than
+// hardcoded here — the checkbox IDs remain stable so that future consent-log
+// writes can reference a canonical English doc_key regardless of the UI
+// language the user saw.
+function getLegalCheckboxes(locale: Locale) {
+  return [
+    { id: 'sole_responsibility', text: t('qa.consentResponsibility', locale) },
+    { id: 'no_liability', text: t('qa.consentNoLiability', locale) },
+    { id: 'no_infringement', text: t('qa.consentNoInfringement', locale) },
+  ];
+}
 
 export function QAScreen({
   qaChecks,
   isChecking,
-  onAcknowledge
+  onAcknowledge,
+  locale = 'en',
 }: QAScreenProps) {
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+  const legalCheckboxes = getLegalCheckboxes(locale);
   
-  const allChecked = LEGAL_CHECKBOXES.every(item => checkedItems[item.id]);
+  const allChecked = legalCheckboxes.every(item => checkedItems[item.id]);
   const qaComplete = qaChecks.every(check => 
     check.status === 'passed' || check.status === 'warning'
   );
@@ -73,9 +74,9 @@ export function QAScreen({
         <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
           <ShieldCheck className="h-8 w-8 text-primary" />
         </div>
-        <h1 className="text-xl font-bold">Quality Assurance</h1>
+        <h1 className="text-xl font-bold">{t('qa.title', locale)}</h1>
         <p className="text-muted-foreground">
-          Automatic review in progress
+          {t('qa.subtitle', locale)}
         </p>
       </div>
       
@@ -100,7 +101,7 @@ export function QAScreen({
                 {check.name}
               </span>
               {check.status === 'checking' && (
-                <span className="text-xs text-primary ml-auto">Checking...</span>
+                <span className="text-xs text-primary ml-auto">{t('qa.checking', locale)}</span>
               )}
             </div>
           ))}
@@ -109,7 +110,7 @@ export function QAScreen({
         {isChecking && (
           <div className="mt-4 text-center text-sm text-muted-foreground">
             <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
-            Running quality checks...
+            {t('qa.runningChecks', locale)}
           </div>
         )}
       </div>
@@ -119,15 +120,15 @@ export function QAScreen({
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className="h-5 w-5 text-amber-500" />
-            <h3 className="font-semibold">Legal Acknowledgment Required</h3>
+            <h3 className="font-semibold">{t('qa.legalRequired', locale)}</h3>
           </div>
           
           <p className="text-sm text-muted-foreground mb-4">
-            Before publishing, please confirm the following:
+            {t('qa.legalIntro', locale)}
           </p>
           
           <div className="space-y-4">
-            {LEGAL_CHECKBOXES.map((item) => (
+            {legalCheckboxes.map((item) => (
               <label
                 key={item.id}
                 className={cn(
@@ -159,14 +160,14 @@ export function QAScreen({
           className="min-w-[200px]"
         >
           <FileCheck className="mr-2 h-4 w-4" />
-          I Agree & Continue
+          {t('qa.agreeContinue', locale)}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
       
       {qaComplete && !allChecked && (
         <p className="text-center text-sm text-muted-foreground mt-3">
-          Please check all boxes to continue
+          {t('qa.pleaseCheckAll', locale)}
         </p>
       )}
     </div>

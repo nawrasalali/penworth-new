@@ -326,6 +326,10 @@ function EditorContentNew() {
           .eq('id', user.id)
           .single();
 
+        // Resolve locale first so QA check names (initialized below) can be
+        // translated synchronously rather than waiting for the setLocale state
+        // update to propagate on the next render.
+        let resolvedLocale: Locale = 'en';
         if (profile) {
           const totalCredits = (profile.credits_balance || 0) + (profile.credits_purchased || 0);
           setUserCredits(totalCredits);
@@ -341,18 +345,21 @@ function EditorContentNew() {
           // locale on first render after data load completes.
           const rawLang = (profile.preferred_language || 'en').toLowerCase();
           if (isSupportedLocale(rawLang)) {
-            setLocale(rawLang as Locale);
+            resolvedLocale = rawLang as Locale;
+            setLocale(resolvedLocale);
           }
         }
 
-        // Initialize QA checks (labels match real endpoint)
+        // Initialize QA checks with translated names so users see check labels
+        // in their locale the moment the agent advances to the QA step. These
+        // labels are UI-only; the QA API keys off the check order, not name.
         setQaChecks([
-          { name: 'Chapter word count', status: 'pending' },
-          { name: 'AI filler phrases', status: 'pending' },
-          { name: 'Readability (Flesch)', status: 'pending' },
-          { name: 'Tonal consistency', status: 'pending' },
-          { name: 'Cross-chapter coherence', status: 'pending' },
-          { name: 'Structural completeness', status: 'pending' },
+          { name: t('qa.check.wordCount', resolvedLocale), status: 'pending' },
+          { name: t('qa.check.fillerPhrases', resolvedLocale), status: 'pending' },
+          { name: t('qa.check.readability', resolvedLocale), status: 'pending' },
+          { name: t('qa.check.tonalConsistency', resolvedLocale), status: 'pending' },
+          { name: t('qa.check.crossChapter', resolvedLocale), status: 'pending' },
+          { name: t('qa.check.structural', resolvedLocale), status: 'pending' },
         ]);
 
       } catch (error) {
@@ -688,12 +695,12 @@ function EditorContentNew() {
   const startQAChecks = async () => {
     setIsCheckingQA(true);
     setQaChecks([
-      { name: 'Chapter word count', status: 'checking' },
-      { name: 'AI filler phrases', status: 'checking' },
-      { name: 'Readability (Flesch)', status: 'checking' },
-      { name: 'Tonal consistency', status: 'checking' },
-      { name: 'Cross-chapter coherence', status: 'checking' },
-      { name: 'Structural completeness', status: 'checking' },
+      { name: t('qa.check.wordCount', locale), status: 'checking' },
+      { name: t('qa.check.fillerPhrases', locale), status: 'checking' },
+      { name: t('qa.check.readability', locale), status: 'checking' },
+      { name: t('qa.check.tonalConsistency', locale), status: 'checking' },
+      { name: t('qa.check.crossChapter', locale), status: 'checking' },
+      { name: t('qa.check.structural', locale), status: 'checking' },
     ]);
 
     try {
@@ -1022,6 +1029,7 @@ function EditorContentNew() {
             qaChecks={qaChecks}
             isChecking={isCheckingQA}
             onAcknowledge={handleQAAcknowledge}
+            locale={locale}
           />
         );
 
