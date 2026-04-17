@@ -121,6 +121,43 @@ export function PublishClient({
    * endpoint signs a state token and redirects to the provider; we use a
    * full-page navigation because OAuth requires an HTTP redirect chain.
    */
+  /**
+   * Tier 2 auto-publish. Platform card's Publish button for connected
+   * api_auto platforms routes here. Long-running — D2D can take 30-60s.
+   */
+  const publishTier2 = async (slug: string, displayName: string) => {
+    if (!selectedId) return;
+    setPublishing(slug);
+    toast.info(`Publishing to ${displayName}...`);
+    try {
+      const resp = await fetch(`/api/publishing/tier2/${slug}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: selectedId }),
+      });
+      const data = await resp.json();
+      if (resp.status === 422 && data.missing) {
+        toast.error(`Complete publishing details first: ${data.missing.join(', ')}`);
+        setMetadataOpen(true);
+        return;
+      }
+      if (resp.status === 428 || data.code === 'not_connected') {
+        toast.error(`Connect your ${displayName} account first`);
+        return;
+      }
+      if (!resp.ok || data.error) {
+        toast.error(data.error || 'Publishing failed');
+        return;
+      }
+      toast.success(`Live on ${displayName}`);
+      loadPlatforms();
+    } catch {
+      toast.error('Publishing failed');
+    } finally {
+      setPublishing(null);
+    }
+  };
+
   const connectPlatform = (slug: string) => {
     const projectParam = selectedId ? `?projectId=${selectedId}` : '';
     window.location.href = `/api/publishing/oauth/${slug}/start${projectParam}`;
@@ -384,7 +421,15 @@ export function PublishClient({
                 <PlatformCard
                   key={p.id}
                   platform={p}
-                  onPublish={() => toast.info(`${p.name}: auto-publish kicks in right after you connect. We'll ship this handler next.`)}
+                  busy={publishing === p.oauth_provider}
+                  onPublish={() => {
+                    if (!p.is_connected) {
+                      toast.info(`Connect ${p.name} first`);
+                      return;
+                    }
+                    if (!p.oauth_provider) return;
+                    publishTier2(p.oauth_provider, p.name);
+                  }}
                   onConnect={() => {
                     if (!p.oauth_provider) {
                       toast.info(`${p.name}: connector coming soon.`);
@@ -484,12 +529,14 @@ function PlatformCard({
   onConnect,
   onDisconnect,
   publishLabel,
+  busy,
 }: {
   platform: Platform;
   onPublish: () => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
   publishLabel?: string;
+  busy?: boolean;
 }) {
   const pub = platform.publication;
   const isLive = pub?.status === 'published';
@@ -545,9 +592,16 @@ function PlatformCard({
         ) : (
           <button
             onClick={onPublish}
-            className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition"
+            disabled={busy}
+            className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition inline-flex items-center justify-center gap-1.5"
           >
-            {publishLabel || 'Publish'}
+            {busy ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" /> Publishing...
+              </>
+            ) : (
+              publishLabel || 'Publish'
+            )}
           </button>
         )}
         {isConnectedAuto && onDisconnect && (
