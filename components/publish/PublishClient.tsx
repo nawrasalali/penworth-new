@@ -355,22 +355,7 @@ export function PublishClient({
 
   // --- Layout ---
   if (projects.length === 0) {
-    return (
-      <div className="max-w-3xl mx-auto px-6 py-20 text-center">
-        <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h1 className="text-2xl font-semibold mb-2">No completed documents yet</h1>
-        <p className="text-muted-foreground mb-6">
-          Finish a document in the editor first, then come back here to publish it to 17 places at once.
-        </p>
-        <Link
-          href="/projects"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90"
-        >
-          Go to My Projects
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
-    );
+    return <PublishShowcase />;
   }
 
   const store = platforms.find((p) => p.publish_tier === 'penworth_store');
@@ -950,4 +935,252 @@ function oauthErrorMessage(code: string, provider?: string | null): string {
     default:
       return `${who} connection failed (${code}).`;
   }
+}
+
+// ---------------------------------------------------------------------------
+// PublishShowcase — rendered when the user has no completed documents yet.
+// Turns an empty state into a marketing moment: shows exactly what publishing
+// unlocks (17 platforms, 3 mechanisms, global reach) so first-time visitors
+// understand the value prop before they've even finished their first book.
+// ---------------------------------------------------------------------------
+
+interface ShowcasePlatform {
+  slug: string;
+  name: string;
+  tagline: string;
+  royalty: string;
+  reach: string;
+}
+
+const SHOWCASE_MARKETPLACE: ShowcasePlatform = {
+  slug: 'penworth',
+  name: 'Penworth Publishing Marketplace',
+  tagline: 'Free global audience. AI audiobook. Visual chapters.',
+  royalty: '70% to author',
+  reach: 'Global · ebook + audiobook',
+};
+
+const SHOWCASE_AUTO: ShowcasePlatform[] = [
+  { slug: 'draft2digital', name: 'Draft2Digital', tagline: 'Distributes to Apple, Kobo, B&N, libraries, and more.', royalty: '60% (Apple/Kobo) + aggregator cut', reach: 'Aggregator — 10+ retailers in one click' },
+  { slug: 'kobo',          name: 'Kobo Writing Life', tagline: 'Strong in Canada, Europe, Japan.', royalty: '70%', reach: 'Kobo readers + OverDrive libraries' },
+  { slug: 'google_play',   name: 'Google Play Books', tagline: 'Worldwide via Penworth Computer.', royalty: '52% (Google share)', reach: 'Android + Google Play Books' },
+  { slug: 'publishdrive',  name: 'PublishDrive', tagline: 'Aggregator to 400+ stores.', royalty: 'Varies by retailer', reach: '400+ retailers worldwide' },
+  { slug: 'streetlib',     name: 'StreetLib', tagline: 'Europe + multilingual reach.', royalty: 'Varies by retailer', reach: 'European libraries + retailers' },
+  { slug: 'gumroad',       name: 'Gumroad', tagline: 'Sell direct to your audience.', royalty: '~95% after fees', reach: 'Your audience, direct' },
+  { slug: 'payhip',        name: 'Payhip', tagline: 'Direct digital sales.', royalty: '~95% after fees', reach: 'Your audience, direct' },
+];
+
+const SHOWCASE_GUIDED: ShowcasePlatform[] = [
+  { slug: 'kdp',          name: 'Amazon Kindle Direct Publishing', tagline: 'Largest ebook marketplace globally.', royalty: '35–70% depending on pricing', reach: '13 global marketplaces, 90%+ ebook market' },
+  { slug: 'apple_books',  name: 'Apple Books', tagline: 'Apple Books global store.', royalty: '70%', reach: 'Apple Books in 50+ countries' },
+  { slug: 'ingram_spark', name: 'IngramSpark', tagline: 'Distribution to libraries and bookstores.', royalty: 'Author sets price', reach: 'Global libraries + bookstore wholesale' },
+  { slug: 'smashwords',   name: 'Smashwords', tagline: 'Large indie ebook distribution.', royalty: '60%', reach: 'Smashwords store + partner retailers' },
+  { slug: 'bn_press',     name: 'Barnes & Noble Press', tagline: 'Barnes & Noble ebook store direct.', royalty: '40–65%', reach: 'Barnes & Noble + Nook readers' },
+  { slug: 'lulu',         name: 'Lulu', tagline: 'Print-on-demand + ebook distribution.', royalty: '80% ebook / varies print', reach: 'Lulu bookstore + global retailers' },
+  { slug: 'bookbaby',     name: 'BookBaby', tagline: 'Hybrid publishing + distribution.', royalty: '100% minus fees', reach: 'Full-service ebook distribution' },
+  { slug: 'blurb',        name: 'Blurb', tagline: 'Premium photobook & ebook platform.', royalty: 'Author sets markup', reach: 'Blurb bookstore + Amazon + Apple' },
+  { slug: 'wattpad',      name: 'Wattpad Paid Stories', tagline: 'Serialised paid fiction audience.', royalty: 'Revenue share', reach: 'Wattpad Paid Stories readers' },
+];
+
+function PublishShowcase() {
+  return (
+    <div className="max-w-6xl mx-auto px-6 py-10 space-y-10">
+      {/* Hero */}
+      <div className="text-center space-y-4 max-w-3xl mx-auto">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+          <Sparkles className="h-3.5 w-3.5" />
+          Publishing Preview
+        </div>
+        <h1 className="text-4xl font-bold tracking-tight">
+          Publish to 17 platforms. One click.
+        </h1>
+        <p className="text-lg text-muted-foreground">
+          Finish your first document and you unlock every marketplace below — from Amazon KDP to your own direct-sales storefront — without filling out a single form yourself.
+        </p>
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <Link
+            href="/projects"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90"
+          >
+            Start my first document
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link
+            href="/pricing"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border bg-background font-medium hover:bg-muted"
+          >
+            See pricing
+          </Link>
+        </div>
+      </div>
+
+      {/* Three mechanisms */}
+      <div className="grid md:grid-cols-3 gap-4">
+        <MechanismCard
+          icon={<Zap className="h-5 w-5" />}
+          title="1-click marketplace"
+          subtitle="Free. Global. Instant."
+          body="Penworth's own storefront publishes your ebook and AI-narrated audiobook the moment you're done. 70% royalty, no gatekeeper."
+          count="1 platform"
+        />
+        <MechanismCard
+          icon={<Globe className="h-5 w-5" />}
+          title="Auto-publish"
+          subtitle="We drive the keyboard."
+          body="Seven platforms published automatically — some via direct API, some via Penworth Computer (Claude drives a real browser). You connect once, we handle every submission."
+          count="7 platforms"
+        />
+        <MechanismCard
+          icon={<FileText className="h-5 w-5" />}
+          title="Guided kits"
+          subtitle="KDP-ready everything."
+          body="For platforms that don't accept automation: we generate platform-specific files (KDP-formatted PDF, DOCX, cover) plus a step-by-step walkthrough so submission takes minutes, not hours."
+          count="9 platforms"
+        />
+      </div>
+
+      {/* Flagship marketplace */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Zap className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-semibold">Penworth Marketplace</h2>
+          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+            Free · Included with every document
+          </span>
+        </div>
+        <div className="rounded-xl border bg-gradient-to-br from-primary/5 to-background p-6 md:p-8">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+            <div className="h-16 w-16 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <BookOpen className="h-8 w-8 text-primary" />
+            </div>
+            <div className="flex-1 space-y-2">
+              <h3 className="text-lg font-semibold">{SHOWCASE_MARKETPLACE.name}</h3>
+              <p className="text-sm text-muted-foreground">{SHOWCASE_MARKETPLACE.tagline}</p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Chip icon={<Coins className="h-3 w-3" />} label={SHOWCASE_MARKETPLACE.royalty} />
+                <Chip icon={<Globe className="h-3 w-3" />} label={SHOWCASE_MARKETPLACE.reach} />
+                <Chip icon={<Clock className="h-3 w-3" />} label="~1 min" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Auto-publish lineup */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Globe className="h-5 w-5 text-blue-500" />
+          <h2 className="text-xl font-semibold">Auto-publish</h2>
+          <span className="text-xs text-muted-foreground">Connect once, publish on every book after.</span>
+        </div>
+        <div className="grid md:grid-cols-2 gap-3">
+          {SHOWCASE_AUTO.map((p) => (
+            <PlatformShowcaseCard key={p.slug} platform={p} />
+          ))}
+        </div>
+      </section>
+
+      {/* Guided kits */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <FileText className="h-5 w-5 text-amber-500" />
+          <h2 className="text-xl font-semibold">Guided publishing kits</h2>
+          <span className="text-xs text-muted-foreground">We generate the files; you click submit.</span>
+        </div>
+        <div className="grid md:grid-cols-3 gap-3">
+          {SHOWCASE_GUIDED.map((p) => (
+            <PlatformShowcaseCard key={p.slug} platform={p} compact />
+          ))}
+        </div>
+      </section>
+
+      {/* CTA footer */}
+      <div className="rounded-xl border-2 border-dashed p-8 text-center space-y-3">
+        <h3 className="text-xl font-semibold">Ready when your first document is.</h3>
+        <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+          Start in the editor, answer a few interview questions, and this page turns into your personal publishing command centre.
+        </p>
+        <Link
+          href="/projects"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 mt-2"
+        >
+          Start my first document
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function MechanismCard({
+  icon,
+  title,
+  subtitle,
+  body,
+  count,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  body: string;
+  count: string;
+}) {
+  return (
+    <div className="rounded-xl border bg-card p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+          {icon}
+        </div>
+        <span className="text-xs font-semibold text-muted-foreground">{count}</span>
+      </div>
+      <div>
+        <h3 className="font-semibold">{title}</h3>
+        <p className="text-xs text-muted-foreground">{subtitle}</p>
+      </div>
+      <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function PlatformShowcaseCard({
+  platform,
+  compact,
+}: {
+  platform: ShowcasePlatform;
+  compact?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border bg-card p-4 space-y-2 hover:border-primary/40 transition-colors">
+      <div className="flex items-start justify-between gap-2">
+        <h4 className="font-semibold text-sm leading-tight">{platform.name}</h4>
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+        {platform.tagline}
+      </p>
+      {!compact && (
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          <Chip icon={<Coins className="h-3 w-3" />} label={platform.royalty} size="xs" />
+        </div>
+      )}
+      <p className="text-[11px] text-muted-foreground/80 pt-1">{platform.reach}</p>
+    </div>
+  );
+}
+
+function Chip({
+  icon,
+  label,
+  size = 'sm',
+}: {
+  icon: React.ReactNode;
+  label: string;
+  size?: 'xs' | 'sm';
+}) {
+  const sizeCls = size === 'xs' ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-1';
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md bg-muted ${sizeCls} font-medium`}>
+      {icon}
+      {label}
+    </span>
+  );
 }
