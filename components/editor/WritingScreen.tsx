@@ -22,7 +22,7 @@ interface WritingScreenProps {
   isWriting: boolean;
   userCredits: number;
   onEditChapter: (chapterId: string, content: string) => void;
-  onRegenerateChapter: (chapterId: string) => void;
+  onRegenerateChapter: (chapterId: string, instructions?: string) => void;
 }
 
 export function WritingScreen({

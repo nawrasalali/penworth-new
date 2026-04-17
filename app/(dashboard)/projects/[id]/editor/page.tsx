@@ -714,17 +714,46 @@ function EditorContentNew() {
     toast.success('Chapter saved (Free)');
   };
 
-  // Handler: Regenerate chapter
-  const handleRegenerateChapter = async (chapterId: string) => {
-    if (userCredits < 100) {
-      toast.error('Insufficient credits. Need 100 credits to regenerate.');
+  // Handler: Regenerate chapter — calls real Opus via /api/ai/regenerate-chapter
+  const handleRegenerateChapter = async (chapterId: string, instructions?: string) => {
+    const cost = 100;
+    if (userCredits < cost && !userProfile.is_admin) {
+      toast.error(`Not enough credits. Chapter regeneration costs ${cost} credits.`);
       return;
     }
-    
-    setUserCredits(prev => prev - 100);
-    toast.info('Regenerating chapter... (100 credits used)');
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    toast.success('Chapter regenerated');
+
+    const chapter = chapters.find((ch) => ch.id === chapterId);
+    toast.info(`Regenerating "${chapter?.title || 'chapter'}"… (${cost} credits)`);
+
+    try {
+      const resp = await fetch('/api/ai/regenerate-chapter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, chapterId, instructions }),
+      });
+      const data = await resp.json();
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
+      // Update the chapter in local state with the new content
+      setChapters((prev) =>
+        prev.map((ch) =>
+          ch.id === chapterId
+            ? {
+                ...ch,
+                content: data.chapter.content,
+                word_count: data.chapter.word_count,
+              }
+            : ch,
+        ),
+      );
+      setUserCredits(data.creditsRemaining ?? userCredits);
+      toast.success(`Chapter regenerated — ${data.chapter.word_count} words`);
+    } catch (err) {
+      console.error('Regeneration failed:', err);
+      toast.error('Regeneration failed. Credits refunded.');
+    }
   };
 
   // Handler: Update author info

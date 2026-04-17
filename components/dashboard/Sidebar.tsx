@@ -16,6 +16,7 @@ import {
   ChevronDown,
   CreditCard,
   Gift,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
@@ -28,6 +29,7 @@ interface SidebarProps {
     email: string;
     full_name?: string;
     avatar_url?: string;
+    is_admin?: boolean;
   };
   organization?: {
     id: string;
@@ -162,6 +164,20 @@ export function Sidebar({ user, organization }: SidebarProps) {
 
         {/* Bottom Navigation */}
         <div className="border-t p-3 space-y-1">
+          {user.is_admin && (
+            <Link
+              href="/admin"
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                pathname.startsWith('/admin')
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Command Center
+            </Link>
+          )}
           {bottomNav.map((item) => {
             const isActive = pathname === item.href;
             return (
