@@ -42,6 +42,7 @@ export interface ProjectRow {
   chapter_count: number;
   updated_at: string;
   created_at: string;
+  deleted_at: string | null;
 }
 
 export default async function ProjectsPage() {
@@ -56,15 +57,30 @@ export default async function ProjectsPage() {
     );
   }
 
-  const { data: rawProjects, error } = await supabase
-    .from('projects')
-    .select(`
-      id, title, description, content_type, status, updated_at, created_at,
-      chapters(word_count, status),
-      interview_sessions(front_cover_url)
-    `)
-    .eq('user_id', user.id)
-    .order('updated_at', { ascending: false });
+  const [activeRes, trashedRes] = await Promise.all([
+    supabase
+      .from('projects')
+      .select(`
+        id, title, description, content_type, status, updated_at, created_at, deleted_at,
+        chapters(word_count, status),
+        interview_sessions(front_cover_url)
+      `)
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .order('updated_at', { ascending: false }),
+    supabase
+      .from('projects')
+      .select(`
+        id, title, description, content_type, status, updated_at, created_at, deleted_at,
+        chapters(word_count, status),
+        interview_sessions(front_cover_url)
+      `)
+      .eq('user_id', user.id)
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false }),
+  ]);
+
+  const error = activeRes.error || trashedRes.error;
 
   if (error) {
     console.error('Projects query error:', error);
@@ -75,7 +91,7 @@ export default async function ProjectsPage() {
     );
   }
 
-  const projects: ProjectRow[] = (rawProjects || []).map((p: any) => {
+  const toRow = (p: any): ProjectRow => {
     const completedChapters = (p.chapters || []).filter((c: any) => c.status === 'complete');
     const wordCount = completedChapters.reduce((s: number, c: any) => s + (c.word_count || 0), 0);
     const categoryId = getCategoryForContentType(p.content_type);
@@ -95,8 +111,12 @@ export default async function ProjectsPage() {
       chapter_count: completedChapters.length,
       updated_at: p.updated_at,
       created_at: p.created_at,
+      deleted_at: p.deleted_at || null,
     };
-  });
+  };
+
+  const projects: ProjectRow[] = (activeRes.data || []).map(toRow);
+  const trashed: ProjectRow[] = (trashedRes.data || []).map(toRow);
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
@@ -130,7 +150,7 @@ export default async function ProjectsPage() {
           </Link>
         </div>
       ) : (
-        <MyProjectsClient projects={projects} />
+        <MyProjectsClient projects={projects} trashed={trashed} />
       )}
     </div>
   );
