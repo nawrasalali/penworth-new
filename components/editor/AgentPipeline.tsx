@@ -1,24 +1,27 @@
 'use client';
 
-import { AGENTS, AgentName, AgentStatusMap } from '@/types/agent-workflow';
+import { AGENTS, AgentName, AgentStatusMap, getAgentLabels } from '@/types/agent-workflow';
 import { cn } from '@/lib/utils';
 import { CheckCircle2, Clock, Loader2 } from 'lucide-react';
+import { t, type Locale } from '@/lib/i18n/strings';
 
 interface AgentPipelineProps {
   currentAgent: AgentName;
   agentStatus: AgentStatusMap;
   activeMessages?: { line1: string; line2: string };
+  locale?: Locale;
 }
 
 export function AgentPipeline({ 
   currentAgent, 
   agentStatus,
-  activeMessages 
+  activeMessages,
+  locale = 'en',
 }: AgentPipelineProps) {
   return (
     <div className="w-[200px] shrink-0 border-r bg-muted/20 p-3 overflow-y-auto">
       <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-        Agent Pipeline
+        {t('editor.agentPipeline', locale)}
       </h2>
       
       <div className="space-y-2">
@@ -27,6 +30,7 @@ export function AgentPipeline({
           const isActive = status === 'active';
           const isCompleted = status === 'completed';
           const isWaiting = status === 'waiting';
+          const labels = getAgentLabels(agent.id, locale);
           
           return (
             <div
@@ -58,7 +62,7 @@ export function AgentPipeline({
                     isWaiting && 'text-muted-foreground'
                   )}
                 >
-                  {agent.shortName}
+                  {labels.shortName}
                 </span>
               </div>
               
@@ -69,7 +73,7 @@ export function AgentPipeline({
                     <div className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
                       <Loader2 className="h-3 w-3 animate-spin" />
                       <span className="truncate">
-                        {activeMessages?.line1 || agent.activeMessage}
+                        {activeMessages?.line1 || labels.activeMessage}
                       </span>
                     </div>
                     {activeMessages?.line2 && (
@@ -85,8 +89,8 @@ export function AgentPipeline({
                     <CheckCircle2 className="h-3 w-3" />
                     <span>
                       {agent.id === 'publishing' 
-                        ? 'Document ready to view'
-                        : 'Completed'
+                        ? t('agent.publishing.done', locale)
+                        : t('editor.completed', locale)
                       }
                     </span>
                   </div>
@@ -95,7 +99,7 @@ export function AgentPipeline({
                 {isWaiting && (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
                     <Clock className="h-3 w-3" />
-                    <span>Waiting...</span>
+                    <span>{t('editor.waiting', locale)}</span>
                   </div>
                 )}
               </div>

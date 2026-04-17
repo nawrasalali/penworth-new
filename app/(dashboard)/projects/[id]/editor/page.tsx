@@ -43,10 +43,12 @@ import {
   AuthorInfo,
   CoverConfig,
   AGENTS,
+  getAgentLabels,
 } from '@/types/agent-workflow';
 
 // Import interview system for questions
 import { getRichInterviewQuestions } from '@/lib/ai/agents/interview-system';
+import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
 // =============================================================================
 // TYPES
@@ -100,10 +102,12 @@ function NavigationSidebar({
   project,
   chapters,
   onNavigateHome,
+  locale = 'en',
 }: {
   project: Project | null;
   chapters: Chapter[];
   onNavigateHome: () => void;
+  locale?: Locale;
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -129,7 +133,7 @@ function NavigationSidebar({
           className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors min-w-0 flex-1"
         >
           <ArrowLeft className="h-4 w-4 shrink-0" />
-          <span className="truncate min-w-0">{project?.title || 'Project'}</span>
+          <span className="truncate min-w-0">{project?.title || t('editor.untitled', locale)}</span>
         </button>
         <button
           onClick={() => setCollapsed(true)}
@@ -148,14 +152,14 @@ function NavigationSidebar({
           </span>
         </div>
         <p className="text-xs text-muted-foreground line-clamp-2">
-          {project?.description || 'No description'}
+          {project?.description || t('editor.noDescription', locale)}
         </p>
       </div>
 
       {/* Chapters List */}
       <div className="flex-1 overflow-y-auto p-3">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-          Chapters ({chapters.length})
+          {t('editor.chapters', locale)} ({chapters.length})
         </h3>
         {chapters.length > 0 ? (
           <div className="space-y-1">
@@ -174,7 +178,7 @@ function NavigationSidebar({
           </div>
         ) : (
           <p className="text-xs text-muted-foreground italic">
-            Chapters will appear as the outline is generated...
+            {t('editor.chaptersEmpty', locale)}
           </p>
         )}
       </div>
@@ -186,7 +190,7 @@ function NavigationSidebar({
           className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           <Home className="h-3 w-3" />
-          Back to Project
+          {t('editor.backToProject', locale)}
         </Link>
       </div>
     </div>
@@ -216,6 +220,10 @@ function EditorContentNew() {
     is_admin?: boolean;
     plan?: string | null;
   }>({});
+  // Locale for chrome translation — resolved from profile.preferred_language.
+  // Defaults to 'en' so the first-paint shell renders in a known language
+  // before the async profile fetch completes.
+  const [locale, setLocale] = useState<Locale>('en');
 
   // Agent-specific state
   const [interviewQuestions, setInterviewQuestions] = useState<InterviewQuestion[]>([]);
@@ -314,7 +322,7 @@ function EditorContentNew() {
         // Load user profile (correct columns from Supabase schema)
         const { data: profile } = await supabase
           .from('profiles')
-          .select('full_name, email, credits_balance, credits_purchased, plan, is_admin')
+          .select('full_name, email, credits_balance, credits_purchased, plan, is_admin, preferred_language')
           .eq('id', user.id)
           .single();
 
@@ -328,6 +336,13 @@ function EditorContentNew() {
             is_admin: profile.is_admin || false,
             plan: profile.plan,
           });
+          // Resolve the user's interface locale for chrome translation. All
+          // agent pipeline labels, sidebar chrome, and toasts switch to this
+          // locale on first render after data load completes.
+          const rawLang = (profile.preferred_language || 'en').toLowerCase();
+          if (isSupportedLocale(rawLang)) {
+            setLocale(rawLang as Locale);
+          }
         }
 
         // Initialize QA checks (labels match real endpoint)
@@ -342,7 +357,7 @@ function EditorContentNew() {
 
       } catch (error) {
         console.error('Error loading data:', error);
-        toast.error('Failed to load project');
+        toast.error(t('editor.loadFailed', locale));
       } finally {
         setLoading(false);
       }
@@ -470,7 +485,7 @@ function EditorContentNew() {
       setResearchResources(data.resources || []);
     } catch (err) {
       clearInterval(stepInterval);
-      toast.error('Research failed. Please try again.');
+      toast.error(t('editor.researchFailed', locale));
     }
     setIsResearching(false);
   };
@@ -549,10 +564,10 @@ function EditorContentNew() {
 
   // Handler: Request outline changes
   const handleRequestOutlineChanges = async (feedback: string) => {
-    toast.info('Processing your feedback...');
+    toast.info(t('editor.feedbackProcessing', locale));
     // Would call AI to regenerate outline based on feedback
     await new Promise(resolve => setTimeout(resolve, 2000));
-    toast.success('Outline updated based on your feedback');
+    toast.success(t('editor.outlineUpdated', locale));
   };
 
   // Handler: Approve outline
@@ -664,7 +679,7 @@ function EditorContentNew() {
         toast.error('Lost connection to writing stream. Chapters may still be generating in the background.');
       };
     } catch (err) {
-      toast.error('Failed to start writing. Please try again.');
+      toast.error(t('editor.writingFailed', locale));
       setIsWriting(false);
     }
   };
@@ -697,7 +712,7 @@ function EditorContentNew() {
 
       setQaChecks(data.checks || []);
     } catch (err) {
-      toast.error('QA checks failed. Please try again.');
+      toast.error(t('editor.qaFailed', locale));
     }
     setIsCheckingQA(false);
   };
@@ -717,7 +732,7 @@ function EditorContentNew() {
         : ch
       )
     );
-    toast.success('Chapter saved (Free)');
+    toast.success(t('editor.chapterSaved', locale));
   };
 
   // Handler: Regenerate chapter — calls real Opus via /api/ai/regenerate-chapter
@@ -758,7 +773,7 @@ function EditorContentNew() {
       toast.success(`Chapter regenerated — ${data.chapter.word_count} words`);
     } catch (err) {
       console.error('Regeneration failed:', err);
-      toast.error('Regeneration failed. Credits refunded.');
+      toast.error(t('editor.regenFailed', locale));
     }
   };
 
@@ -791,8 +806,8 @@ function EditorContentNew() {
         sessionId: session?.id,
         coverType: type,
         prompt,
-        bookTitle: session?.book_title || project?.title || 'Untitled',
-        authorName: session?.author_name || 'Author',
+        bookTitle: session?.book_title || project?.title || t('editor.untitled', locale),
+        authorName: session?.author_name || t('editor.author', locale),
       }),
     });
     
@@ -814,29 +829,29 @@ function EditorContentNew() {
 
   // Handler: Upload author photo
   const handleUploadAuthorPhoto = async (file: File) => {
-    toast.info('Photo upload coming soon');
+    toast.info(t('editor.photoSoon', locale));
   };
 
   // Handler: Extract from LinkedIn
   const handleExtractFromLinkedIn = (url: string) => {
-    toast.info('LinkedIn extraction coming soon');
+    toast.info(t('editor.linkedinSoon', locale));
   };
 
   // Handler: View PDF
   const handleViewPDF = () => {
-    toast.info('PDF preview opening...');
+    toast.info(t('editor.pdfOpening', locale));
   };
 
   // Handler: Download
   const handleDownload = () => {
-    toast.info('Download starting...');
+    toast.info(t('editor.downloadStarting', locale));
   };
 
   // Handler: Publish — one-click publish to Penworth Store (the 17th platform
   // Penworth owns fully). Creates a live marketplace listing at /marketplace/[id].
   const handlePublish = async () => {
     try {
-      toast.info('Publishing to Penworth Store...');
+      toast.info(t('editor.publishingToStore', locale));
       const resp = await fetch('/api/publishing/penworth-store', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -876,7 +891,7 @@ function EditorContentNew() {
       router.push(data.externalUrl);
     } catch (err) {
       console.error('Publish failed:', err);
-      toast.error('Publishing failed. Please try again.');
+      toast.error(t('editor.publishFailed', locale));
     }
   };
 
@@ -977,8 +992,8 @@ function EditorContentNew() {
       case 'outline':
         return (
           <OutlineScreen
-            bookTitle={session?.book_title || project?.title || 'Untitled'}
-            authorName={session?.author_name || 'Author'}
+            bookTitle={session?.book_title || project?.title || t('editor.untitled', locale)}
+            authorName={session?.author_name || t('editor.author', locale)}
             sections={outlineSections}
             isGenerating={isGeneratingOutline}
             onRequestChanges={handleRequestOutlineChanges}
@@ -989,7 +1004,7 @@ function EditorContentNew() {
       case 'writing':
         return (
           <WritingScreen
-            bookTitle={session?.book_title || project?.title || 'Untitled'}
+            bookTitle={session?.book_title || project?.title || t('editor.untitled', locale)}
             chapters={outlineSections.filter(s => s.type === 'chapter')}
             currentChapterIndex={chapters.length}
             currentChapterContent={currentChapterContent}
@@ -1012,7 +1027,7 @@ function EditorContentNew() {
       case 'cover':
         return (
           <CoverDesignScreen
-            bookTitle={session?.book_title || project?.title || 'Untitled'}
+            bookTitle={session?.book_title || project?.title || t('editor.untitled', locale)}
             authorInfo={authorInfo}
             coverConfig={coverConfig}
             userCredits={userCredits}
@@ -1032,7 +1047,7 @@ function EditorContentNew() {
       case 'publishing':
         return (
           <PublishScreen
-            bookTitle={session?.book_title || project?.title || 'Untitled'}
+            bookTitle={session?.book_title || project?.title || t('editor.untitled', locale)}
             contentType={project?.content_type || 'book'}
             authorInfo={authorInfo}
             coverConfig={coverConfig}
@@ -1052,7 +1067,7 @@ function EditorContentNew() {
         );
 
       default:
-        return <div>Unknown agent</div>;
+        return <div>{t('editor.unknownAgent', locale)}</div>;
     }
   };
 
@@ -1065,17 +1080,19 @@ function EditorContentNew() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <span className="text-sm font-medium truncate max-w-[200px]">
-            {project?.title || 'Project'}
+            {project?.title || t('editor.untitled', locale)}
           </span>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">
-            {AGENTS.find(a => a.id === currentAgent)?.name || 'Editor'}
+            {currentAgent
+              ? getAgentLabels(currentAgent, locale).shortName
+              : t('editor.unknownAgent', locale)}
           </span>
         </div>
         
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
-            {userCredits} credits
+            {userCredits} {t('editor.credits', locale)}
           </span>
           <Button variant="ghost" size="sm">
             <Settings className="h-4 w-4" />
@@ -1090,6 +1107,7 @@ function EditorContentNew() {
           project={project}
           chapters={chapters}
           onNavigateHome={() => router.push('/projects')}
+          locale={locale}
         />
 
         {/* Column 2: Agent Pipeline */}
@@ -1097,6 +1115,7 @@ function EditorContentNew() {
           currentAgent={currentAgent}
           agentStatus={agentStatus}
           activeMessages={getActiveMessage()}
+          locale={locale}
         />
 
         {/* Column 3: Main Interaction Area */}
@@ -1106,8 +1125,8 @@ function EditorContentNew() {
 
         {/* Column 4: Document Preview */}
         <DocumentPreview
-          bookTitle={session?.book_title || project?.title || 'Untitled'}
-          authorName={session?.author_name || 'Author'}
+          bookTitle={session?.book_title || project?.title || t('editor.untitled', locale)}
+          authorName={session?.author_name || t('editor.author', locale)}
           contentType={project?.content_type || 'book'}
           coverUrl={session?.front_cover_url || undefined}
           wordCount={wordCount}
@@ -1115,13 +1134,13 @@ function EditorContentNew() {
           chapterCount={chapterCount}
           creditsUsed={1000 - userCredits}
           creditsRemaining={userCredits}
-          estimatedTimeRemaining={isWriting ? '~5 minutes' : undefined}
+          estimatedTimeRemaining={isWriting ? t('editor.estimatedMinutes', locale) : undefined}
           currentAgent={currentAgent}
           isFreeTier={isFreeTier}
           onViewPDF={handleViewPDF}
           onExportDraft={handleDownload}
-          onSharePreview={() => toast.info('Share preview coming soon')}
-          onInviteCollaborator={() => toast.info('Collaborator invites coming soon')}
+          onSharePreview={() => toast.info(t('editor.shareSoon', locale))}
+          onInviteCollaborator={() => toast.info(t('editor.collabSoon', locale))}
           onTopUp={() => router.push('/billing')}
         />
       </div>
@@ -1139,7 +1158,7 @@ export default function EditorPage() {
       <div className="h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading your writing workspace...</p>
+          <p className="text-muted-foreground">…</p>
         </div>
       </div>
     }>

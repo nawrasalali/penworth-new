@@ -102,6 +102,32 @@ export const AGENTS: AgentInfo[] = [
   },
 ];
 
+/**
+ * Returns the translated short-name, active-message, and completed-message for
+ * an agent, for the given locale. Import `t` lazily here rather than at module
+ * scope so this file can be consumed by any caller without pulling the whole
+ * i18n bundle unless the helper is actually used.
+ *
+ * The English strings in AGENTS above are kept as the source-of-truth fallback
+ * and for any consumer that hasn't been converted to locale-aware rendering.
+ */
+export function getAgentLabels(agentId: AgentName, locale: string = 'en'): {
+  shortName: string;
+  activeMessage: string;
+  completedMessage: string;
+} {
+  // Lazy import to avoid circular-ish issues when types are pulled into server
+  // components or build-time tooling.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { t, isSupportedLocale } = require('@/lib/i18n/strings');
+  const safeLocale = isSupportedLocale(locale) ? locale : 'en';
+  return {
+    shortName: t(`agent.${agentId}.name`, safeLocale),
+    activeMessage: t(`agent.${agentId}.active`, safeLocale),
+    completedMessage: t(`agent.${agentId}.done`, safeLocale),
+  };
+}
+
 // Validation types
 export interface ValidationScore {
   total: number;
