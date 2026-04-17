@@ -19,7 +19,7 @@ export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 export type StringKey =
   // Nav
-  | 'nav.dashboard' | 'nav.myProjects' | 'nav.marketplace'
+  | 'nav.dashboard' | 'nav.myProjects' | 'nav.marketplace' | 'nav.publish'
   | 'nav.referrals' | 'nav.billing' | 'nav.settings' | 'nav.help'
   | 'nav.commandCenter' | 'nav.organization' | 'nav.members'
   // My Projects page
@@ -45,6 +45,7 @@ const en: Bundle = {
   'nav.dashboard': 'Dashboard',
   'nav.myProjects': 'My Projects',
   'nav.marketplace': 'Marketplace',
+  'nav.publish': 'Publish',
   'nav.referrals': 'Referrals',
   'nav.billing': 'Billing',
   'nav.settings': 'Settings',
@@ -96,6 +97,7 @@ const ar: Bundle = {
   'nav.dashboard': 'لوحة التحكم',
   'nav.myProjects': 'مشاريعي',
   'nav.marketplace': 'السوق',
+  'nav.publish': 'النشر',
   'nav.referrals': 'الإحالات',
   'nav.billing': 'الفواتير',
   'nav.settings': 'الإعدادات',
@@ -147,6 +149,7 @@ const es: Bundle = {
   'nav.dashboard': 'Panel',
   'nav.myProjects': 'Mis Proyectos',
   'nav.marketplace': 'Mercado',
+  'nav.publish': 'Publicar',
   'nav.referrals': 'Referidos',
   'nav.billing': 'Facturación',
   'nav.settings': 'Ajustes',
@@ -198,6 +201,7 @@ const fr: Bundle = {
   'nav.dashboard': 'Tableau de bord',
   'nav.myProjects': 'Mes projets',
   'nav.marketplace': 'Marketplace',
+  'nav.publish': 'Publier',
   'nav.referrals': 'Parrainage',
   'nav.billing': 'Facturation',
   'nav.settings': 'Paramètres',

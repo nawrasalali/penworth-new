@@ -49,7 +49,7 @@ type NavItem = {
 const mainNav: NavItem[] = [
   { href: '/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
   { href: '/projects', icon: FolderOpen, labelKey: 'nav.myProjects' },
-  { href: '/marketplace', icon: Store, labelKey: 'nav.marketplace' },
+  { href: '/publish', icon: Store, labelKey: 'nav.publish' },
 ];
 
 const orgNav: NavItem[] = [
