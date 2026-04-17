@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { t, type Locale, type StringKey } from '@/lib/i18n/strings';
 
 interface SidebarProps {
   user: {
@@ -36,27 +37,34 @@ interface SidebarProps {
     name: string;
     slug: string;
   } | null;
+  locale?: Locale;
 }
 
-const mainNav = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/projects', icon: FolderOpen, label: 'My Projects' },
-  { href: '/marketplace', icon: Store, label: 'Marketplace' },
+type NavItem = {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  labelKey: StringKey;
+};
+
+const mainNav: NavItem[] = [
+  { href: '/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
+  { href: '/projects', icon: FolderOpen, labelKey: 'nav.myProjects' },
+  { href: '/marketplace', icon: Store, labelKey: 'nav.marketplace' },
 ];
 
-const orgNav = [
-  { href: '/organization', icon: Building2, label: 'Organization' },
-  { href: '/organization/members', icon: Users, label: 'Members' },
+const orgNav: NavItem[] = [
+  { href: '/organization', icon: Building2, labelKey: 'nav.organization' },
+  { href: '/organization/members', icon: Users, labelKey: 'nav.members' },
 ];
 
-const bottomNav = [
-  { href: '/referrals', icon: Gift, label: 'Referrals' },
-  { href: '/billing', icon: CreditCard, label: 'Billing' },
-  { href: '/settings', icon: Settings, label: 'Settings' },
-  { href: '/help', icon: HelpCircle, label: 'Help & Support' },
+const bottomNav: NavItem[] = [
+  { href: '/referrals', icon: Gift, labelKey: 'nav.referrals' },
+  { href: '/billing', icon: CreditCard, labelKey: 'nav.billing' },
+  { href: '/settings', icon: Settings, labelKey: 'nav.settings' },
+  { href: '/help', icon: HelpCircle, labelKey: 'nav.help' },
 ];
 
-export function Sidebar({ user, organization }: SidebarProps) {
+export function Sidebar({ user, organization, locale = 'en' }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [showOrgMenu, setShowOrgMenu] = useState(false);
@@ -115,7 +123,7 @@ export function Sidebar({ user, organization }: SidebarProps) {
                   )}
                 >
                   <item.icon className="h-4 w-4" />
-                  {item.label}
+                  {t(item.labelKey, locale)}
                 </Link>
               );
             })}
@@ -128,7 +136,7 @@ export function Sidebar({ user, organization }: SidebarProps) {
                 onClick={() => setShowOrgMenu(!showOrgMenu)}
                 className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
               >
-                <span>Organization</span>
+                <span>{t('nav.organization', locale)}</span>
                 <ChevronDown
                   className={cn(
                     'h-4 w-4 transition-transform',
@@ -152,7 +160,7 @@ export function Sidebar({ user, organization }: SidebarProps) {
                         )}
                       >
                         <item.icon className="h-4 w-4" />
-                        {item.label}
+                        {t(item.labelKey, locale)}
                       </Link>
                     );
                   })}
@@ -175,7 +183,7 @@ export function Sidebar({ user, organization }: SidebarProps) {
               )}
             >
               <ShieldCheck className="h-4 w-4" />
-              Command Center
+              {t('nav.commandCenter', locale)}
             </Link>
           )}
           {bottomNav.map((item) => {
@@ -192,7 +200,7 @@ export function Sidebar({ user, organization }: SidebarProps) {
                 )}
               >
                 <item.icon className="h-4 w-4" />
-                {item.label}
+                {t(item.labelKey, locale)}
               </Link>
             );
           })}

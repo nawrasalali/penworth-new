@@ -13,17 +13,18 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CATEGORIES, type CategoryId } from '@/lib/categories';
+import { t, type Locale, type StringKey } from '@/lib/i18n/strings';
 import type { ProjectRow } from '@/app/(dashboard)/projects/page';
 
 type StatusFilter = 'all' | 'draft' | 'writing' | 'complete' | 'published';
 type View = 'active' | 'bin';
 
-const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'draft', label: 'Draft' },
-  { id: 'writing', label: 'Writing' },
-  { id: 'complete', label: 'Complete' },
-  { id: 'published', label: 'Published' },
+const STATUS_FILTERS: { id: StatusFilter; labelKey: StringKey }[] = [
+  { id: 'all', labelKey: 'projects.statusAll' },
+  { id: 'draft', labelKey: 'projects.statusDraft' },
+  { id: 'writing', labelKey: 'projects.statusWriting' },
+  { id: 'complete', labelKey: 'projects.statusComplete' },
+  { id: 'published', labelKey: 'projects.statusPublished' },
 ];
 
 const STATUS_STYLES: Record<string, string> = {
@@ -36,9 +37,11 @@ const STATUS_STYLES: Record<string, string> = {
 export function MyProjectsClient({
   projects,
   trashed,
+  locale = 'en',
 }: {
   projects: ProjectRow[];
   trashed: ProjectRow[];
+  locale?: Locale;
 }) {
   const router = useRouter();
   const [view, setView] = useState<View>('active');
@@ -103,29 +106,31 @@ export function MyProjectsClient({
   };
 
   const handleSoftDelete = (p: ProjectRow) => {
+    const name = p.title || t('projects.untitled', locale);
     callAction(p.id, 'soft_delete', {
-      ok: `Moved "${p.title || 'Untitled'}" to the recycle bin`,
-      fail: 'Failed to move to recycle bin',
+      ok: `${t('toast.movedToBin', locale)} — "${name}"`,
+      fail: 'Failed',
     });
   };
 
   const handleRestore = (p: ProjectRow) => {
+    const name = p.title || t('projects.untitled', locale);
     callAction(p.id, 'restore', {
-      ok: `Restored "${p.title || 'Untitled'}"`,
-      fail: 'Failed to restore project',
+      ok: `${t('toast.restored', locale)} — "${name}"`,
+      fail: 'Failed',
     });
   };
 
   const askPermanentDelete = (p: ProjectRow) => {
     setConfirmId(p.id);
-    setConfirmTitle(p.title || 'Untitled');
+    setConfirmTitle(p.title || t('projects.untitled', locale));
   };
 
   const confirmPermanentDelete = async () => {
     if (!confirmId) return;
     const ok = await callAction(confirmId, 'permanent_delete', {
-      ok: 'Permanently deleted',
-      fail: 'Failed to permanently delete',
+      ok: t('toast.deletedPermanently', locale),
+      fail: 'Failed',
     });
     if (ok) {
       setConfirmId(null);
@@ -149,7 +154,7 @@ export function MyProjectsClient({
               : 'text-muted-foreground hover:bg-muted'
           }`}
         >
-          Active <span className="opacity-70 ml-1">{projects.length}</span>
+          {t('projects.active', locale)} <span className="opacity-70 ml-1">{projects.length}</span>
         </button>
         <button
           onClick={() => {
@@ -164,7 +169,7 @@ export function MyProjectsClient({
           }`}
         >
           <Trash2 className="h-3.5 w-3.5" />
-          Recycle Bin
+          {t('projects.recycleBin', locale)}
           <span className="opacity-70">{trashed.length}</span>
         </button>
       </div>
@@ -180,7 +185,7 @@ export function MyProjectsClient({
                   : 'bg-background hover:bg-muted border-border'
               }`}
             >
-              All <span className="opacity-70 ml-1">{categoryCounts.all}</span>
+              {t('projects.categoryAll', locale)} <span className="opacity-70 ml-1">{categoryCounts.all}</span>
             </button>
             {CATEGORIES.map((cat) => {
               const count = categoryCounts[cat.id] || 0;
@@ -209,7 +214,7 @@ export function MyProjectsClient({
 
           <div className="flex flex-wrap items-center gap-2 mb-6 pb-4 border-b">
             <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mr-1">
-              Status
+              {t('projects.status', locale)}
             </span>
             {STATUS_FILTERS.map((s) => {
               const count = statusCounts[s.id as keyof typeof statusCounts];
@@ -224,7 +229,7 @@ export function MyProjectsClient({
                       : 'text-muted-foreground hover:bg-muted'
                   }`}
                 >
-                  {s.label}
+                  {t(s.labelKey, locale)}
                   <span className="opacity-60 ml-1">{count}</span>
                 </button>
               );
@@ -238,12 +243,12 @@ export function MyProjectsClient({
           {view === 'bin' ? (
             <>
               <Trash2 className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-              <p className="text-muted-foreground">The recycle bin is empty.</p>
+              <p className="text-muted-foreground">{t('projects.binEmpty', locale)}</p>
             </>
           ) : (
             <>
               <FileText className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-              <p className="text-muted-foreground">No projects match the current filter.</p>
+              <p className="text-muted-foreground">{t('projects.noMatch', locale)}</p>
             </>
           )}
         </div>
@@ -254,6 +259,7 @@ export function MyProjectsClient({
               key={p.id}
               project={p}
               view={view}
+              locale={locale}
               disabled={isPending}
               onSoftDelete={handleSoftDelete}
               onRestore={handleRestore}
@@ -283,12 +289,10 @@ export function MyProjectsClient({
                 <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
               </div>
               <div className="min-w-0">
-                <h3 className="font-semibold">Permanently delete this project?</h3>
+                <h3 className="font-semibold">{t('confirm.title', locale)}</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  <strong className="text-foreground">"{confirmTitle}"</strong> and
-                  all its chapters, covers, research, and publishing history will
-                  be deleted forever.{' '}
-                  <strong className="text-foreground">This cannot be undone.</strong>
+                  <strong className="text-foreground">"{confirmTitle}"</strong> {t('confirm.bodyPrefix', locale)}{' '}
+                  <strong className="text-foreground">{t('confirm.cannotUndo', locale)}</strong>
                 </p>
               </div>
             </div>
@@ -297,14 +301,14 @@ export function MyProjectsClient({
                 onClick={() => setConfirmId(null)}
                 className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-muted transition-colors"
               >
-                Cancel
+                {t('action.cancel', locale)}
               </button>
               <button
                 onClick={confirmPermanentDelete}
                 disabled={isPending}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
               >
-                {isPending ? 'Deleting…' : 'Delete forever'}
+                {isPending ? t('action.deleting', locale) : t('action.deleteForever', locale)}
               </button>
             </div>
           </div>
@@ -317,6 +321,7 @@ export function MyProjectsClient({
 function ProjectCard({
   project,
   view,
+  locale = 'en',
   disabled,
   onSoftDelete,
   onRestore,
@@ -324,13 +329,14 @@ function ProjectCard({
 }: {
   project: ProjectRow;
   view: View;
+  locale?: Locale;
   disabled: boolean;
   onSoftDelete: (p: ProjectRow) => void;
   onRestore: (p: ProjectRow) => void;
   onPermanentDelete: (p: ProjectRow) => void;
 }) {
-  const timeAgo = formatRelative(new Date(project.updated_at));
-  const deletedAgo = project.deleted_at ? formatRelative(new Date(project.deleted_at)) : null;
+  const timeAgo = formatRelative(new Date(project.updated_at), locale);
+  const deletedAgo = project.deleted_at ? formatRelative(new Date(project.deleted_at), locale) : null;
   const isTrashed = view === 'bin';
 
   return (
@@ -344,7 +350,7 @@ function ProjectCard({
           {project.cover_url ? (
             <img
               src={project.cover_url}
-              alt={project.title || 'Cover'}
+              alt={project.title || t('projects.untitled', locale)}
               className="w-full h-full object-cover"
               loading="lazy"
             />
@@ -358,13 +364,16 @@ function ProjectCard({
               STATUS_STYLES[project.ui_status] || STATUS_STYLES.draft
             }`}
           >
-            {project.ui_status}
+            {t(
+              (`projects.status${project.ui_status.charAt(0).toUpperCase()}${project.ui_status.slice(1)}` as StringKey),
+              locale,
+            )}
           </span>
         </div>
 
         <div className="p-4 flex-1 flex flex-col">
           <h3 className="font-semibold line-clamp-1 group-hover:text-primary transition-colors">
-            {project.title || 'Untitled'}
+            {project.title || t('projects.untitled', locale)}
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             {project.content_type_label}
@@ -379,11 +388,11 @@ function ProjectCard({
           <div className="flex items-center justify-between text-xs text-muted-foreground mt-3 pt-3 border-t">
             <span>
               {project.chapter_count > 0
-                ? `${project.chapter_count} ch · ${project.word_count.toLocaleString()} words`
-                : 'Not started'}
+                ? `${project.chapter_count} ch · ${project.word_count.toLocaleString()}`
+                : t('projects.notStarted', locale)}
             </span>
             <span>
-              {isTrashed && deletedAgo ? `Deleted ${deletedAgo}` : timeAgo}
+              {isTrashed && deletedAgo ? `${t('time.deletedPrefix', locale)} ${deletedAgo}` : timeAgo}
             </span>
           </div>
         </div>
@@ -397,7 +406,7 @@ function ProjectCard({
         {isTrashed ? (
           <>
             <IconButton
-              title="Restore"
+              title={t('action.restore', locale)}
               onClick={() => onRestore(project)}
               disabled={disabled}
               className="bg-white/90 dark:bg-neutral-800/90 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/30"
@@ -405,7 +414,7 @@ function ProjectCard({
               <RotateCcw className="h-3.5 w-3.5" />
             </IconButton>
             <IconButton
-              title="Delete forever"
+              title={t('action.deleteForever', locale)}
               onClick={() => onPermanentDelete(project)}
               disabled={disabled}
               className="bg-white/90 dark:bg-neutral-800/90 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30"
@@ -415,7 +424,7 @@ function ProjectCard({
           </>
         ) : (
           <IconButton
-            title="Move to recycle bin"
+            title={t('action.moveToBin', locale)}
             onClick={() => onSoftDelete(project)}
             disabled={disabled}
             className="bg-white/90 dark:bg-neutral-800/90 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30"
@@ -454,19 +463,19 @@ function IconButton({
   );
 }
 
-function formatRelative(date: Date): string {
+function formatRelative(date: Date, locale: Locale = 'en'): string {
   const now = Date.now();
   const diffSec = Math.floor((now - date.getTime()) / 1000);
-  if (diffSec < 60) return 'just now';
+  if (diffSec < 60) return t('time.justNow', locale);
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffMin < 60) return `${diffMin}m`;
   const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
+  if (diffHr < 24) return `${diffHr}h`;
   const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
+  if (diffDay < 7) return `${diffDay}d`;
   const diffWk = Math.floor(diffDay / 7);
-  if (diffWk < 5) return `${diffWk}w ago`;
+  if (diffWk < 5) return `${diffWk}w`;
   const diffMo = Math.floor(diffDay / 30);
-  if (diffMo < 12) return `${diffMo}mo ago`;
-  return date.toLocaleDateString();
+  if (diffMo < 12) return `${diffMo}mo`;
+  return date.toLocaleDateString(locale);
 }

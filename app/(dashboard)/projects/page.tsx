@@ -5,6 +5,7 @@ import { Plus, FileText } from 'lucide-react';
 import { CONTENT_TYPE_LABELS } from '@/lib/utils';
 import { CATEGORIES, getCategoryForContentType, type CategoryId } from '@/lib/categories';
 import { MyProjectsClient } from '@/components/projects/MyProjectsClient';
+import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -56,6 +57,15 @@ export default async function ProjectsPage() {
       </div>
     );
   }
+
+  // Resolve locale for this page (same source the layout uses)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('preferred_language')
+    .eq('id', user.id)
+    .single();
+  const rawLang = (profile?.preferred_language || 'en').toLowerCase();
+  const locale: Locale = isSupportedLocale(rawLang) ? rawLang : 'en';
 
   const [activeRes, trashedRes] = await Promise.all([
     supabase
@@ -122,35 +132,35 @@ export default async function ProjectsPage() {
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
       <div className="flex items-start justify-between mb-6 gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Projects</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('projects.title', locale)}</h1>
           <p className="text-muted-foreground mt-1">
-            Everything you've created, grouped by category.
+            {t('projects.subtitle', locale)}
           </p>
         </div>
         <Link href="/projects/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
-            New Project
+            {t('projects.newProject', locale)}
           </Button>
         </Link>
       </div>
 
-      {projects.length === 0 ? (
+      {projects.length === 0 && trashed.length === 0 ? (
         <div className="rounded-xl border bg-card py-16 flex flex-col items-center justify-center">
           <FileText className="h-16 w-16 text-muted-foreground/40 mb-4" />
-          <h3 className="font-semibold text-lg mb-2">No projects yet</h3>
+          <h3 className="font-semibold text-lg mb-2">{t('projects.noneYet', locale)}</h3>
           <p className="text-muted-foreground text-center mb-6 max-w-sm px-4">
-            Create your first project to start generating verified, publication-ready content.
+            {t('projects.noneYetBody', locale)}
           </p>
           <Link href="/projects/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              Create Your First Project
+              {t('projects.createFirst', locale)}
             </Button>
           </Link>
         </div>
       ) : (
-        <MyProjectsClient projects={projects} trashed={trashed} />
+        <MyProjectsClient projects={projects} trashed={trashed} locale={locale} />
       )}
     </div>
   );

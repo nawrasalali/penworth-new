@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { Sidebar } from '@/components/dashboard/Sidebar';
+import { isSupportedLocale, isRTL, type Locale } from '@/lib/i18n/strings';
 
 export default async function DashboardLayout({
   children,
@@ -15,7 +16,7 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
-  // Fetch user profile
+  // Fetch user profile (includes preferred_language for i18n)
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')
@@ -39,10 +40,16 @@ export default async function DashboardLayout({
     is_admin: profile?.is_admin === true,
   };
 
+  // Resolve locale + direction for the shell. Falls back to English for any
+  // unrecognised code so a corrupted row can't crash the layout.
+  const rawLang = (profile?.preferred_language || 'en').toLowerCase();
+  const locale: Locale = isSupportedLocale(rawLang) ? rawLang : 'en';
+  const dir = isRTL(locale) ? 'rtl' : 'ltr';
+
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar user={userData} organization={organization} />
-      <main className="pl-64">
+    <div className="min-h-screen bg-background" dir={dir} lang={locale}>
+      <Sidebar user={userData} organization={organization} locale={locale} />
+      <main className={dir === 'rtl' ? 'pr-64' : 'pl-64'}>
         <div className="min-h-screen">{children}</div>
       </main>
     </div>
