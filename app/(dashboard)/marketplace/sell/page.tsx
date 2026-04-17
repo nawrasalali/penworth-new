@@ -87,6 +87,7 @@ export default function SellPage() {
         `)
         .eq('user_id', user.id)
         .eq('status', 'completed')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

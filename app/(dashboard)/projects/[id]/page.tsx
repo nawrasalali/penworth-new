@@ -27,6 +27,7 @@ export default async function ProjectDetailPage({
     .from('projects')
     .select('*, chapters(*), organizations(name, industry)')
     .eq('id', params.id)
+    .is('deleted_at', null)
     .single();
 
   if (error || !project) {

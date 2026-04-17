@@ -62,6 +62,7 @@ export default async function DashboardPage() {
     .from('projects')
     .select('*')
     .eq('user_id', user?.id)
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false })
     .limit(5);
 
