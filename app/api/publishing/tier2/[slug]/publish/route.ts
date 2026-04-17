@@ -8,6 +8,7 @@ import {
   loadProjectForPublish,
   D2DError,
 } from '@/lib/publishing/draft2digital';
+import { publishToGumroad, GumroadError } from '@/lib/publishing/gumroad';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -177,13 +178,47 @@ export async function POST(
       });
     }
 
+    if (oauthProvider === 'gumroad') {
+      const result = await publishToGumroad({
+        token: credential.token,
+        metadata,
+        manuscriptBuffer,
+        manuscriptFilename: 'manuscript.docx',
+        coverBuffer,
+      });
+
+      await supabase
+        .from('project_publications')
+        .update({
+          status: 'published',
+          external_url: result.shortUrl,
+          published_at: new Date().toISOString(),
+          automation_log: { productId: result.productId },
+          error_message: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('project_id', projectId)
+        .eq('platform_id', platform.id)
+        .eq('user_id', user.id);
+
+      return NextResponse.json({
+        success: true,
+        platform: platform.slug,
+        productId: result.productId,
+        externalUrl: result.shortUrl,
+      });
+    }
+
     // Other Tier 2 providers land here when their adapters ship
     return NextResponse.json(
       { error: `Auto-publish for ${platform.name} is not yet implemented` },
       { status: 501 },
     );
   } catch (err) {
-    const detail = err instanceof D2DError ? err.detail : undefined;
+    const detail =
+      err instanceof D2DError ? err.detail :
+      err instanceof GumroadError ? err.detail :
+      undefined;
     const message = err instanceof Error ? err.message : 'Publish failed';
     console.error(`Tier 2 publish failed [${oauthProvider}]:`, message, detail);
 
