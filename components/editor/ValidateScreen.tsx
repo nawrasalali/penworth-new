@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ValidationScore } from '@/types/agent-workflow';
+import { getValidationRubric } from '@/lib/ai/interview-questions';
 import { cn } from '@/lib/utils';
 import {
   Sparkles,
@@ -34,6 +35,7 @@ interface ValidateScreenProps {
   onProposeStronger: (originalTopic: string, score: ValidationScore) => Promise<ProposedIdea>;
   onProceed: (topic: string, score: ValidationScore) => void;
   initialTopic?: string;
+  contentType?: string | null;
 }
 
 type Phase = 'input' | 'validating' | 'results' | 'proposing' | 'compare';
@@ -43,11 +45,16 @@ export function ValidateScreen({
   onProposeStronger,
   onProceed,
   initialTopic = '',
+  contentType,
 }: ValidateScreenProps) {
   const [phase, setPhase] = useState<Phase>('input');
   const [topic, setTopic] = useState(initialTopic);
   const [score, setScore] = useState<ValidationScore | null>(null);
   const [proposal, setProposal] = useState<ProposedIdea | null>(null);
+
+  // Doc-type-aware copy: different document types see different intro, labels,
+  // and placeholders on the Validate screen. Cheap lookup — no network.
+  const rubric = useMemo(() => getValidationRubric(contentType), [contentType]);
 
   const handleValidate = async () => {
     if (!topic.trim()) return;
@@ -99,21 +106,21 @@ export function ValidateScreen({
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <Sparkles className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">Validate Your Idea</h1>
-          <p className="text-muted-foreground">
-            Describe your book, thesis, business plan, or report idea. We'll analyze market potential,
-            identify gaps, and help you decide how to move forward.
-          </p>
+          <h1 className="text-2xl font-bold mb-2">Validate your idea</h1>
+          <p className="text-muted-foreground">{rubric.intro}</p>
         </div>
-        <div className="w-full space-y-4">
+        <div className="w-full space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {rubric.inputLabel}
+          </label>
           <Textarea
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            placeholder="What's it about? Who is it for? What makes it different?"
+            placeholder={rubric.inputPlaceholder}
             className="min-h-[150px] resize-none"
           />
-          <Button onClick={handleValidate} className="w-full" disabled={!topic.trim()}>
-            Validate My Idea <ArrowRight className="ml-2 h-4 w-4" />
+          <Button onClick={handleValidate} className="w-full mt-3" disabled={!topic.trim()}>
+            {rubric.buttonLabel} <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
       </div>

@@ -911,6 +911,13 @@ export function getInterviewQuestions(contentType: string): string[] {
  * Get the full rich interview questions for a content type, mapped into the
  * shape the UI's InterviewScreen expects. Preserves real options, helpText,
  * and the "Something else..." escape hatch on every multiple-choice question.
+ *
+ * As of Apr 2026 the authoritative source is `lib/ai/interview-questions.ts`
+ * (the new `InterviewQuestionSpec` shape with pre-made answers + 'Other' +
+ * per-doc-type banks). This function is now a thin adapter that converts
+ * the new specs into the legacy UI shape so downstream components keep
+ * working. We keep the legacy INTERVIEW_QUESTIONS table as fallback for any
+ * content type the new module doesn't cover yet.
  */
 export function getRichInterviewQuestions(contentType: string): Array<{
   id: string;
@@ -919,14 +926,45 @@ export function getRichInterviewQuestions(contentType: string): Array<{
   options?: string[];
   helpText?: string;
   followUp?: string;
+  multi?: boolean;
 }> {
+  // Lazy-import so we don't create a circular dep during initial module load
+  // (interview-questions.ts doesn't import from this file today, but this
+  // keeps us safe if it ever does).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getInterviewQuestions } = require('../interview-questions') as
+    typeof import('../interview-questions');
+
+  const specs = getInterviewQuestions(contentType);
+  if (specs && specs.length) {
+    return specs.map((q) => {
+      const uiType: 'open' | 'multiple_choice' =
+        q.type === 'text' ? 'open' : 'multiple_choice';
+      // Map new choice objects to plain string labels, append the
+      // "Something else..." escape hatch when allowOther !== false
+      let options: string[] | undefined;
+      if (uiType === 'multiple_choice' && q.choices) {
+        options = q.choices.map((c) => c.label);
+        if (q.allowOther !== false) options.push('Something else...');
+      }
+      return {
+        id: q.id,
+        question: q.title,
+        type: uiType,
+        options,
+        helpText: q.prompt,
+        followUp: undefined,
+        multi: q.type === 'multi',
+      };
+    });
+  }
+
+  // Fallback to legacy banks (shouldn't be hit in practice — the new module
+  // covers every ContentType via flavor fallback)
   const questions = INTERVIEW_QUESTIONS[contentType as ContentType] || DEFAULT_QUESTIONS;
   return questions.map((q) => {
-    // Collapse 'scale' and 'yes_no' into 'open' for the UI (it only handles
-    // 'open' vs 'multiple_choice' today). They read as open-ended text prompts.
     const uiType: 'open' | 'multiple_choice' =
       q.type === 'multiple_choice' ? 'multiple_choice' : 'open';
-
     return {
       id: q.id,
       question: q.question,

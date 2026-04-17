@@ -935,6 +935,7 @@ function EditorContentNew() {
             onProposeStronger={handleProposeStronger}
             onProceed={handleValidationProceed}
             initialTopic={project?.title || ''}
+            contentType={project?.content_type}
           />
         );
 

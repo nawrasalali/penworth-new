@@ -63,6 +63,17 @@ export function InterviewScreen({
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
   const [dynamicFollowupRationale, setDynamicFollowupRationale] = useState<Record<number, string>>({});
+  // For multi-select questions: the set of labels the user has ticked so far.
+  // Cleared when the question changes. Works alongside the 'Something else...'
+  // flow — users can tick checkboxes AND add a free-text entry on the same Q.
+  const [multiSelections, setMultiSelections] = useState<string[]>([]);
+
+  // Reset per-question transient state when currentIndex changes
+  useEffect(() => {
+    setMultiSelections([]);
+    setShowCustomInput(false);
+    setCustomAnswer('');
+  }, [currentIndex]);
 
   // Build the follow-up question list. For document types that require citations
   // (research papers, theses, white papers, business plans), append the
@@ -130,6 +141,19 @@ export function InterviewScreen({
   };
   
   const handleOptionSelect = (option: string) => {
+    // Multi-select path: toggle membership and let the user hit Continue when ready
+    if (currentQuestion?.multi) {
+      if (option === 'Something else...') {
+        setShowCustomInput(true);
+        return;
+      }
+      setMultiSelections((prev) =>
+        prev.includes(option) ? prev.filter((o) => o !== option) : [...prev, option],
+      );
+      return;
+    }
+
+    // Single-select (legacy) path
     if (option === 'Something else...') {
       setShowCustomInput(true);
       return;
@@ -140,8 +164,31 @@ export function InterviewScreen({
     moveToNext();
   };
 
+  /**
+   * Commit a multi-select answer. Joins all ticked boxes + any free-text
+   * 'Something else...' entry into a single comma-separated string so the
+   * rest of the pipeline (which treats answers as strings) keeps working.
+   */
+  const handleMultiSubmit = () => {
+    const pieces = [...multiSelections];
+    const custom = customAnswer.trim();
+    if (custom) pieces.push(custom);
+    if (pieces.length === 0) return;
+    const joined = pieces.join(', ');
+    onAnswer(currentQuestion.id, joined);
+    maybeGenerateFollowup(currentIndex, joined);
+    moveToNext();
+  };
+
   const handleCustomSubmit = () => {
     if (!customAnswer.trim()) return;
+
+    // If this is a multi-select question with checkboxes already ticked,
+    // prefer the combined multi-submit (custom text becomes an extra entry).
+    if (currentQuestion?.multi && multiSelections.length > 0) {
+      handleMultiSubmit();
+      return;
+    }
 
     const answer = customAnswer;
     onAnswer(currentQuestion.id, answer);
@@ -247,6 +294,9 @@ export function InterviewScreen({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-lg">{firstQuestionIntro}</p>
+                {currentQuestion?.helpText && !isFirstQuestion && (
+                  <p className="text-sm text-muted-foreground mt-1">{currentQuestion.helpText}</p>
+                )}
                 {dynamicFollowupRationale[currentIndex] && !isFirstQuestion && (
                   <p className="text-xs text-muted-foreground/80 italic mt-2">
                     {dynamicFollowupRationale[currentIndex]}
@@ -254,24 +304,45 @@ export function InterviewScreen({
                 )}
               </div>
             </div>
-            
-            {/* Multiple Choice Options */}
+
+            {/* Multiple Choice Options (single-select OR multi-select) */}
             {currentQuestion?.type === 'multiple_choice' && !showCustomInput && (
               <div className="space-y-2 ml-11">
-                {currentQuestion.options?.map((option, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleOptionSelect(option)}
-                    className={cn(
-                      'w-full text-left p-3 rounded-lg border transition-colors',
-                      'hover:bg-primary/10 hover:border-primary',
-                      currentQuestion.answer === option && 'bg-primary/10 border-primary'
-                    )}
+                {currentQuestion.multi && (
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Pick one or more. We&apos;ll blend them.
+                  </p>
+                )}
+                {currentQuestion.options?.map((option, idx) => {
+                  const isSelected = currentQuestion.multi
+                    ? multiSelections.includes(option)
+                    : currentQuestion.answer === option;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => handleOptionSelect(option)}
+                      className={cn(
+                        'w-full text-left p-3 rounded-lg border transition-colors',
+                        'hover:bg-primary/10 hover:border-primary',
+                        isSelected && 'bg-primary/10 border-primary',
+                      )}
+                    >
+                      <span className="text-muted-foreground mr-2">
+                        {currentQuestion.multi ? (isSelected ? '☑' : '☐') : '○'}
+                      </span>
+                      {option}
+                    </button>
+                  );
+                })}
+                {currentQuestion.multi && (
+                  <Button
+                    onClick={handleMultiSubmit}
+                    disabled={multiSelections.length === 0}
+                    className="w-full mt-2"
                   >
-                    <span className="text-muted-foreground mr-2">○</span>
-                    {option}
-                  </button>
-                ))}
+                    Continue <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
               </div>
             )}
             

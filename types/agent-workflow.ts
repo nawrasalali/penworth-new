@@ -131,6 +131,14 @@ export interface InterviewQuestion {
   type: 'open' | 'multiple_choice';
   options?: string[]; // Always includes "Something else..." as last option
   answer?: string;
+  /**
+   * When true, multiple_choice renders as checkboxes and accepts 1+ selections.
+   * The stored `answer` is a comma-separated string of the chosen labels
+   * (plus any free-text from 'Something else...').
+   */
+  multi?: boolean;
+  /** Optional sub-prompt shown in muted text under the question. */
+  helpText?: string;
 }
 
 export interface FollowUpQuestion {
