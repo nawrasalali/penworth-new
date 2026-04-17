@@ -63,16 +63,32 @@ export default async function GuildDashboardPage() {
     .filter((c) => c.status !== 'clawed_back')
     .reduce((sum, c) => sum + Number(c.commission_amount_usd || 0), 0);
 
+  // Academy mandatory gate
+  const { data: academyStatus } = await admin
+    .from('v_guild_academy_status')
+    .select('mandatory_completed, mandatory_total')
+    .eq('guildmember_id', member.id)
+    .maybeSingle();
+
+  const mandatoryCompleted = academyStatus?.mandatory_completed ?? 0;
+  const mandatoryTotal = academyStatus?.mandatory_total ?? 0;
+  const referralUnlocked = mandatoryTotal > 0 && mandatoryCompleted >= mandatoryTotal;
+
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
-      <DashboardHeader member={member} />
+      <DashboardHeader member={member} referralUnlocked={referralUnlocked} />
 
       <div className="mt-12 grid gap-6 lg:grid-cols-[200px_1fr_300px]">
         {/* Column 2: Ladder progress */}
         <TierProgressPanel member={member} retainedCount={retainedCount || 0} />
 
         {/* Column 3: Main content */}
-        <MainWorkArea member={member} />
+        <MainWorkArea
+          member={member}
+          referralUnlocked={referralUnlocked}
+          mandatoryCompleted={mandatoryCompleted}
+          mandatoryTotal={mandatoryTotal}
+        />
 
         {/* Column 4: Live stats */}
         <LiveStatsPanel
@@ -87,7 +103,13 @@ export default async function GuildDashboardPage() {
   );
 }
 
-function DashboardHeader({ member }: { member: any }) {
+function DashboardHeader({
+  member,
+  referralUnlocked,
+}: {
+  member: any;
+  referralUnlocked: boolean;
+}) {
   const firstName = member.display_name.split(' ')[0];
   const tierLabel = member.tier.charAt(0).toUpperCase() + member.tier.slice(1);
   return (
@@ -101,9 +123,28 @@ function DashboardHeader({ member }: { member: any }) {
         </h1>
       </div>
       <div className="flex gap-4 text-right">
-        <ShareReferralButton referralCode={member.referral_code} />
+        {referralUnlocked ? (
+          <ShareReferralButton referralCode={member.referral_code} />
+        ) : (
+          <ReferralLockedBadge />
+        )}
       </div>
     </div>
+  );
+}
+
+function ReferralLockedBadge() {
+  return (
+    <Link
+      href="/guild/dashboard/academy"
+      className="group block rounded-lg border border-[#2a3149] bg-[#141a2a] p-4 hover:border-[#d4af37]/40"
+    >
+      <div className="text-xs uppercase tracking-widest text-[#8a8370]">Referral link</div>
+      <div className="mt-1 font-serif text-sm tracking-wide text-[#c9c2b0]">
+        Complete 3 mandatory Academy modules
+      </div>
+      <div className="mt-1 text-xs text-[#d4af37] group-hover:underline">Go to Academy →</div>
+    </Link>
   );
 }
 
@@ -197,11 +238,43 @@ function NavItem({
   );
 }
 
-function MainWorkArea({ member }: { member: any }) {
+function MainWorkArea({
+  member,
+  referralUnlocked,
+  mandatoryCompleted,
+  mandatoryTotal,
+}: {
+  member: any;
+  referralUnlocked: boolean;
+  mandatoryCompleted: number;
+  mandatoryTotal: number;
+}) {
   return (
     <div className="space-y-6">
       {/* Onboarding checklist for new members */}
       <OnboardingCard member={member} />
+
+      {/* Academy gate banner — shown prominently until mandatory modules are done */}
+      {!referralUnlocked && (
+        <div className="rounded-xl border border-[#d4af37]/30 bg-gradient-to-br from-[#d4af37]/10 to-transparent p-6">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-[#d4af37]">
+            Unlock your referral link
+          </div>
+          <h2 className="font-serif text-2xl tracking-tight">
+            Complete 3 mandatory Academy modules to activate your referral link.
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-[#c9c2b0]">
+            You&apos;ve completed {mandatoryCompleted} of {mandatoryTotal || 3}. These teach you how
+            Penworth works, how the Guild works, and how to find your first 5 referrals.
+          </p>
+          <Link
+            href="/guild/dashboard/academy"
+            className="mt-5 inline-flex items-center gap-2 rounded-md bg-[#d4af37] px-5 py-2.5 text-sm font-medium text-[#0a0e1a] hover:bg-[#e6c14a]"
+          >
+            Go to Academy →
+          </Link>
+        </div>
+      )}
 
       {/* Weekly plan card */}
       <div className="rounded-xl border border-[#1e2436] bg-[#0f1424] p-6">
@@ -220,13 +293,19 @@ function MainWorkArea({ member }: { member: any }) {
           Your personalised growth plan will appear here once the Scout agent completes its audit
           of your audience. This typically happens within 24 hours of joining.
         </p>
-        <div className="mt-4 rounded-md bg-[#0a0e1a] p-4 text-sm text-[#c9c2b0]">
-          While you wait, start by sharing your referral code{' '}
-          <code className="rounded bg-[#1e2436] px-2 py-0.5 font-mono text-[#d4af37]">
-            {member.referral_code}
-          </code>{' '}
-          with someone you know who has a book in them.
-        </div>
+        {referralUnlocked ? (
+          <div className="mt-4 rounded-md bg-[#0a0e1a] p-4 text-sm text-[#c9c2b0]">
+            While you wait, start by sharing your referral code{' '}
+            <code className="rounded bg-[#1e2436] px-2 py-0.5 font-mono text-[#d4af37]">
+              {member.referral_code}
+            </code>{' '}
+            with someone you know who has a book in them.
+          </div>
+        ) : (
+          <div className="mt-4 rounded-md bg-[#0a0e1a] p-4 text-sm text-[#8a8370]">
+            Your referral code appears here once you&apos;ve finished the 3 mandatory Academy modules.
+          </div>
+        )}
       </div>
 
       {/* Recent activity */}
