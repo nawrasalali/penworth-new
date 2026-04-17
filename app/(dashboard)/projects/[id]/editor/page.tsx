@@ -572,25 +572,31 @@ function EditorContentNew() {
     setCurrentChapterContent('');
 
     try {
-      // Get the outline's chapter array (with keyPoints) from the session
+      // Get the full outline_data (body + templateMeta) from the session
       const sessionResp = await fetch(`/api/interview-session?projectId=${projectId}`);
       const sessionData = await sessionResp.json();
       const outlineData = sessionData?.session?.outline_data;
-      const outlineChapters = outlineData?.chapters;
+      const outlineBody = outlineData?.body || outlineData?.chapters;
 
-      if (!outlineChapters || outlineChapters.length === 0) {
+      if (!outlineBody || outlineBody.length === 0) {
         toast.error('No outline found. Please regenerate the outline first.');
         setIsWriting(false);
         return;
       }
 
-      // Trigger Inngest durable book writing
+      // Trigger Inngest durable writing (works for any document type)
       const startResp = await fetch('/api/books/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
-          outline: { chapters: outlineChapters },
+          outline: {
+            body: outlineBody,
+            chapters: outlineBody, // legacy alias
+            frontMatter: outlineData?.frontMatter || [],
+            backMatter: outlineData?.backMatter || [],
+            templateMeta: outlineData?.templateMeta,
+          },
           voiceProfile: {
             tone: session?.follow_up_data?.style || 'professional',
             style: session?.follow_up_data?.style || 'conversational',
@@ -643,8 +649,8 @@ function EditorContentNew() {
               });
             // Advance to QA
             advanceToNextAgent({
-              currentChapter: outlineChapters.length,
-              totalChapters: outlineChapters.length,
+              currentChapter: outlineBody.length,
+              totalChapters: outlineBody.length,
               progress: 100,
             }).then(() => startQAChecks());
           }
@@ -915,6 +921,7 @@ function EditorContentNew() {
             chosenIdea={session?.validation_data?.chosenTopic || project?.title}
             ideaPositioning={session?.validation_data?.positioning}
             projectId={projectId}
+            contentType={project?.content_type}
             onAnswer={handleInterviewAnswer}
             onSaveAndExit={handleSaveAndExit}
             onStopAndNext={handleStopInterview}

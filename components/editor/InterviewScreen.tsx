@@ -7,8 +7,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { 
   InterviewQuestion, 
   FollowUpQuestion, 
-  FOLLOW_UP_QUESTIONS 
+  FOLLOW_UP_QUESTIONS,
+  CITATION_STYLE_QUESTION,
+  extractCitationStyleId
 } from '@/types/agent-workflow';
+import { getTemplate } from '@/lib/ai/document-templates';
 import { cn } from '@/lib/utils';
 import { 
   Mic, 
@@ -27,6 +30,7 @@ interface InterviewScreenProps {
   chosenIdea?: string;            // The validated idea from Validate stage
   ideaPositioning?: string;       // Optional positioning hook (if from stronger proposal)
   projectId?: string;             // For dynamic follow-up generation
+  contentType?: string;           // Drives citation-style picker visibility in follow-up
   onAnswer: (questionId: string, answer: string) => void;
   onSaveAndExit: () => void;
   onStopAndNext: (followUpAnswers: Record<string, string>) => void;
@@ -46,6 +50,7 @@ export function InterviewScreen({
   chosenIdea,
   ideaPositioning,
   projectId,
+  contentType,
   onAnswer,
   onSaveAndExit,
   onStopAndNext,
@@ -58,6 +63,17 @@ export function InterviewScreen({
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
   const [dynamicFollowupRationale, setDynamicFollowupRationale] = useState<Record<number, string>>({});
+
+  // Build the follow-up question list. For document types that require citations
+  // (research papers, theses, white papers, business plans), append the
+  // citation-style picker as an additional follow-up card. Its answer is
+  // mapped to a stable id ("apa" / "vancouver" / etc.) that the outline,
+  // research, and writing agents all read from follow_up_data.citationStyle.
+  const template = contentType ? getTemplate(contentType) : null;
+  const requiresCitations = template?.requiresCitations === true;
+  const followUpQuestions: FollowUpQuestion[] = requiresCitations
+    ? [...FOLLOW_UP_QUESTIONS, CITATION_STYLE_QUESTION]
+    : FOLLOW_UP_QUESTIONS;
 
   const currentQuestion = questions[currentIndex];
   const progress = ((currentIndex + 1) / questions.length) * 100;
@@ -163,10 +179,17 @@ export function InterviewScreen({
   };
   
   const handleContinueToResearch = () => {
-    onStopAndNext(followUpAnswers);
+    // Normalize the citation style answer to a stable short id so the backend
+    // reads follow_up_data.citationStyle as "apa" / "vancouver" / etc.
+    const normalized = { ...followUpAnswers };
+    if (normalized.citationStyle) {
+      const id = extractCitationStyleId(normalized.citationStyle);
+      if (id) normalized.citationStyle = id;
+    }
+    onStopAndNext(normalized);
   };
   
-  const allFollowUpAnswered = FOLLOW_UP_QUESTIONS.every(
+  const allFollowUpAnswered = followUpQuestions.every(
     q => followUpAnswers[q.id]
   );
 
@@ -350,7 +373,7 @@ export function InterviewScreen({
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {FOLLOW_UP_QUESTIONS.map((question) => (
+        {followUpQuestions.map((question) => (
           <div 
             key={question.id}
             className="rounded-xl border bg-card p-4"

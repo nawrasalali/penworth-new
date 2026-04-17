@@ -190,6 +190,44 @@ export const FOLLOW_UP_QUESTIONS: FollowUpQuestion[] = [
   },
 ];
 
+/**
+ * Shown only for document types that require citations (research papers,
+ * theses, white papers, business plans). Merged into the follow-up questions
+ * by InterviewScreen when the template declares requiresCitations.
+ *
+ * The stored answer is an option label; the writing agent reads the id from
+ * follow_up_data.citationStyle where the id is apa/vancouver/mla/chicago/harvard/ieee.
+ */
+export const CITATION_STYLE_QUESTION: FollowUpQuestion = {
+  id: 'citationStyle',
+  title: '📑 CITATION STYLE',
+  question: 'How should sources be cited?',
+  options: [
+    'APA 7th (most common in social sciences)',
+    'Vancouver (medicine, life sciences)',
+    'MLA 9th (humanities)',
+    'Chicago (history, arts)',
+    'Harvard (general academic)',
+    'IEEE (engineering, computer science)',
+  ],
+};
+
+/**
+ * Maps a CITATION_STYLE_QUESTION option label back to its short id for the
+ * backend (keeps follow_up_data.citationStyle a stable key like "apa").
+ */
+export function extractCitationStyleId(label: string | undefined): string | undefined {
+  if (!label) return undefined;
+  const lower = label.toLowerCase();
+  if (lower.startsWith('apa')) return 'apa';
+  if (lower.startsWith('vancouver')) return 'vancouver';
+  if (lower.startsWith('mla')) return 'mla';
+  if (lower.startsWith('chicago')) return 'chicago';
+  if (lower.startsWith('harvard')) return 'harvard';
+  if (lower.startsWith('ieee')) return 'ieee';
+  return undefined;
+}
+
 // Research types
 export interface ResearchResource {
   id: string;

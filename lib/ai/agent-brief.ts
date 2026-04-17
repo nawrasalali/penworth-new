@@ -30,6 +30,7 @@ export interface AgentBrief {
     audience?: string;   // e.g. "Professionals"
     market?: string;     // e.g. "Global audience"
     style?: string;      // e.g. "Conversational"
+    citationStyle?: string; // e.g. "apa", "vancouver" — only present for academic docs
   };
 
   // From research stage (if past it)

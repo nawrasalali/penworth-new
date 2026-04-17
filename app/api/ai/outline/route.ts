@@ -1,16 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/lib/supabase/server';
-import { modelFor, maxTokensFor, calculateCost } from '@/lib/ai/model-router';
+import { modelFor, maxTokensFor } from '@/lib/ai/model-router';
 import { loadAgentBrief, formatBriefForPrompt, resolveChapterCount } from '@/lib/ai/agent-brief';
+import {
+  getTemplate,
+  type DocumentTemplate,
+  type DocumentSection,
+  CITATION_STYLES,
+} from '@/lib/ai/document-templates';
 
 const anthropic = new Anthropic();
 
-interface OutlineChapter {
+/**
+ * Outline endpoint — document-type aware.
+ *
+ * For narrative books (fiction, non-fiction, memoir): asks the AI to produce
+ * N variable chapters with key points.
+ *
+ * For fixed-structure documents (research papers, business plans, contracts):
+ * emits EXACTLY the template's fixedBody sections. The AI only fills in
+ * titles, descriptions, and keyPoints tailored to the author's brief — it
+ * cannot add or remove sections.
+ *
+ * Output shape preserves legacy `chapters` alias for backwards compatibility,
+ * but the authoritative field is `body` (front -> body -> back).
+ */
+
+interface BodySection {
   number: number;
+  key: string;
   title: string;
   description: string;
-  keyPoints: string[];      // 3-6 bullets the chapter must cover
+  keyPoints: string[];
   estimatedWords: number;
 }
 
@@ -34,96 +56,46 @@ export async function POST(request: NextRequest) {
     if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 });
 
     const brief = await loadAgentBrief(supabase, projectId, user.id);
-
-    const chapterCount = resolveChapterCount(brief.followUp.chapters, 10);
-    const totalTargetWords = chapterCount * 4000; // rough target: 4k words/chapter average
-
-    // Choose task: initial vs refine
+    const template = getTemplate(brief.contentType);
     const task = feedback ? 'outline_refine' : 'outline_generate';
 
-    const systemPrompt = `You are an outline agent for a publishing platform. Your job is to produce a detailed chapter structure — a blueprint the writing agent will use to generate each chapter.
-
-OUTPUT REQUIREMENTS:
-- Front matter: Introduction (required). Optionally Preface if the interview suggests the author has a personal origin story.
-- Chapters: Exactly ${chapterCount} chapters based on author's preference. Each chapter must:
-  * Have a title that is specific and promise-driven (not generic like "Chapter 1: Introduction" — already handled by front matter)
-  * Progress logically from chapter N to N+1 (no random ordering)
-  * Cover 3-6 key points, each concrete enough that the writing agent can write 500+ words about it
-  * Target ~4000 words per chapter (range 3000-5000)
-- Back matter: Conclusion (required). Optionally References section if the content type suggests citations.
-
-The structure must directly reflect the interview answers and research. Do NOT output generic filler chapters. Every chapter must earn its place by serving the chosen idea.
-
-${feedback ? `AUTHOR FEEDBACK ON PREVIOUS OUTLINE: ${feedback}\nRevise the outline to address this feedback while preserving what was working.` : ''}
-
-Respond ONLY with valid JSON matching exactly:
-{
-  "frontMatter": [
-    { "title": "Introduction", "description": "<1-2 sentences on what the introduction does>" }
-  ],
-  "chapters": [
-    {
-      "number": 1,
-      "title": "<specific, promise-driven title>",
-      "description": "<2-3 sentence summary of what this chapter delivers>",
-      "keyPoints": ["<point 1>", "<point 2>", "<point 3>"],
-      "estimatedWords": 4000
-    }
-  ],
-  "backMatter": [
-    { "title": "Conclusion", "description": "<1-2 sentences>" }
-  ]
-}`;
-
-    const userMessage = `Build the outline for this book.
-
-${formatBriefForPrompt(brief)}
-
-Target total: ~${totalTargetWords.toLocaleString()} words across ${chapterCount} chapters.
-
-Produce the outline now.`;
-
-    const message = await anthropic.messages.create({
-      model: modelFor(task),
-      max_tokens: maxTokensFor(task),
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-    });
-
-    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
-    const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-
     let parsed: {
-      frontMatter: Array<{ title: string; description: string }>;
-      chapters: OutlineChapter[];
-      backMatter: Array<{ title: string; description: string }>;
+      frontMatter: Array<{ title: string; description: string; key?: string; keyPoints?: string[]; estimatedWords?: number }>;
+      body: BodySection[];
+      backMatter: Array<{ title: string; description: string; key?: string; keyPoints?: string[]; estimatedWords?: number }>;
     };
-    try {
-      parsed = JSON.parse(cleanJson);
-    } catch {
-      return NextResponse.json({ error: 'Failed to parse outline response' }, { status: 500 });
+
+    if (template.bodyIsVariable) {
+      parsed = await generateVariableOutline(brief, template, feedback, task);
+    } else {
+      parsed = await generateFixedOutline(brief, template, feedback, task);
     }
 
-    if (!Array.isArray(parsed.chapters) || parsed.chapters.length === 0) {
-      return NextResponse.json({ error: 'No chapters in outline' }, { status: 500 });
+    if (!Array.isArray(parsed.body) || parsed.body.length === 0) {
+      return NextResponse.json({ error: 'Outline produced no body sections' }, { status: 500 });
     }
 
-    // Flatten into OutlineSection[] for the UI
+    // Flatten into OutlineSection[] for the UI.
+    const bodyLabel = template.bodyLabelSingular;
     const sections: OutlineSectionOut[] = [
       ...parsed.frontMatter.map((fm, i) => ({
         id: `fm-${i}`,
         type: 'front_matter' as const,
         title: fm.title,
         description: fm.description,
+        keyPoints: fm.keyPoints,
+        estimatedWords: fm.estimatedWords,
         status: 'complete' as const,
       })),
-      ...parsed.chapters.map((ch) => ({
-        id: `ch-${ch.number}`,
+      ...parsed.body.map((b) => ({
+        id: `body-${b.number}`,
         type: 'chapter' as const,
-        title: ch.title.startsWith('Chapter ') ? ch.title : `Chapter ${ch.number}: ${ch.title}`,
-        description: ch.description,
-        keyPoints: ch.keyPoints,
-        estimatedWords: ch.estimatedWords,
+        title: b.title.startsWith(bodyLabel) || /^\d+\./.test(b.title)
+          ? b.title
+          : `${bodyLabel} ${b.number}: ${b.title}`,
+        description: b.description,
+        keyPoints: b.keyPoints,
+        estimatedWords: b.estimatedWords,
         status: 'complete' as const,
       })),
       ...parsed.backMatter.map((bm, i) => ({
@@ -131,11 +103,14 @@ Produce the outline now.`;
         type: 'back_matter' as const,
         title: bm.title,
         description: bm.description,
+        keyPoints: bm.keyPoints,
+        estimatedWords: bm.estimatedWords,
         status: 'complete' as const,
       })),
     ];
 
-    // Persist outline into interview_sessions.outline_data
+    // Persist into interview_sessions.outline_data with template metadata so
+    // the writing pipeline can honor it without re-reading the registry.
     const { data: sessionRow } = await supabase
       .from('interview_sessions')
       .select('id')
@@ -149,9 +124,26 @@ Produce the outline now.`;
         .update({
           outline_data: {
             sections,
-            chapters: parsed.chapters,        // preserve full chapter objects with keyPoints for Writing agent
+            body: parsed.body,
+            // Legacy alias: keep `chapters` populated so older readers don't break
+            chapters: parsed.body.map((b) => ({
+              number: b.number,
+              title: b.title,
+              description: b.description,
+              keyPoints: b.keyPoints,
+              estimatedWords: b.estimatedWords,
+            })),
             frontMatter: parsed.frontMatter,
             backMatter: parsed.backMatter,
+            templateMeta: {
+              flavor: template.flavor,
+              bodyLabelSingular: template.bodyLabelSingular,
+              bodyLabelPlural: template.bodyLabelPlural,
+              bodyIsVariable: template.bodyIsVariable,
+              requiresCitations: template.requiresCitations,
+              writingStyleGuide: template.writingStyleGuide,
+              citationStyle: brief.followUp.citationStyle,
+            },
             generatedAt: new Date().toISOString(),
           },
           updated_at: new Date().toISOString(),
@@ -159,31 +151,211 @@ Produce the outline now.`;
         .eq('id', sessionRow.id);
     }
 
-    // Log usage (best-effort)
-    const cost = calculateCost(task, message.usage.input_tokens, message.usage.output_tokens);
-    try {
-      await supabase.from('usage').insert({
-        user_id: user.id,
-        action_type: task,
-        tokens_input: message.usage.input_tokens,
-        tokens_output: message.usage.output_tokens,
-        model: modelFor(task),
-        cost_usd: cost,
-        metadata: { projectId, chapterCount: parsed.chapters.length },
-      });
-    } catch {
-      // usage table may not exist yet — non-fatal
-    }
-
     return NextResponse.json({
       sections,
-      chapters: parsed.chapters,
+      body: parsed.body,
+      chapters: parsed.body,
       frontMatter: parsed.frontMatter,
       backMatter: parsed.backMatter,
+      flavor: template.flavor,
+      requiresCitations: template.requiresCitations,
     });
   } catch (error) {
     console.error('Outline error:', error);
     const msg = error instanceof Error ? error.message : 'Outline generation failed';
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+}
+
+// ============================================================================
+// VARIABLE BODY (books, cookbooks, technical docs)
+// ============================================================================
+
+async function generateVariableOutline(
+  brief: any,
+  template: DocumentTemplate,
+  feedback: string | undefined,
+  task: 'outline_generate' | 'outline_refine',
+) {
+  const bodyCount = resolveChapterCount(brief.followUp.chapters, 10);
+  const targetPerSection = Math.round((template.bodyMinWords + template.bodyMaxWords) / 2);
+  const bodyLabel = template.bodyLabelSingular;
+  const bodyLabelPlural = template.bodyLabelPlural;
+
+  const frontMatterSpec = template.frontMatter
+    .map((s) => `  * "${s.label}" (${s.required ? 'required' : 'optional'}) — ${s.description} [${s.minWords}-${s.maxWords} words]`)
+    .join('\n');
+
+  const backMatterSpec = template.backMatter
+    .map((s) => `  * "${s.label}" (${s.required ? 'required' : 'optional'}) — ${s.description} [${s.minWords}-${s.maxWords} words]`)
+    .join('\n');
+
+  const systemPrompt = `You are an outline agent for a ${template.flavor} document. Produce a detailed ${bodyLabelPlural} structure.
+
+STYLE GUIDE:
+${template.writingStyleGuide}
+
+OUTPUT REQUIREMENTS:
+- Front matter:
+${frontMatterSpec || '  (none)'}
+- Body: Exactly ${bodyCount} ${bodyLabelPlural.toLowerCase()}. Each must:
+  * Have a specific, promise-driven title
+  * Progress logically
+  * Cover ${template.bodyKeyPoints} key points (each concrete enough for 300+ words of prose)
+  * Target ~${targetPerSection} words (range ${template.bodyMinWords}-${template.bodyMaxWords})
+- Back matter:
+${backMatterSpec || '  (none)'}
+
+${feedback ? `AUTHOR FEEDBACK: ${feedback}\nRevise to address this while preserving what worked.` : ''}
+
+Respond ONLY with valid JSON matching EXACTLY:
+{
+  "frontMatter": [
+    { "title": "<label>", "description": "<1-2 sentences>", "keyPoints": ["..."], "estimatedWords": 1500 }
+  ],
+  "body": [
+    {
+      "number": 1,
+      "key": "ch-1",
+      "title": "<specific title>",
+      "description": "<2-3 sentences>",
+      "keyPoints": ["<point 1>", "<point 2>", "<point 3>"],
+      "estimatedWords": ${targetPerSection}
+    }
+  ],
+  "backMatter": [
+    { "title": "<label>", "description": "<1-2 sentences>", "keyPoints": ["..."], "estimatedWords": 1500 }
+  ]
+}`;
+
+  const userMessage = `Build the ${bodyLabelPlural.toLowerCase()} outline.
+
+${formatBriefForPrompt(brief)}
+
+Target: ~${bodyCount * targetPerSection} words across ${bodyCount} ${bodyLabelPlural.toLowerCase()}.`;
+
+  const message = await anthropic.messages.create({
+    model: modelFor(task),
+    max_tokens: maxTokensFor(task),
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userMessage }],
+  });
+
+  const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+  const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const parsed = JSON.parse(cleanJson);
+  parsed.body = parsed.body || parsed.chapters || [];
+  parsed.frontMatter = parsed.frontMatter || [];
+  parsed.backMatter = parsed.backMatter || [];
+  return parsed;
+}
+
+// ============================================================================
+// FIXED BODY (research papers, theses, business plans, contracts)
+// ============================================================================
+
+async function generateFixedOutline(
+  brief: any,
+  template: DocumentTemplate,
+  feedback: string | undefined,
+  task: 'outline_generate' | 'outline_refine',
+) {
+  const bodySections: DocumentSection[] = template.fixedBody || [];
+  const frontSections = template.frontMatter;
+  const backSections = template.backMatter;
+
+  const citationStyleId = brief.followUp.citationStyle as string | undefined;
+  const citationStyle = CITATION_STYLES.find((s) => s.id === citationStyleId);
+
+  const citationDirective = template.requiresCitations
+    ? `\n\nCITATIONS — MANDATORY:
+- Every factual claim, statistic, or quote MUST be backed by a real, retrievable source.
+- The author has chosen ${citationStyle ? `${citationStyle.label} style (example: ${citationStyle.example})` : '[citation style TBD — default to APA 7th]'}.
+- Flag in keyPoints which points require citations.
+- Do NOT invent citations at the outline stage — the writing agent pulls them from the approved research foundation.`
+    : '';
+
+  const sectionSpec = (sections: DocumentSection[]) =>
+    sections
+      .map(
+        (s) =>
+          `  - "${s.label}" [key=${s.key}] ${s.required ? '(required)' : '(optional)'}: ${s.description} [${s.minWords}-${s.maxWords} words]`,
+      )
+      .join('\n');
+
+  const systemPrompt = `You are an outline agent for a ${template.flavor} document (content type: ${brief.contentType}).
+
+STRICT FIXED STRUCTURE. You MUST emit EXACTLY the sections below, in exactly this order, using the exact section keys provided. Do NOT add, remove, rename, or reorder sections. Your only job is to tailor each section's description and keyPoints to the author's brief.
+
+STYLE GUIDE:
+${template.writingStyleGuide}
+${citationDirective}
+
+FRONT MATTER (exact order):
+${frontSections.length ? sectionSpec(frontSections) : '  (none)'}
+
+BODY — ${template.bodyLabelPlural} (exact order):
+${sectionSpec(bodySections)}
+
+BACK MATTER (exact order):
+${backSections.length ? sectionSpec(backSections) : '  (none)'}
+
+${feedback ? `\nAUTHOR FEEDBACK: ${feedback}\nRevise section descriptions and keyPoints only — do NOT change structure.` : ''}
+
+Respond ONLY with valid JSON matching EXACTLY:
+{
+  "frontMatter": [
+    { "key": "<key>", "title": "<label>", "description": "<tailored 1-2 sentences>", "keyPoints": ["..."], "estimatedWords": <number> }
+  ],
+  "body": [
+    { "number": 1, "key": "<key>", "title": "<label>", "description": "<tailored 2-3 sentences>", "keyPoints": ["..."], "estimatedWords": <number> }
+  ],
+  "backMatter": [
+    { "key": "<key>", "title": "<label>", "description": "<tailored 1-2 sentences>", "keyPoints": ["..."], "estimatedWords": <number> }
+  ]
+}`;
+
+  const userMessage = `Build the outline for this ${template.flavor} document.
+
+${formatBriefForPrompt(brief)}
+
+Emit EXACTLY the fixed sections listed in the system prompt, in the exact order, with the exact keys. Tailor only titles, descriptions, and keyPoints.`;
+
+  const message = await anthropic.messages.create({
+    model: modelFor(task),
+    max_tokens: maxTokensFor(task),
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userMessage }],
+  });
+
+  const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+  const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const parsed = JSON.parse(cleanJson);
+  parsed.body = parsed.body || parsed.chapters || [];
+  parsed.frontMatter = parsed.frontMatter || [];
+  parsed.backMatter = parsed.backMatter || [];
+
+  // Safety rail: if the AI drops a required body section, auto-insert from template
+  const haveBodyKeys = new Set(parsed.body.map((b: any) => b.key));
+  const missingBody = bodySections.filter((s) => s.required && !haveBodyKeys.has(s.key));
+  if (missingBody.length > 0) {
+    missingBody.forEach((s) => {
+      parsed.body.push({
+        number: 0,
+        key: s.key,
+        title: s.label,
+        description: s.description,
+        keyPoints: [],
+        estimatedWords: Math.round((s.minWords + s.maxWords) / 2),
+      });
+    });
+  }
+  // Re-sort to template order + renumber
+  parsed.body.sort(
+    (a: any, b: any) =>
+      bodySections.findIndex((s) => s.key === a.key) - bodySections.findIndex((s) => s.key === b.key),
+  );
+  parsed.body = parsed.body.map((b: any, i: number) => ({ ...b, number: i + 1 }));
+
+  return parsed;
 }

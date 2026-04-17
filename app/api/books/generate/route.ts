@@ -150,7 +150,8 @@ export async function POST(request: NextRequest) {
       metadata: { projectId, plan },
     });
 
-    // Trigger Inngest function for durable book writing
+    // Trigger Inngest function for durable writing (any document type)
+    const outlineBody = outline.body || outline.chapters || [];
     const { ids } = await inngest.send({
       name: 'book/write',
       data: {
@@ -158,10 +159,16 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         title: project.title,
         description: project.description,
-        outline,
+        outline: {
+          body: outlineBody,
+          chapters: outlineBody, // legacy
+          frontMatter: outline.frontMatter || [],
+          backMatter: outline.backMatter || [],
+          templateMeta: outline.templateMeta,
+        },
         industry: project.organizations?.industry || 'general',
         voiceProfile,
-        plan, // Include plan for model selection
+        plan,
       },
     });
 
@@ -173,7 +180,7 @@ export async function POST(request: NextRequest) {
         metadata: {
           inngestEventId: ids[0],
           startedAt: new Date().toISOString(),
-          totalChapters: outline.chapters.length,
+          totalChapters: outlineBody.length,
           creditsUsed: creditCost,
         },
       })
