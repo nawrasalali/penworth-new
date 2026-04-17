@@ -1005,6 +1005,7 @@ function EditorContentNew() {
             isGenerating={isGeneratingOutline}
             onRequestChanges={handleRequestOutlineChanges}
             onApprove={handleApproveOutline}
+            locale={locale}
           />
         );
 

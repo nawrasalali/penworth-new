@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { OutlineSection } from '@/types/agent-workflow';
 import { cn } from '@/lib/utils';
+import { t, type Locale } from '@/lib/i18n/strings';
 import {
   FileText,
   CheckCircle2,
@@ -22,6 +23,7 @@ interface OutlineScreenProps {
   isGenerating: boolean;
   onRequestChanges: (feedback: string) => void;
   onApprove: () => void;
+  locale?: Locale;
 }
 
 export function OutlineScreen({
@@ -30,7 +32,8 @@ export function OutlineScreen({
   sections,
   isGenerating,
   onRequestChanges,
-  onApprove
+  onApprove,
+  locale = 'en',
 }: OutlineScreenProps) {
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedback, setFeedback] = useState('');
@@ -66,10 +69,10 @@ export function OutlineScreen({
       <div className="mb-4">
         <div className="flex items-center gap-2 mb-2">
           <FileText className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-bold">Your Document Outline</h1>
+          <h1 className="text-xl font-bold">{t('outline.title', locale)}</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Watch your book structure form in real-time
+          {t('outline.subtitle', locale)}
         </p>
       </div>
       
@@ -80,10 +83,10 @@ export function OutlineScreen({
           <div className="border-b p-8 text-center">
             <div className="border-4 border-double border-primary/20 p-8">
               <div className="text-3xl font-bold text-primary mb-4 uppercase tracking-wider">
-                {bookTitle || 'Untitled Book'}
+                {bookTitle || t('outline.untitledBook', locale)}
               </div>
               <div className="text-lg text-muted-foreground">
-                by {authorName || 'Author Name'}
+                {t('outline.byByline', locale)} {authorName || t('outline.authorName', locale)}
               </div>
             </div>
           </div>
@@ -94,7 +97,7 @@ export function OutlineScreen({
             {frontMatter.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  Front Matter
+                  {t('outline.frontMatter', locale)}
                 </h3>
                 <div className="space-y-1 ml-4">
                   {frontMatter.map((section) => (
@@ -118,7 +121,7 @@ export function OutlineScreen({
             {/* Chapters */}
             <div className="mb-6">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                Chapters
+                {t('outline.chaptersHeading', locale)}
               </h3>
               <div className="space-y-2 ml-4">
                 {chapters.map((section, idx) => (
@@ -133,7 +136,7 @@ export function OutlineScreen({
                         section.status === 'complete' && 'text-foreground',
                         section.status === 'pending' && 'text-muted-foreground'
                       )}>
-                        Ch {idx + 1}: {section.title}
+                        {t('outline.chapterPrefix', locale)} {idx + 1}: {section.title}
                       </div>
                       {section.description && (
                         <div className="text-xs text-muted-foreground mt-0.5">
@@ -150,7 +153,7 @@ export function OutlineScreen({
             {backMatter.length > 0 && (
               <div>
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  Back Matter
+                  {t('outline.backMatter', locale)}
                 </h3>
                 <div className="space-y-1 ml-4">
                   {backMatter.map((section) => (
@@ -177,19 +180,19 @@ export function OutlineScreen({
       {/* Feedback Panel */}
       {showFeedback && (
         <div className="mt-4 p-4 border rounded-lg bg-muted/30">
-          <h4 className="font-medium mb-2">Request Changes</h4>
+          <h4 className="font-medium mb-2">{t('outline.requestChanges', locale)}</h4>
           <Textarea
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
-            placeholder="Describe the changes you'd like to make to the outline..."
+            placeholder={t('outline.feedbackPlaceholder', locale)}
             className="min-h-[80px] mb-3"
           />
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setShowFeedback(false)}>
-              Cancel
+              {t('outline.cancel', locale)}
             </Button>
             <Button onClick={handleSubmitFeedback} disabled={!feedback.trim()}>
-              Submit Feedback
+              {t('outline.submitFeedback', locale)}
             </Button>
           </div>
         </div>
@@ -204,14 +207,14 @@ export function OutlineScreen({
             disabled={isGenerating}
           >
             <Edit3 className="mr-2 h-4 w-4" />
-            Request Changes
+            {t('outline.requestChanges', locale)}
           </Button>
           <Button 
             onClick={onApprove}
             disabled={isGenerating || completedCount < sections.length}
           >
             <CheckCircle2 className="mr-2 h-4 w-4" />
-            Approve Outline
+            {t('outline.approve', locale)}
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -220,7 +223,7 @@ export function OutlineScreen({
       {isGenerating && (
         <p className="text-center text-sm text-muted-foreground mt-3">
           <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
-          Generating outline... {Math.round(progress)}% complete
+          {t('outline.generating', locale)} {Math.round(progress)}%
         </p>
       )}
     </div>
