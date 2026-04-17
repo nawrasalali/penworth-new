@@ -136,6 +136,13 @@ export async function POST(request: NextRequest) {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
 
+    // Diagnostic: log exactly what we're sending to Stripe so 'No such price'
+    // errors point at the offending env var. We log the priceId as-is (not a
+    // secret; price IDs are visible in Stripe's UI and emails).
+    console.log(
+      `[stripe-checkout] subscription: planId=${planId} billingPeriod=${billingPeriod} priceId=${priceId} priceLen=${priceId.length}`,
+    );
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
@@ -168,8 +175,24 @@ export async function POST(request: NextRequest) {
     // invalid customer IDs, etc. become diagnosable instead of a blank 500.
     const message =
       error instanceof Error ? error.message : 'Failed to create checkout session';
-    console.error('Checkout error:', error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('Checkout error:', error, {
+      planId: (await request.clone().json().catch(() => ({})))?.planId,
+    });
+
+    // Stripe "No such price" errors are the most common production issue when
+    // env-var price IDs don't match what's actually in the Stripe account.
+    // Detect and hint at the fix so support doesn't have to read logs.
+    const isNoSuchPrice = /No such price/i.test(message);
+    return NextResponse.json(
+      {
+        error: message,
+        code: isNoSuchPrice ? 'stripe_invalid_price' : 'checkout_failed',
+        hint: isNoSuchPrice
+          ? 'A Stripe price ID in the server env does not exist in Stripe. Check STRIPE_PRICE_PRO_MONTHLY / STRIPE_PRICE_PRO_ANNUAL / STRIPE_PRICE_MAX_MONTHLY / STRIPE_PRICE_MAX_ANNUAL / STRIPE_PRICE_CREDITS_* in Vercel env vars match an active price in the Stripe dashboard.'
+          : undefined,
+      },
+      { status: 500 },
+    );
   }
 }
 
@@ -264,6 +287,10 @@ async function handleCreditPackPurchase(
       }
     }
   }
+
+  console.log(
+    `[stripe-checkout] credit pack: creditPackId=${creditPackId} priceId=${priceId} priceLen=${priceId.length}`,
+  );
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
