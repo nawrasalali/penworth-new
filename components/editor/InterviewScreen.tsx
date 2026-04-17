@@ -26,10 +26,17 @@ interface InterviewScreenProps {
   questions: InterviewQuestion[];
   chosenIdea?: string;            // The validated idea from Validate stage
   ideaPositioning?: string;       // Optional positioning hook (if from stronger proposal)
+  projectId?: string;             // For dynamic follow-up generation
   onAnswer: (questionId: string, answer: string) => void;
   onSaveAndExit: () => void;
   onStopAndNext: (followUpAnswers: Record<string, string>) => void;
   onUploadFile?: (file: File) => void;
+  /**
+   * Called when a new dynamic follow-up question should be spliced into the
+   * remaining question queue. The parent owns the questions array and must
+   * mutate it so this screen re-renders with the new question in place.
+   */
+  onInjectDynamicFollowup?: (question: InterviewQuestion, insertAfterIndex: number) => void;
 }
 
 type Phase = 'interview' | 'followup';
@@ -38,45 +45,103 @@ export function InterviewScreen({
   questions,
   chosenIdea,
   ideaPositioning,
+  projectId,
   onAnswer,
   onSaveAndExit,
   onStopAndNext,
-  onUploadFile
+  onUploadFile,
+  onInjectDynamicFollowup,
 }: InterviewScreenProps) {
   const [phase, setPhase] = useState<Phase>('interview');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [customAnswer, setCustomAnswer] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
-  
+  const [dynamicFollowupRationale, setDynamicFollowupRationale] = useState<Record<number, string>>({});
+
   const currentQuestion = questions[currentIndex];
   const progress = ((currentIndex + 1) / questions.length) * 100;
   const answeredCount = questions.filter(q => q.answer).length;
+
+  /**
+   * Ask Claude (Haiku) for a contextual follow-up based on prior answers.
+   * Runs in the background after the user answers — doesn't block advancing.
+   */
+  const maybeGenerateFollowup = async (questionIndex: number, answerJustGiven: string) => {
+    if (!projectId || !chosenIdea || !onInjectDynamicFollowup) return;
+
+    // Build the answers seen so far (including the one just given)
+    const answersSoFar = questions
+      .slice(0, questionIndex + 1)
+      .map((q, i) => ({
+        question: q.question,
+        answer: i === questionIndex ? answerJustGiven : q.answer || '',
+      }))
+      .filter((a) => a.answer.trim());
+
+    if (answersSoFar.length < 2) return;
+
+    try {
+      const resp = await fetch('/api/ai/interview-followup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          chosenIdea,
+          answers: answersSoFar,
+        }),
+      });
+      const data = await resp.json();
+      if (!data?.followup?.question) return;
+
+      const f = data.followup as { question: string; rationale: string; type: string };
+      const injected: InterviewQuestion = {
+        id: `dyn-${Date.now()}`,
+        question: f.question,
+        type: 'open',
+      };
+
+      // Remember the rationale so it can be shown under the question.
+      setDynamicFollowupRationale((prev) => ({
+        ...prev,
+        [questionIndex + 1]: f.rationale,
+      }));
+
+      onInjectDynamicFollowup(injected, questionIndex);
+    } catch {
+      // Non-fatal — the static interview continues without follow-ups.
+    }
+  };
   
   const handleOptionSelect = (option: string) => {
     if (option === 'Something else...') {
       setShowCustomInput(true);
       return;
     }
-    
+
     onAnswer(currentQuestion.id, option);
+    maybeGenerateFollowup(currentIndex, option);
     moveToNext();
   };
-  
+
   const handleCustomSubmit = () => {
     if (!customAnswer.trim()) return;
-    
-    onAnswer(currentQuestion.id, customAnswer);
+
+    const answer = customAnswer;
+    onAnswer(currentQuestion.id, answer);
     setCustomAnswer('');
     setShowCustomInput(false);
+    maybeGenerateFollowup(currentIndex, answer);
     moveToNext();
   };
-  
+
   const handleOpenAnswer = () => {
     if (!customAnswer.trim()) return;
-    
-    onAnswer(currentQuestion.id, customAnswer);
+
+    const answer = customAnswer;
+    onAnswer(currentQuestion.id, answer);
     setCustomAnswer('');
+    maybeGenerateFollowup(currentIndex, answer);
     moveToNext();
   };
   
@@ -157,7 +222,14 @@ export function InterviewScreen({
               <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Bot className="h-4 w-4 text-primary" />
               </div>
-              <p className="text-lg">{firstQuestionIntro}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-lg">{firstQuestionIntro}</p>
+                {dynamicFollowupRationale[currentIndex] && !isFirstQuestion && (
+                  <p className="text-xs text-muted-foreground/80 italic mt-2">
+                    {dynamicFollowupRationale[currentIndex]}
+                  </p>
+                )}
+              </div>
             </div>
             
             {/* Multiple Choice Options */}

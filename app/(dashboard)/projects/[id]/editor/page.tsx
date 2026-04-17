@@ -866,9 +866,17 @@ function EditorContentNew() {
             questions={interviewQuestions}
             chosenIdea={session?.validation_data?.chosenTopic || project?.title}
             ideaPositioning={session?.validation_data?.positioning}
+            projectId={projectId}
             onAnswer={handleInterviewAnswer}
             onSaveAndExit={handleSaveAndExit}
             onStopAndNext={handleStopInterview}
+            onInjectDynamicFollowup={(question, insertAfterIndex) => {
+              setInterviewQuestions((prev) => [
+                ...prev.slice(0, insertAfterIndex + 1),
+                question,
+                ...prev.slice(insertAfterIndex + 1),
+              ]);
+            }}
           />
         );
 

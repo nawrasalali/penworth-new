@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -75,17 +75,32 @@ export function PublishScreen({
   onDownload,
   onPublish
 }: PublishScreenProps) {
-  const [phase, setPhase] = useState<'author' | 'cover' | 'preview'>('author');
+  // If the author info was already collected (e.g. in the Cover Design agent
+  // step), skip the author phase — no one should have to fill it in twice.
+  const authorAlreadyFilled = !!authorInfo.name && !!authorInfo.aboutAuthor;
+  const isBook = ['fiction', 'non-fiction', 'memoir', 'self-help', 'children', 'poetry', 'cookbook', 'travel', 'biography'].includes(contentType);
+  const isBusinessPlan = contentType === 'business' || contentType === 'business_plan';
+  const needsCover = isBook || isBusinessPlan;
+  const coversAlreadyReady =
+    (!needsCover) || (!!coverConfig.frontCoverUrl && (!isBook || !!coverConfig.backCoverUrl));
+
+  const [phase, setPhase] = useState<'author' | 'cover' | 'preview'>(
+    authorAlreadyFilled
+      ? (coversAlreadyReady ? 'preview' : (needsCover ? 'cover' : 'preview'))
+      : 'author'
+  );
   const [coverPrompt, setCoverPrompt] = useState('');
   const [linkedInUrl, setLinkedInUrl] = useState('');
   const [isGeneratingCover, setIsGeneratingCover] = useState(false);
   const [editingAbout, setEditingAbout] = useState(false);
   const [aboutDraft, setAboutDraft] = useState(authorInfo.aboutAuthor || '');
-  
-  const isBook = ['fiction', 'non-fiction', 'memoir', 'self-help', 'children', 'poetry', 'cookbook', 'travel', 'biography'].includes(contentType);
-  const isBusinessPlan = contentType === 'business' || contentType === 'business_plan';
-  const needsCover = isBook || isBusinessPlan;
-  
+
+  // Keep aboutDraft in sync with the prop when it arrives from the session
+  // (author info is saved in the Cover Design step before Publish loads).
+  useEffect(() => {
+    if (!editingAbout) setAboutDraft(authorInfo.aboutAuthor || '');
+  }, [authorInfo.aboutAuthor, editingAbout]);
+
   const canRegenerateFront = userCredits >= CREDIT_COSTS.FRONT_COVER_REGENERATE;
   const canRegenerateBack = userCredits >= CREDIT_COSTS.BACK_COVER_REGENERATE;
   
