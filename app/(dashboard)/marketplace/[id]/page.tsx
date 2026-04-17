@@ -20,9 +20,11 @@ import {
   Loader2
 } from 'lucide-react';
 import Link from 'next/link';
+import { AudiobookPlayer } from '@/components/marketplace/AudiobookPlayer';
 
 interface MarketplaceListing {
   id: string;
+  project_id: string;
   title: string;
   description: string;
   long_description: string;
@@ -295,6 +297,9 @@ export default function ListingDetailPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Audiobook player — only renders if narration exists */}
+          {listing.project_id && <AudiobookPlayer projectId={listing.project_id} />}
 
           {/* Sample Content */}
           {listing.sample_content && (
