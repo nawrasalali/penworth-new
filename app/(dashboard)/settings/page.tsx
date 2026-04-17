@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { LANGUAGE_NAMES } from '@/lib/ai/user-language';
+import { Loader2 } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -33,6 +35,8 @@ export default function SettingsPage() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [autoSave, setAutoSave] = useState(true);
   const [defaultAgent, setDefaultAgent] = useState('writing');
+  const [language, setLanguage] = useState('en');
+  const [isChangingLanguage, setIsChangingLanguage] = useState(false);
 
   const supabase = createClient();
 
@@ -59,8 +63,43 @@ export default function SettingsPage() {
       setProfile(profileData);
       setFullName(profileData.full_name || '');
       setEmail(profileData.email || user.email || '');
+      setLanguage(profileData.preferred_language || 'en');
     }
     setIsLoading(false);
+  };
+
+  /**
+   * Change the user's interface language.
+   *
+   * Arabic/Spanish/etc. users should live on {lang}.penworth.ai so SEO,
+   * AI writing, and the shell language are all aligned. This handler:
+   *   1. POSTs the new language to the API (which updates profiles.preferred_language)
+   *   2. Receives a redirectUrl pointing at the correct subdomain
+   *   3. Hard-navigates so the session cookie (scoped to .penworth.ai) carries
+   *      the logged-in state across subdomains
+   */
+  const changeLanguage = async (newLang: string) => {
+    if (newLang === language) return;
+    setIsChangingLanguage(true);
+    try {
+      const resp = await fetch('/api/user/language', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: newLang }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) {
+        alert(data.error || 'Failed to change language');
+        setIsChangingLanguage(false);
+        return;
+      }
+      setLanguage(newLang);
+      // Hard-navigate so the shell reloads in the new language + direction
+      window.location.href = data.redirectUrl;
+    } catch (err) {
+      alert('Failed to change language');
+      setIsChangingLanguage(false);
+    }
   };
 
   const saveProfile = async () => {
@@ -197,6 +236,36 @@ export default function SettingsPage() {
       {/* Preferences Tab */}
       {activeTab === 'preferences' && (
         <div className="space-y-6 max-w-lg">
+          {/* Language picker — changes preferred_language and redirects the
+              user to their language subdomain so SEO, AI writing, and the
+              shell all stay aligned. */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Language</label>
+            <div className="relative">
+              <select
+                value={language}
+                onChange={(e) => changeLanguage(e.target.value)}
+                disabled={isChangingLanguage}
+                className="w-full px-3 py-2 border rounded-md bg-background disabled:opacity-60"
+              >
+                {Object.entries(LANGUAGE_NAMES).map(([code, name]) => (
+                  <option key={code} value={code}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              {isChangingLanguage && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Changes the entire Penworth interface and AI writing language.
+              You'll be redirected to your language's subdomain (e.g. ar.penworth.ai for Arabic).
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium mb-2">Theme</label>
             <select
