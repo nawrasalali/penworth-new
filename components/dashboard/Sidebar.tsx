@@ -40,7 +40,7 @@ interface SidebarProps {
 
 const mainNav = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/projects', icon: FolderOpen, label: 'Projects' },
+  { href: '/projects', icon: FolderOpen, label: 'My Projects' },
   { href: '/marketplace', icon: Store, label: 'Marketplace' },
 ];
 
