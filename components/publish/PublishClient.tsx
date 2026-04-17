@@ -29,7 +29,7 @@ import { ComputerSessionPanel } from './ComputerSessionPanel';
  * branch into the computer-use connect dialog (email + password) and
  * the live session panel.
  */
-const COMPUTER_USE_SLUGS = new Set(['kobo', 'google_play']);
+const COMPUTER_USE_SLUGS = new Set(['kobo', 'google_play', 'publishdrive', 'streetlib']);
 
 interface ProjectRow {
   id: string;

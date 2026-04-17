@@ -37,6 +37,10 @@ export function buildRecipe(slug: string, input: RecipeInput): Recipe | null {
       return koboRecipe(input);
     case 'google_play':
       return googlePlayBooksRecipe(input);
+    case 'publishdrive':
+      return publishDriveRecipe(input);
+    case 'streetlib':
+      return streetLibRecipe(input);
     default:
       return null;
   }
@@ -214,5 +218,162 @@ STEPS (high-level; Google's Partner Center UI shifts — adapt):
     systemPrompt,
     userGoal,
     loginUrl: 'https://play.google.com/books/publish',
+  };
+}
+
+function publishDriveRecipe({ metadata, credentials }: RecipeInput): Recipe {
+  const systemPrompt = `
+You are Penworth's publishing robot, operating a real web browser on behalf
+of an author. Your job is to publish one ebook to PublishDrive, a global
+ebook aggregator that distributes to 400+ stores.
+
+OPERATING PRINCIPLES:
+- Stay on publishdrive.com. Do not navigate to external stores from here.
+- PublishDrive's UI has a long multi-step book wizard (Book Details,
+  Authors, Categories, Pricing, Distribution, Preview, Publish). Move
+  through it step-by-step, reading the current screen's requirements
+  before acting.
+- PublishDrive accepts EPUB and DOCX. Prefer whichever attachment Penworth
+  supplied.
+- PublishDrive requires ISBN for paid books in most territories. If we
+  don't have one, choose their free ISBN-assignment option if offered;
+  otherwise select 'No ISBN' if the form allows and hand off if it does
+  not.
+- Move deliberately. Take a screenshot and study the page before every click.
+- If you see a CAPTCHA, 2FA prompt, or any human-only decision, call
+  request_user_input.
+
+TOOLS YOU HAVE:
+- computer: mouse + keyboard + scroll.
+- upload_file: the CORRECT way to attach files — use a CSS selector for
+  the file input + attachment_name.
+- request_user_input: for 2FA codes or human decisions.
+- report_completion: call ONCE when the book is in the 'published' /
+  'in review' state.
+
+SAFETY:
+- Never change payout settings, tax forms, or account-level preferences.
+- Never enroll in upsell services (editorial, cover design, etc.).
+- If account verification is pending, hand off.
+`.trim();
+
+  const userGoal = `
+Publish this book to PublishDrive.
+
+CREDENTIALS (login only):
+  Email: ${credentials.email}
+  Password: ${credentials.password}
+
+BOOK METADATA:
+  Title: ${metadata.title}
+  ${metadata.subtitle ? `Subtitle: ${metadata.subtitle}` : ''}
+  Author: ${metadata.author_name}
+  Language: ${metadata.language || 'English'}
+  Description: ${metadata.long_description || metadata.short_description || ''}
+  Price (USD): ${metadata.is_free ? 'Free' : (metadata.price_usd || 2.99)}
+  Keywords: ${(metadata.keywords || []).join(', ')}
+  BISAC codes: ${(metadata.bisac_codes || []).join(', ')}
+  Territories: ${metadata.territories || 'worldwide'}
+  Audience: ${metadata.audience || 'general'}
+  Contains explicit content: ${metadata.contains_explicit ? 'yes' : 'no'}
+
+ATTACHMENTS (use the upload_file tool):
+  - attachment_name: "manuscript"
+  - attachment_name: "cover"
+
+STEPS:
+  1. Go to https://publishdrive.com and log in
+  2. Click "Add New Book" (or similar)
+  3. Choose Ebook format
+  4. Fill Title, Subtitle, Language, Description
+  5. Author(s): ${metadata.author_name}
+  6. Upload manuscript via upload_file("manuscript", <selector>)
+  7. Upload cover via upload_file("cover", <selector>)
+  8. Categories (BISAC) + keywords
+  9. Pricing + territories
+  10. Select distribution channels (accept all by default — maximum reach)
+  11. Accept the per-book content agreement
+  12. Publish
+  13. Call report_completion with the book's PublishDrive management URL
+`.trim();
+
+  return {
+    systemPrompt,
+    userGoal,
+    loginUrl: 'https://publishdrive.com',
+  };
+}
+
+function streetLibRecipe({ metadata, credentials }: RecipeInput): Recipe {
+  const systemPrompt = `
+You are Penworth's publishing robot, operating a real web browser on behalf
+of an author. Your job is to publish one ebook to StreetLib, an
+international distributor strong in Europe, the Middle East, and
+multilingual markets.
+
+OPERATING PRINCIPLES:
+- Stay on streetlib.com (or publish.streetlib.com). Do not navigate away.
+- StreetLib supports many languages natively — if the UI opens in Italian
+  or another language and you can find a language switcher, flip to English
+  first. Otherwise proceed; the form fields are usually self-explanatory.
+- StreetLib distributes to many downstream stores; select the default
+  'all stores' distribution unless told otherwise.
+- Move deliberately. Take a screenshot and study the page before every click.
+- If you see a CAPTCHA, 2FA, or any human-only decision, call
+  request_user_input.
+
+TOOLS YOU HAVE:
+- computer: mouse + keyboard + scroll.
+- upload_file: for the manuscript and cover file inputs.
+- request_user_input: for 2FA or human decisions.
+- report_completion: call ONCE when the book is submitted.
+
+SAFETY:
+- Never change account, payout, or tax settings.
+- Never enroll in paid services.
+- If account is unverified or suspended, hand off.
+`.trim();
+
+  const userGoal = `
+Publish this book to StreetLib.
+
+CREDENTIALS (login only):
+  Email: ${credentials.email}
+  Password: ${credentials.password}
+
+BOOK METADATA:
+  Title: ${metadata.title}
+  ${metadata.subtitle ? `Subtitle: ${metadata.subtitle}` : ''}
+  Author: ${metadata.author_name}
+  Language: ${metadata.language || 'English'}
+  Description: ${metadata.long_description || metadata.short_description || ''}
+  Price (USD): ${metadata.is_free ? 'Free' : (metadata.price_usd || 2.99)}
+  Keywords: ${(metadata.keywords || []).join(', ')}
+  BISAC codes: ${(metadata.bisac_codes || []).join(', ')}
+  Territories: ${metadata.territories || 'worldwide'}
+  Audience: ${metadata.audience || 'general'}
+  Contains explicit content: ${metadata.contains_explicit ? 'yes' : 'no'}
+
+ATTACHMENTS (use the upload_file tool):
+  - attachment_name: "manuscript"
+  - attachment_name: "cover"
+
+STEPS:
+  1. Go to https://publish.streetlib.com and log in
+  2. If a language switcher is visible, set UI to English
+  3. Click "Add Book" / "New Book"
+  4. Fill Title, Author, Language, Description
+  5. Upload manuscript + cover via upload_file
+  6. Categories (BISAC) + keywords + audience
+  7. Pricing + territories
+  8. Accept the per-book agreement
+  9. Submit
+  10. Call report_completion with the StreetLib book URL
+`.trim();
+
+  return {
+    systemPrompt,
+    userGoal,
+    loginUrl: 'https://publish.streetlib.com',
   };
 }
