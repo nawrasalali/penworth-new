@@ -60,6 +60,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // ROLLOUT GATE: narration is admin-only until the cost model is tuned.
+  // ElevenLabs costs ~$2-5 per book; letting every free user trigger it
+  // would be burn-rate-catastrophic. Later we'll switch this to a credit
+  // deduction (e.g. 500 credits/chapter mirroring regenerate-chapter).
+  const { data: adminProfile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single();
+  if (!adminProfile?.is_admin) {
+    return NextResponse.json(
+      { error: 'Audio narration is in limited preview. Contact support for early access.' },
+      { status: 402 },
+    );
+  }
+
   const { projectId, voiceId: customVoiceId } = await request.json();
   if (!projectId) {
     return NextResponse.json({ error: 'projectId required' }, { status: 400 });

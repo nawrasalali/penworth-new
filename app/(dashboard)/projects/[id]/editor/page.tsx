@@ -848,6 +848,30 @@ function EditorContentNew() {
         return;
       }
       toast.success(`Live on Penworth Store — ${data.stats.chapterCount} chapters, ${data.stats.totalWords.toLocaleString()} words`);
+
+      // Fire-and-forget audiobook narration. The response can take several
+      // minutes for a full book, so we don't await it — the author is
+      // redirected immediately, and the marketplace AudiobookPlayer will
+      // appear on their listing as chapters finish narrating.
+      fetch('/api/publishing/penworth-store/narrate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      })
+        .then(async (r) => {
+          if (r.status === 402 || r.status === 403) {
+            // Gated — silent no-op (rollout: admin-only)
+            return;
+          }
+          if (r.ok) {
+            toast.success('Audio narration started — it will appear on your listing within minutes.', { duration: 5000 });
+          }
+        })
+        .catch(() => {
+          // Network or 503 (ELEVENLABS_API_KEY not set) — silent no-op so the
+          // publish success toast isn't drowned out by a narration error.
+        });
+
       // Take the author to their live listing so they can share it
       router.push(data.externalUrl);
     } catch (err) {
