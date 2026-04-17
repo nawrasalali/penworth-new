@@ -1,11 +1,13 @@
 import { NextRequest } from 'next/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { startBrowserRuntime } from '@/lib/publishing/computer-runtime';
-import { runAgent } from '@/lib/publishing/computer-agent';
+import { runAgent, type AgentAttachment } from '@/lib/publishing/computer-agent';
 import { buildRecipe } from '@/lib/publishing/computer-recipes';
 import { loadActiveCredential } from '@/lib/publishing/load-credential';
 import { ensurePublishingMetadata } from '@/lib/publishing/metadata';
+import { buildManuscriptDocx, loadProjectForPublish } from '@/lib/publishing/draft2digital';
 
 export const runtime = 'nodejs';
 export const maxDuration = 600; // 10 minutes; Kobo uploads can take a while
@@ -140,11 +142,21 @@ export async function GET(
         // Claude can recover from nav errors; don't abort
       }
 
+      // Build file attachments the agent can upload via upload_file tool
+      const attachments = await buildAttachmentsForSession({
+        supabase,
+        userId: user.id,
+        projectId: session.project_id,
+        authorName: metadata.author_name,
+        title: metadata.title,
+      });
+
       // --- Run agent loop ---
       const handle = runAgent({
         runtime: runtimeHandle,
         systemPrompt: recipe.systemPrompt,
         userGoal: recipe.userGoal,
+        attachments,
       });
       controls.set(sessionId, handle.control);
 
@@ -264,4 +276,53 @@ export async function GET(
       'X-Accel-Buffering': 'no',
     },
   });
+}
+
+/**
+ * Build the attachments the agent can upload into browser file inputs:
+ * a DOCX manuscript of the completed chapters, plus a cover JPG if the
+ * project has one. All in-memory buffers — nothing touches disk.
+ */
+async function buildAttachmentsForSession(args: {
+  supabase: SupabaseClient;
+  userId: string;
+  projectId: string;
+  authorName: string;
+  title: string;
+}): Promise<AgentAttachment[]> {
+  const { supabase, userId, projectId, authorName, title } = args;
+
+  const bundle = await loadProjectForPublish(supabase, projectId, userId);
+  if (!bundle) return [];
+
+  const docxBuffer = await buildManuscriptDocx(title, authorName, bundle.chapters);
+
+  const attachments: AgentAttachment[] = [
+    {
+      name: 'manuscript',
+      filename: 'manuscript.docx',
+      buffer: docxBuffer,
+      mimeType:
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    },
+  ];
+
+  if (bundle.coverUrl) {
+    try {
+      const coverResp = await fetch(bundle.coverUrl);
+      if (coverResp.ok) {
+        const coverBuffer = Buffer.from(await coverResp.arrayBuffer());
+        attachments.push({
+          name: 'cover',
+          filename: 'cover.jpg',
+          buffer: coverBuffer,
+          mimeType: 'image/jpeg',
+        });
+      }
+    } catch {
+      // non-fatal — book uploads without cover, author can add later
+    }
+  }
+
+  return attachments;
 }

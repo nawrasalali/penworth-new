@@ -39,10 +39,25 @@ export interface AgentControl {
   resolveHandoff(text: string): void;
 }
 
+export interface AgentAttachment {
+  /** Agent-facing name. Must match what the system prompt tells Claude about. */
+  name: string;
+  /** On-disk or in-memory filename the buffer will be written as before upload. */
+  filename: string;
+  buffer: Buffer;
+  mimeType: string;
+}
+
 export interface AgentRunOptions {
   runtime: BrowserRuntime;
   systemPrompt: string;
   userGoal: string;
+  /**
+   * Files the agent can upload into browser file inputs via the upload_file
+   * tool. Keyed by .name. The agent only sees the names — never the paths
+   * or contents — and calls upload_file with the name it wants.
+   */
+  attachments?: AgentAttachment[];
   /**
    * Called before each Claude API request. Use this to short-circuit or
    * inject supplemental context (e.g. append "file is now uploaded" after
@@ -128,6 +143,33 @@ export function runAgent(opts: AgentRunOptions): AgentRunHandle {
             },
           },
           required: ['summary'],
+        },
+      },
+      // Custom tool for uploading a file into a browser <input type=file>
+      {
+        name: 'upload_file',
+        description:
+          'Upload one of the provided attachments into a file input on ' +
+          'the current page. Use this when the page shows a file-picker ' +
+          'or drop-zone that expects a real file. Pass a CSS selector that ' +
+          "points at the input element (or its parent if it's hidden).",
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            selector: {
+              type: 'string',
+              description:
+                "CSS selector for the <input type='file'> (e.g. 'input[type=file]', " +
+                "'input[name=manuscript]', or a data-testid selector).",
+            },
+            attachment_name: {
+              type: 'string',
+              description:
+                'Which attachment to upload. Must match one of the names listed ' +
+                'in the system prompt\'s ATTACHMENTS section.',
+            },
+          },
+          required: ['selector', 'attachment_name'],
         },
       },
     ];
@@ -272,6 +314,70 @@ export function runAgent(opts: AgentRunOptions): AgentRunHandle {
               tool_use_id: use.id,
               is_error: true,
               content: `Action failed: ${msg}`,
+            });
+            yield {
+              turnIndex,
+              type: 'error',
+              payload: { action: input, error: msg },
+            };
+          }
+          continue;
+        }
+
+        if (use.name === 'upload_file') {
+          const input = use.input as { selector: string; attachment_name: string };
+          try {
+            const attachment = (opts.attachments || []).find(
+              (a) => a.name === input.attachment_name,
+            );
+            if (!attachment) {
+              throw new Error(
+                `No attachment named "${input.attachment_name}". Available: ` +
+                  (opts.attachments || []).map((a) => a.name).join(', ') || '(none)',
+              );
+            }
+            yield {
+              turnIndex,
+              type: 'action',
+              payload: {
+                action: 'upload_file',
+                selector: input.selector,
+                attachment: attachment.name,
+                bytes: attachment.buffer.byteLength,
+              },
+            };
+            // Playwright accepts in-memory payloads for setInputFiles — no
+            // disk writes, no temp files, no leak of credentials through fs
+            await opts.runtime.page.setInputFiles(input.selector, {
+              name: attachment.filename,
+              mimeType: attachment.mimeType,
+              buffer: attachment.buffer,
+            });
+            // After upload, give the page a moment + return a fresh screenshot
+            await new Promise((r) => setTimeout(r, 500));
+            const shot = await opts.runtime.page.screenshot({ type: 'png', fullPage: false });
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: use.id,
+              content: [
+                { type: 'text', text: `Uploaded ${attachment.filename} (${attachment.buffer.byteLength} bytes)` },
+                {
+                  type: 'image',
+                  source: {
+                    type: 'base64',
+                    media_type: 'image/png',
+                    data: shot.toString('base64'),
+                  },
+                },
+              ],
+            });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: use.id,
+              is_error: true,
+              content: `Upload failed: ${msg}`,
             });
             yield {
               turnIndex,

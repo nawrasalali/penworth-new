@@ -59,6 +59,20 @@ OPERATING PRINCIPLES:
 - When the ebook is fully submitted for review OR published, call
   report_completion with the book's Kobo URL if visible.
 
+TOOLS YOU HAVE:
+- computer: mouse + keyboard + scroll, as usual.
+- upload_file: the CORRECT way to attach the manuscript or cover. DO NOT try
+  to drag-and-drop files or simulate a file dialog via mouse clicks — the
+  browser has no filesystem you can reach. Instead, locate the
+  <input type="file"> element (often hidden behind a styled label/button) and
+  call upload_file with a CSS selector pointing at it, plus the attachment
+  name. If the input is hidden, selector 'input[type=file]' usually works
+  because upload_file attaches the file directly to the input element, which
+  triggers the same change event a manual user click would.
+- request_user_input: pause for a 2FA code, email verification link, or any
+  human-only decision.
+- report_completion: call ONCE when the upload is fully submitted.
+
 SAFETY:
 - Never change account settings, payout details, or royalty options you
   aren't explicitly told to change.
@@ -87,22 +101,25 @@ BOOK METADATA:
   Audience: ${metadata.audience || 'general'}
   Contains explicit content: ${metadata.contains_explicit ? 'yes' : 'no'}
 
-FILES UPLOADED IN-BROWSER:
-  - manuscript: manuscript.epub (or .docx) — already dropped in the downloads
-    folder visible to the browser
-  - cover: cover.jpg — also in downloads
+ATTACHMENTS (use the upload_file tool to attach these; do not try to open
+a file dialog manually):
+  - attachment_name: "manuscript"  (DOCX of the full book, ~10-100 KB)
+  - attachment_name: "cover"       (JPG cover image, may be absent)
 
 STEPS (high-level; adapt if Kobo's UI differs):
-  1. Go to https://writinglife.kobo.com and log in
-  2. Click "Create New eBook"
+  1. Go to https://writinglife.kobo.com and log in with the email/password above
+  2. Click "Create New eBook" (or similar — UI may have moved)
   3. Fill in Title, Language, Description
   4. Enter Author name(s)
-  5. Upload manuscript.epub, then cover.jpg
-  6. Choose categories (BISAC) + keywords
-  7. Set price + territories
-  8. Accept the one-time content agreement for this book
-  9. Submit for publishing review
-  10. Call report_completion with the book's management URL
+  5. When you reach the manuscript upload step, call upload_file with
+     attachment_name="manuscript" and a selector for the file input
+  6. When you reach the cover step, call upload_file with
+     attachment_name="cover" and the cover file input's selector
+  7. Choose categories (BISAC) + keywords
+  8. Set price + territories
+  9. Accept the one-time content agreement for this book
+  10. Submit for publishing review
+  11. Call report_completion with the book's management URL
 `.trim();
 
   return {
