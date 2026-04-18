@@ -27,11 +27,10 @@ function ForgotPasswordForm() {
     try {
       const supabase = createClient();
       // Redirect target after the user clicks the link in the email.
-      // Supabase serves a built-in password update page via the auth
-      // callback hash, so we point back to /login with a reset hint.
-      // TODO: add a dedicated /reset-password page that reads the access
-      // token from the URL hash and calls supabase.auth.updateUser.
-      const redirectTo = `${window.location.origin}/login?lang=${lang ?? 'en'}`;
+      // This goes to /reset-password which reads the access token from
+      // the URL hash, sets the session, and shows the password update form.
+      const langSuffix = lang && lang !== 'en' ? `?lang=${lang}` : '';
+      const redirectTo = `${window.location.origin}/reset-password${langSuffix}`;
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
       if (error) {
         console.error('[forgot-password] resetPasswordForEmail failed:', error);
