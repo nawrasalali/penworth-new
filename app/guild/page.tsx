@@ -1,6 +1,45 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
 
-export default function GuildLandingPage() {
+export default async function GuildLandingPage() {
+  // If the viewer is an authenticated user who's already a guild member
+  // (or an admin), skip the marketing landing entirely and send them to
+  // their dashboard. Otherwise, show the public apply-to-join page.
+  //
+  // This page is reached via the guild.penworth.ai subdomain rewrite
+  // (see middleware.ts). The rewrite shares auth cookies on the parent
+  // penworth.ai domain, so createClient() here sees the same session
+  // the user has on new.penworth.ai.
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (user) {
+    // Admins always go straight to the dashboard
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.is_admin) {
+      redirect('/guild/dashboard');
+    }
+
+    // Existing guild members — any status — also bypass the landing.
+    // A returning member who clicks 'Guild' in the main app sidebar
+    // should land on their dashboard, not be asked to apply again.
+    const { data: member } = await supabase
+      .from('guild_members')
+      .select('user_id, status')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (member) {
+      redirect('/guild/dashboard');
+    }
+  }
+
   return (
     <>
       <HeroSection />
