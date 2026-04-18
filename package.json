@@ -40,9 +40,11 @@
   },
   "devDependencies": {
     "@types/node": "^22.8.1",
+    "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "autoprefixer": "^10.4.20",
+    "pdf-parse": "^2.4.5",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.6.3",
