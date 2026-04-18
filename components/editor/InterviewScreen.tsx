@@ -13,6 +13,7 @@ import {
 } from '@/types/agent-workflow';
 import { getTemplate } from '@/lib/ai/document-templates';
 import { cn } from '@/lib/utils';
+import { t, type Locale } from '@/lib/i18n/strings';
 import { 
   Mic, 
   Save, 
@@ -24,6 +25,13 @@ import {
   Bot,
   User
 } from 'lucide-react';
+
+// Stable English sentinel emitted by the interview-system AI prompt in
+// lib/ai/agents/interview-system.ts and lib/ai/agents/index.ts. The AI always
+// emits this exact English string as the last option on multiple-choice
+// questions, so the comparison in handleOptionSelect must match it literally.
+// The DISPLAYED label is translated via t('interview.somethingElse', locale).
+const SOMETHING_ELSE_SENTINEL = 'Something else...';
 
 interface InterviewScreenProps {
   questions: InterviewQuestion[];
@@ -41,6 +49,7 @@ interface InterviewScreenProps {
    * mutate it so this screen re-renders with the new question in place.
    */
   onInjectDynamicFollowup?: (question: InterviewQuestion, insertAfterIndex: number) => void;
+  locale?: Locale;
 }
 
 type Phase = 'interview' | 'followup';
@@ -56,6 +65,7 @@ export function InterviewScreen({
   onStopAndNext,
   onUploadFile,
   onInjectDynamicFollowup,
+  locale = 'en',
 }: InterviewScreenProps) {
   const [phase, setPhase] = useState<Phase>('interview');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -144,7 +154,7 @@ export function InterviewScreen({
   const handleOptionSelect = (option: string) => {
     // Multi-select path: toggle membership and let the user hit Continue when ready
     if (currentQuestion?.multi) {
-      if (option === 'Something else...') {
+      if (option === SOMETHING_ELSE_SENTINEL) {
         setShowCustomInput(true);
         return;
       }
@@ -155,7 +165,7 @@ export function InterviewScreen({
     }
 
     // Single-select (legacy) path
-    if (option === 'Something else...') {
+    if (option === SOMETHING_ELSE_SENTINEL) {
       setShowCustomInput(true);
       return;
     }
@@ -247,7 +257,14 @@ export function InterviewScreen({
     // We override the rendered question text for index 0 only if chosenIdea is present.
     const isFirstQuestion = currentIndex === 0;
     const firstQuestionIntro = chosenIdea && isFirstQuestion
-      ? `Great — we're moving forward with: "${chosenIdea}". ${ideaPositioning ? `That's "${ideaPositioning}". ` : ''}To make sure I capture your vision accurately, let me start with this: ${currentQuestion?.question}`
+      ? (ideaPositioning
+          ? t('interview.firstQuestionIntroWithPositioning', locale)
+              .replace('{idea}', chosenIdea)
+              .replace('{positioning}', ideaPositioning)
+              .replace('{question}', currentQuestion?.question || '')
+          : t('interview.firstQuestionIntro', locale)
+              .replace('{idea}', chosenIdea)
+              .replace('{question}', currentQuestion?.question || ''))
       : currentQuestion?.question;
 
     return (
@@ -256,7 +273,7 @@ export function InterviewScreen({
         {chosenIdea && (
           <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3">
             <div className="text-[10px] uppercase tracking-wider text-primary font-semibold mb-1">
-              Writing About
+              {t('interview.writingAbout', locale)}
             </div>
             <p className="text-sm font-medium">{chosenIdea}</p>
             {ideaPositioning && (
@@ -269,7 +286,7 @@ export function InterviewScreen({
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
             <Mic className="h-5 w-5 text-primary" />
-            <h1 className="text-xl font-bold">Interview: Let's dive deeper</h1>
+            <h1 className="text-xl font-bold">{t('interview.title', locale)}</h1>
           </div>
 
           {/* Progress Bar */}
@@ -281,7 +298,7 @@ export function InterviewScreen({
               />
             </div>
             <span className="text-sm text-muted-foreground whitespace-nowrap">
-              {currentIndex + 1}/{questions.length} questions
+              {currentIndex + 1}/{questions.length} {t('interview.questionsCounter', locale)}
             </span>
           </div>
         </div>
@@ -311,13 +328,18 @@ export function InterviewScreen({
               <div className="space-y-2 ml-11">
                 {currentQuestion.multi && (
                   <p className="text-xs text-muted-foreground mb-2">
-                    Pick one or more. We&apos;ll blend them.
+                    {t('interview.pickOneOrMore', locale)}
                   </p>
                 )}
                 {currentQuestion.options?.map((option, idx) => {
                   const isSelected = currentQuestion.multi
                     ? multiSelections.includes(option)
                     : currentQuestion.answer === option;
+                  // Translate the sentinel for display only — the underlying
+                  // value stays English so logic comparisons still fire.
+                  const displayOption = option === SOMETHING_ELSE_SENTINEL
+                    ? t('interview.somethingElse', locale)
+                    : option;
                   return (
                     <button
                       key={idx}
@@ -331,7 +353,7 @@ export function InterviewScreen({
                       <span className="text-muted-foreground mr-2">
                         {currentQuestion.multi ? (isSelected ? '☑' : '☐') : '○'}
                       </span>
-                      {option}
+                      {displayOption}
                     </button>
                   );
                 })}
@@ -341,7 +363,7 @@ export function InterviewScreen({
                     disabled={multiSelections.length === 0}
                     className="w-full mt-2"
                   >
-                    Continue <ArrowRight className="ml-2 h-4 w-4" />
+                    {t('interview.continue', locale)} <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 )}
               </div>
@@ -351,12 +373,12 @@ export function InterviewScreen({
             {showCustomInput && (
               <div className="ml-11 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Tell me more about that...
+                  {t('interview.tellMeMore', locale)}
                 </p>
                 <Textarea
                   value={customAnswer}
                   onChange={(e) => setCustomAnswer(e.target.value)}
-                  placeholder="Type your answer here..."
+                  placeholder={t('interview.answerPlaceholder', locale)}
                   className="min-h-[100px]"
                 />
                 <div className="flex gap-2">
@@ -367,11 +389,11 @@ export function InterviewScreen({
                       setCustomAnswer('');
                     }}
                   >
-                    Back to options
+                    {t('interview.backToOptions', locale)}
                   </Button>
                   <Button onClick={handleCustomSubmit} disabled={!customAnswer.trim()}>
                     <Send className="mr-2 h-4 w-4" />
-                    Submit
+                    {t('interview.submit', locale)}
                   </Button>
                 </div>
               </div>
@@ -383,12 +405,12 @@ export function InterviewScreen({
                 <Textarea
                   value={customAnswer}
                   onChange={(e) => setCustomAnswer(e.target.value)}
-                  placeholder="Take your time with this one - the more detail you share, the better I can help shape your book."
+                  placeholder={t('interview.openPlaceholder', locale)}
                   className="min-h-[120px]"
                 />
                 <Button onClick={handleOpenAnswer} disabled={!customAnswer.trim()}>
                   <Send className="mr-2 h-4 w-4" />
-                  Continue
+                  {t('interview.continue', locale)}
                 </Button>
               </div>
             )}
@@ -398,11 +420,11 @@ export function InterviewScreen({
           <div className="rounded-lg border border-dashed p-4 text-center mb-4">
             <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
             <p className="text-sm text-muted-foreground mb-2">
-              Have existing content? Upload drafts, images, or research.
+              {t('interview.uploadPrompt', locale)}
             </p>
             <Button variant="outline" size="sm" asChild>
               <label className="cursor-pointer">
-                Choose File
+                {t('interview.chooseFile', locale)}
                 <input
                   type="file"
                   className="hidden"
@@ -423,11 +445,11 @@ export function InterviewScreen({
         <div className="flex gap-3 pt-4 border-t">
           <Button variant="outline" onClick={onSaveAndExit} className="flex-1">
             <Save className="mr-2 h-4 w-4" />
-            Save and Exit
+            {t('interview.saveAndExit', locale)}
           </Button>
           <Button variant="default" onClick={handleStopInterview} className="flex-1">
             <SkipForward className="mr-2 h-4 w-4" />
-            Stop Interview & Next
+            {t('interview.stopAndNext', locale)}
           </Button>
         </div>
       </div>
@@ -438,9 +460,9 @@ export function InterviewScreen({
   return (
     <div className="flex-1 flex flex-col p-6 max-w-3xl mx-auto w-full">
       <div className="mb-6 text-center">
-        <h1 className="text-xl font-bold mb-2">📋 Quick Follow-Up Questions</h1>
+        <h1 className="text-xl font-bold mb-2">{t('interview.followupTitle', locale)}</h1>
         <p className="text-muted-foreground">
-          Help us finalize your document settings
+          {t('interview.followupSubtitle', locale)}
         </p>
       </div>
       
@@ -479,14 +501,14 @@ export function InterviewScreen({
           disabled={!allFollowUpAnswered}
           size="lg"
         >
-          Continue to Research
+          {t('interview.continueToResearch', locale)}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
       
       {!allFollowUpAnswered && (
         <p className="text-center text-sm text-muted-foreground mt-3">
-          Please answer all questions to continue
+          {t('interview.pleaseAnswerAll', locale)}
         </p>
       )}
     </div>

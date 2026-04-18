@@ -983,6 +983,7 @@ function EditorContentNew() {
                 ...prev.slice(insertAfterIndex + 1),
               ]);
             }}
+            locale={locale}
           />
         );
 
