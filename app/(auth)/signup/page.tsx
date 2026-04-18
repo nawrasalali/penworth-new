@@ -74,17 +74,27 @@ function SignupForm() {
   };
 
   const handleGoogleSignup = async () => {
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback${callbackQuery}`,
-      },
-    });
+    try {
+      const supabase = createClient();
+      const result = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback${callbackQuery}`,
+        },
+      });
 
-    if (error) {
-      console.error('[signup] signInWithOAuth failed:', error);
-      setError(mapAuthError(error, locale));
+      console.log('[signup] signInWithOAuth result:', result);
+
+      if (result.error) {
+        console.error('[signup] signInWithOAuth error:', result.error);
+        setError(mapAuthError(result.error, locale));
+      } else if (!result.data?.url) {
+        console.error('[signup] signInWithOAuth returned no URL — provider likely disabled in Supabase');
+        setError(t('auth.err.oauthUnavailable', locale));
+      }
+    } catch (err) {
+      console.error('[signup] signInWithOAuth threw:', err);
+      setError(t('auth.genericError', locale));
     }
   };
 

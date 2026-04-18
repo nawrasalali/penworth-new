@@ -72,17 +72,33 @@ function LoginForm() {
   };
 
   const handleGoogleLogin = async () => {
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?${callbackQuery}`,
-      },
-    });
+    try {
+      const supabase = createClient();
+      const result = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?${callbackQuery}`,
+        },
+      });
 
-    if (error) {
-      console.error('[login] signInWithOAuth failed:', error);
-      setError(mapAuthError(error, locale));
+      // Supabase should set window.location to the OAuth URL. Log the
+      // response so we can see when that doesn't happen (provider disabled,
+      // redirect URL not whitelisted, config missing).
+      console.log('[login] signInWithOAuth result:', result);
+
+      if (result.error) {
+        console.error('[login] signInWithOAuth error:', result.error);
+        setError(mapAuthError(result.error, locale));
+      } else if (!result.data?.url) {
+        // No error AND no redirect URL — Supabase didn't give us anywhere
+        // to go. This means Google is disabled or misconfigured in the
+        // Supabase Auth settings.
+        console.error('[login] signInWithOAuth returned no URL — provider likely disabled in Supabase');
+        setError(t('auth.err.oauthUnavailable', locale));
+      }
+    } catch (err) {
+      console.error('[login] signInWithOAuth threw:', err);
+      setError(t('auth.genericError', locale));
     }
   };
 

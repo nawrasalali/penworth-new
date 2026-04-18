@@ -297,7 +297,7 @@ export type StringKey =
   // Friendly error mappings — Supabase's raw error strings are replaced
   // with these human-readable versions when we recognise the pattern.
   | 'auth.err.rateLimit' | 'auth.err.invalidCreds' | 'auth.err.emailNotConfirmed'
-  | 'auth.err.networkIssue'
+  | 'auth.err.networkIssue' | 'auth.err.oauthUnavailable'
   // Dashboard home (server component)
   | 'dashboard.title' | 'dashboard.subtitle'
   | 'dashboard.planSuffix' | 'dashboard.newProject'
@@ -794,6 +794,7 @@ const en: Bundle = {
   'auth.err.invalidCreds': 'That email and password don\'t match. Check them and try again.',
   'auth.err.emailNotConfirmed': 'Please confirm your email address first — check your inbox for the verification link we sent.',
   'auth.err.networkIssue': 'We couldn\'t reach our servers. Check your connection and try again.',
+  'auth.err.oauthUnavailable': 'Google sign-in is temporarily unavailable. Try signing in with your email and password, or try again later.',
   'dashboard.title': 'Dashboard',
   'dashboard.subtitle': 'Welcome back! Here\'s an overview of your knowledge creation.',
   'dashboard.planSuffix': 'Plan',
@@ -1315,6 +1316,7 @@ const ar: Bundle = {
   'auth.err.invalidCreds': 'البريد الإلكتروني وكلمة المرور غير متطابقين. تحقق منهما وحاول مجددًا.',
   'auth.err.emailNotConfirmed': 'يرجى تأكيد بريدك الإلكتروني أولاً — تحقق من صندوق الوارد للعثور على رابط التحقق.',
   'auth.err.networkIssue': 'تعذّر الاتصال بخوادمنا. تحقق من اتصالك وحاول مرة أخرى.',
+  'auth.err.oauthUnavailable': 'تسجيل الدخول بجوجل غير متاح مؤقتًا. جرّب تسجيل الدخول بالبريد وكلمة المرور، أو حاول لاحقًا.',
   'dashboard.title': 'لوحة التحكم',
   'dashboard.subtitle': 'مرحبًا بعودتك! هذه نظرة عامة على ما تُنتجه من معرفة.',
   'dashboard.planSuffix': 'خطة',
@@ -1836,6 +1838,7 @@ const es: Bundle = {
   'auth.err.invalidCreds': 'El correo y la contraseña no coinciden. Revísalos e inténtalo de nuevo.',
   'auth.err.emailNotConfirmed': 'Primero confirma tu correo — revisa tu bandeja de entrada para encontrar el enlace de verificación.',
   'auth.err.networkIssue': 'No pudimos conectar con nuestros servidores. Revisa tu conexión e inténtalo de nuevo.',
+  'auth.err.oauthUnavailable': 'El inicio de sesión con Google no está disponible temporalmente. Usa tu correo y contraseña, o vuelve a intentarlo más tarde.',
   'dashboard.title': 'Panel',
   'dashboard.subtitle': '¡Bienvenido de nuevo! Aquí tienes un resumen de tu creación de conocimiento.',
   'dashboard.planSuffix': 'Plan',
@@ -2357,6 +2360,7 @@ const fr: Bundle = {
   'auth.err.invalidCreds': 'L\'e-mail et le mot de passe ne correspondent pas. Vérifiez-les et réessayez.',
   'auth.err.emailNotConfirmed': 'Confirmez d\'abord votre e-mail — vérifiez votre boîte de réception pour trouver le lien de vérification.',
   'auth.err.networkIssue': 'Impossible de joindre nos serveurs. Vérifiez votre connexion et réessayez.',
+  'auth.err.oauthUnavailable': 'La connexion Google est temporairement indisponible. Essayez avec votre e-mail et mot de passe, ou réessayez plus tard.',
   'dashboard.title': 'Tableau de bord',
   'dashboard.subtitle': 'Bon retour ! Voici un aperçu de votre création de contenu.',
   'dashboard.planSuffix': 'Plan',
@@ -2878,6 +2882,7 @@ const pt: Bundle = {
   'auth.err.invalidCreds': 'E-mail e senha não correspondem. Verifique-os e tente novamente.',
   'auth.err.emailNotConfirmed': 'Confirme seu e-mail primeiro — verifique sua caixa de entrada para encontrar o link de verificação.',
   'auth.err.networkIssue': 'Não conseguimos nos conectar aos nossos servidores. Verifique sua conexão e tente novamente.',
+  'auth.err.oauthUnavailable': 'O login com Google está temporariamente indisponível. Use seu e-mail e senha, ou tente novamente mais tarde.',
   'dashboard.title': 'Painel',
   'dashboard.subtitle': 'Bem-vindo de volta! Aqui está um resumo da sua criação de conhecimento.',
   'dashboard.planSuffix': 'Plano',
@@ -3399,6 +3404,7 @@ const ru: Bundle = {
   'auth.err.invalidCreds': 'Почта и пароль не совпадают. Проверьте и попробуйте снова.',
   'auth.err.emailNotConfirmed': 'Сначала подтвердите почту — проверьте входящие, там должна быть ссылка для подтверждения.',
   'auth.err.networkIssue': 'Не удалось связаться с сервером. Проверьте соединение и попробуйте снова.',
+  'auth.err.oauthUnavailable': 'Вход через Google временно недоступен. Войдите по почте и паролю или попробуйте позже.',
   'dashboard.title': 'Панель',
   'dashboard.subtitle': 'С возвращением! Вот обзор вашего создания контента.',
   'dashboard.planSuffix': 'Тариф',
@@ -3920,6 +3926,7 @@ const zh: Bundle = {
   'auth.err.invalidCreds': '邮箱和密码不匹配。请检查后重试。',
   'auth.err.emailNotConfirmed': '请先确认您的邮箱 — 查看收件箱以找到验证链接。',
   'auth.err.networkIssue': '无法连接到服务器。请检查网络后重试。',
+  'auth.err.oauthUnavailable': 'Google登录暂时不可用。请使用邮箱和密码登录,或稍后再试。',
   'dashboard.title': '仪表板',
   'dashboard.subtitle': '欢迎回来!这是您知识创作的概览。',
   'dashboard.planSuffix': '套餐',
@@ -4441,6 +4448,7 @@ const bn: Bundle = {
   'auth.err.invalidCreds': 'ইমেল এবং পাসওয়ার্ড মিলছে না। পরীক্ষা করে আবার চেষ্টা করুন।',
   'auth.err.emailNotConfirmed': 'আগে আপনার ইমেল নিশ্চিত করুন — ইনবক্সে ভেরিফিকেশন লিঙ্কটি দেখুন।',
   'auth.err.networkIssue': 'আমাদের সার্ভারে পৌঁছানো যায়নি। সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।',
+  'auth.err.oauthUnavailable': 'Google সাইন-ইন সাময়িকভাবে অনুপলব্ধ। ইমেল এবং পাসওয়ার্ড দিয়ে সাইন ইন করুন, বা পরে আবার চেষ্টা করুন।',
   'dashboard.title': 'ড্যাশবোর্ড',
   'dashboard.subtitle': 'ফিরে আসার জন্য স্বাগতম! এখানে আপনার জ্ঞান সৃষ্টির একটি সংক্ষিপ্তসার।',
   'dashboard.planSuffix': 'প্ল্যান',
@@ -4962,6 +4970,7 @@ const hi: Bundle = {
   'auth.err.invalidCreds': 'ईमेल और पासवर्ड मेल नहीं खाते। जाँचकर पुनः प्रयास करें।',
   'auth.err.emailNotConfirmed': 'पहले अपना ईमेल पुष्टि करें — अपने इनबॉक्स में सत्यापन लिंक देखें।',
   'auth.err.networkIssue': 'हम अपने सर्वर तक नहीं पहुँच पाए। अपना कनेक्शन जाँचें और पुनः प्रयास करें।',
+  'auth.err.oauthUnavailable': 'Google साइन-इन अस्थायी रूप से अनुपलब्ध है। अपने ईमेल और पासवर्ड से साइन इन करें, या बाद में पुनः प्रयास करें।',
   'dashboard.title': 'डैशबोर्ड',
   'dashboard.subtitle': 'वापस स्वागत है! यहाँ आपके ज्ञान निर्माण का अवलोकन है।',
   'dashboard.planSuffix': 'प्लान',
@@ -5483,6 +5492,7 @@ const id: Bundle = {
   'auth.err.invalidCreds': 'Email dan kata sandi tidak cocok. Periksa dan coba lagi.',
   'auth.err.emailNotConfirmed': 'Konfirmasikan email Anda dulu — cek kotak masuk untuk tautan verifikasi.',
   'auth.err.networkIssue': 'Tidak dapat menjangkau server. Periksa koneksi dan coba lagi.',
+  'auth.err.oauthUnavailable': 'Login Google sementara tidak tersedia. Coba masuk dengan email dan kata sandi, atau coba lagi nanti.',
   'dashboard.title': 'Dasbor',
   'dashboard.subtitle': 'Selamat datang kembali! Berikut ringkasan pembuatan pengetahuan Anda.',
   'dashboard.planSuffix': 'Paket',
@@ -6004,6 +6014,7 @@ const vi: Bundle = {
   'auth.err.invalidCreds': 'Email và mật khẩu không khớp. Kiểm tra lại và thử lại.',
   'auth.err.emailNotConfirmed': 'Vui lòng xác nhận email của bạn trước — kiểm tra hộp thư đến để tìm liên kết xác minh.',
   'auth.err.networkIssue': 'Không thể kết nối đến máy chủ. Kiểm tra kết nối và thử lại.',
+  'auth.err.oauthUnavailable': 'Đăng nhập Google tạm thời không khả dụng. Hãy đăng nhập bằng email và mật khẩu, hoặc thử lại sau.',
   'dashboard.title': 'Bảng điều khiển',
   'dashboard.subtitle': 'Chào mừng trở lại! Đây là tổng quan về việc tạo tri thức của bạn.',
   'dashboard.planSuffix': 'Gói',
