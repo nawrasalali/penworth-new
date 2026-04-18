@@ -14,6 +14,7 @@ import {
   TimeseriesPoint,
   buildAnalystPrompt,
 } from '@/lib/guild/agents/analyst';
+import { requireAgentAccess } from '@/lib/guild/require-agent-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,11 +39,12 @@ async function handle(
   _req: NextRequest,
   opts: { forceFresh: boolean },
 ): Promise<NextResponse> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  // Auth + probation check in one call. Account-health failures (probation)
+  // return 403 agent_access_locked; auth failures return 401.
+  const gate = await requireAgentAccess();
+  if (!gate.ok) return gate.response;
+  const { user, admin } = gate;
 
-  const admin = createAdminClient();
   const member = await resolveGuildMember(admin, user.id);
   if (!member) return NextResponse.json({ error: 'not a Guild member' }, { status: 403 });
 

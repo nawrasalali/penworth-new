@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import AnalystRefresh from './AnalystRefresh';
+import { ProbationBanner } from '@/components/guild/ProbationBanner';
+import { isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Analyst — Penworth Guild' };
@@ -27,10 +29,35 @@ export default async function AnalystPage() {
   const admin = createAdminClient();
   const { data: member } = await admin
     .from('guild_members')
-    .select('id')
+    .select('id, status, primary_language')
     .eq('user_id', user.id)
     .maybeSingle();
   if (!member) redirect('/guild/dashboard');
+
+  const rawLang = (member.primary_language || 'en').toLowerCase();
+  const locale: Locale = isSupportedLocale(rawLang) ? rawLang : 'en';
+
+  // Probation gate — takeover banner, skip report load.
+  if (member.status !== 'active') {
+    const { data: balanceRaw } = await admin.rpc('guild_deferred_balance_usd', {
+      p_guildmember_id: member.id,
+    });
+    const deferredBalance = Number(balanceRaw ?? 0);
+    return (
+      <div className="mx-auto max-w-3xl px-6 py-10">
+        <nav className="mb-4 text-xs text-neutral-500">
+          <Link href="/guild/dashboard/agents" className="hover:text-neutral-900">
+            ← AI Agents
+          </Link>
+        </nav>
+        <ProbationBanner
+          deferredBalance={deferredBalance}
+          variant="full"
+          locale={locale}
+        />
+      </div>
+    );
+  }
 
   const { data: ctxRow } = await admin
     .from('guild_agent_context')

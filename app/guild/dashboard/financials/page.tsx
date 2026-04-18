@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
+import ClearBalanceButton from './ClearBalanceButton';
 
 export const dynamic = 'force-dynamic';
 export const metadata = {
@@ -61,9 +62,50 @@ export default async function FinancialsPage() {
     .eq('guildmember_id', member.id)
     .in('status', ['active_paid', 'retention_qualified']);
 
+  // Fee posture — two queries.
+  //   (a) v_guild_account_fee_pipeline for rollup totals and pipeline state
+  //       (deferred_balance_usd, months_fully_deferred, last_fee_month,
+  //       account_fee_starts_at, etc.). View shape was documented in the
+  //       Phase 1D pre-flight; columns may vary if the prod view changes.
+  //   (b) guild_account_fees filtered by guildmember_id for the itemized
+  //       per-month list the user sees in the card.
+  const { data: feePipeline } = await admin
+    .from('v_guild_account_fee_pipeline')
+    .select('*')
+    .eq('guildmember_id', member.id)
+    .maybeSingle();
+
+  const { data: feeMonths } = await admin
+    .from('guild_account_fees')
+    .select(
+      'id, fee_month, tier_at_time, fee_amount_usd, amount_deducted_usd, amount_deferred_usd, amount_waived_usd, status, resolved_at',
+    )
+    .eq('guildmember_id', member.id)
+    .order('fee_month', { ascending: false })
+    .limit(24);
+
+  const deferredBalance = Number(feePipeline?.deferred_balance_usd ?? 0);
+  const hasFeeHistory = (feeMonths?.length ?? 0) > 0;
+
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
       <NavBreadcrumbs />
+
+      {/* Probation banner — only rendered when member is on probation. */}
+      {member.status === 'probation' && (
+        <div className="mt-6">
+          <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-5">
+            <div className="font-semibold text-yellow-200">
+              Your account is on probation
+            </div>
+            <div className="mt-1 text-sm text-yellow-100/80">
+              Deferred balance has crossed the probation threshold. Your agents are
+              locked until the balance is cleared. Options are shown below — let
+              future commissions absorb it, or clear it now via Stripe.
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 mb-10">
         <div className="text-xs font-semibold uppercase tracking-widest text-[#d4af37]">
@@ -83,6 +125,16 @@ export default async function FinancialsPage() {
         <SummaryCard title="Active referrals" value={String(activeReferralsCount || 0)} />
         <SummaryCard title="Lifetime paid out" value={formatUSD(stats.lifetimePaid)} />
       </div>
+
+      {/* Account fee posture */}
+      {hasFeeHistory && (
+        <FeePostureCard
+          pipeline={feePipeline}
+          feeMonths={feeMonths || []}
+          deferredBalance={deferredBalance}
+          status={member.status}
+        />
+      )}
 
       {/* Payout method warning */}
       {member.payout_method === 'pending' && (
@@ -315,6 +367,170 @@ function MaskedEmail({ email }: { email: string }) {
       {masked}@{domain}
     </span>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Fee posture card — rollup from v_guild_account_fee_pipeline + per-month
+// itemized list from guild_account_fees.
+// ---------------------------------------------------------------------------
+
+function FeePostureCard({
+  pipeline,
+  feeMonths,
+  deferredBalance,
+  status,
+}: {
+  pipeline: any;
+  feeMonths: Array<{
+    id: string;
+    fee_month: string;
+    tier_at_time: string | null;
+    fee_amount_usd: number | string;
+    amount_deducted_usd: number | string;
+    amount_deferred_usd: number | string;
+    amount_waived_usd: number | string;
+    status: string;
+    resolved_at: string | null;
+  }>;
+  deferredBalance: number;
+  status: string;
+}) {
+  // Pipeline columns may not all exist depending on view state; defensive reads.
+  const monthsFullyDeferred = Number(pipeline?.months_fully_deferred ?? 0);
+  const lastFeeMonth = pipeline?.last_fee_month ?? null;
+
+  // Current-month row (first in the DESC-sorted list)
+  const thisMonth = feeMonths[0];
+  const thisMonthFee = Number(thisMonth?.fee_amount_usd ?? 0);
+
+  return (
+    <section className="mt-8 rounded-xl border border-[#1e2436] bg-[#0f1424] p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="font-serif text-2xl tracking-tight">Account fee posture</h2>
+          <p className="mt-1 text-xs text-[#8a8370]">
+            Per-month account fee obligations, deductions, and deferred balance.
+          </p>
+        </div>
+        {deferredBalance > 0 && (
+          <ClearBalanceButton amountUsd={deferredBalance} />
+        )}
+      </div>
+
+      {/* Headline numbers */}
+      <div className="mb-6 grid gap-4 md:grid-cols-4">
+        <MiniStat
+          label="This month's fee"
+          value={formatUSD(thisMonthFee)}
+          sublabel={thisMonth?.tier_at_time ? `Tier: ${thisMonth.tier_at_time}` : undefined}
+        />
+        <MiniStat
+          label="Deferred balance"
+          value={formatUSD(deferredBalance)}
+          tone={deferredBalance > 0 ? 'warn' : 'ok'}
+        />
+        <MiniStat
+          label="Months fully deferred"
+          value={String(monthsFullyDeferred)}
+          tone={monthsFullyDeferred >= 2 ? 'warn' : 'ok'}
+        />
+        <MiniStat
+          label="Last fee month"
+          value={lastFeeMonth ? formatMonth(lastFeeMonth) : '—'}
+        />
+      </div>
+
+      {/* Per-month itemized list */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-xs uppercase tracking-widest text-[#6b6452]">
+            <tr className="border-b border-[#1e2436]">
+              <th className="pb-3 text-left font-normal">Month</th>
+              <th className="pb-3 text-left font-normal">Tier</th>
+              <th className="pb-3 text-right font-normal">Fee</th>
+              <th className="pb-3 text-right font-normal">Deducted</th>
+              <th className="pb-3 text-right font-normal">Deferred</th>
+              <th className="pb-3 text-right font-normal">Waived</th>
+              <th className="pb-3 text-right font-normal">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {feeMonths.map((f) => (
+              <tr key={f.id} className="border-b border-[#1e2436]/50">
+                <td className="py-3 text-[#c9c2b0]">{formatMonth(f.fee_month)}</td>
+                <td className="py-3 uppercase text-[#c9c2b0]">{f.tier_at_time || '—'}</td>
+                <td className="py-3 text-right text-[#c9c2b0]">
+                  {formatUSD(Number(f.fee_amount_usd))}
+                </td>
+                <td className="py-3 text-right text-[#c9c2b0]">
+                  {formatUSD(Number(f.amount_deducted_usd))}
+                </td>
+                <td
+                  className={`py-3 text-right ${
+                    Number(f.amount_deferred_usd) > 0 ? 'text-yellow-400' : 'text-[#c9c2b0]'
+                  }`}
+                >
+                  {formatUSD(Number(f.amount_deferred_usd))}
+                </td>
+                <td className="py-3 text-right text-[#c9c2b0]">
+                  {formatUSD(Number(f.amount_waived_usd))}
+                </td>
+                <td className="py-3 text-right">
+                  <FeeStatus status={f.status} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {status === 'probation' && deferredBalance > 0 && (
+        <div className="mt-6 rounded-md border border-yellow-500/40 bg-yellow-500/10 p-4 text-xs text-yellow-100/80">
+          Agent access is paused. Clear the deferred balance to restore access
+          immediately, or let upcoming commission payouts absorb it — the
+          trigger will return you to active automatically when the balance
+          reaches zero.
+        </div>
+      )}
+    </section>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  sublabel,
+  tone,
+}: {
+  label: string;
+  value: string;
+  sublabel?: string;
+  tone?: 'ok' | 'warn';
+}) {
+  const toneClass =
+    tone === 'warn' ? 'text-yellow-400' : tone === 'ok' ? 'text-[#8fbc8f]' : 'text-[#e7e2d4]';
+  return (
+    <div className="rounded-lg border border-[#1e2436] bg-[#0a0e1a] p-4">
+      <div className="text-xs uppercase tracking-widest text-[#8a8370]">{label}</div>
+      <div className={`mt-2 font-serif text-2xl tracking-tight ${toneClass}`}>{value}</div>
+      {sublabel && (
+        <div className="mt-1 text-xs text-[#6b6452]">{sublabel}</div>
+      )}
+    </div>
+  );
+}
+
+function FeeStatus({ status }: { status: string }) {
+  const map: Record<string, { label: string; class: string }> = {
+    pending:             { label: 'Pending',             class: 'bg-yellow-500/10 text-yellow-400' },
+    partially_deducted:  { label: 'Partial',             class: 'bg-yellow-500/10 text-yellow-400' },
+    fully_deferred:      { label: 'Deferred',            class: 'bg-red-500/10 text-red-400' },
+    fully_deducted:      { label: 'Deducted',            class: 'bg-green-500/10 text-green-400' },
+    waived:              { label: 'Waived',              class: 'bg-blue-500/10 text-blue-400' },
+    cancelled:           { label: 'Cancelled',           class: 'bg-gray-500/10 text-gray-400' },
+  };
+  const info = map[status] || { label: status, class: 'bg-gray-500/10 text-gray-400' };
+  return <span className={`rounded-full px-2 py-0.5 text-xs ${info.class}`}>{info.label}</span>;
 }
 
 // ---------------------------------------------------------------------------

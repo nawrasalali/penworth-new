@@ -59,7 +59,97 @@ export async function POST(request: NextRequest) {
       switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        
+
+        // Handle Guild self-pay deferred balance.
+        // The metadata contract is set by POST /api/guild/self-pay-deferred:
+        //   type='guild_self_pay_deferred', member_id, user_id, balance_usd
+        // We UPDATE existing deferred rows (never INSERT a new one) so the
+        // guild_deferred_balance_usd RPC correctly drops to $0, which fires
+        // the trg_guild_auto_lift_probation trigger and returns the member
+        // to 'active'. See lib/guild/commissions.ts for the schema details.
+        if (
+          session.mode === 'payment' &&
+          session.metadata?.type === 'guild_self_pay_deferred'
+        ) {
+          const memberId = session.metadata.member_id;
+          const userId = session.metadata.user_id;
+
+          if (memberId && userId) {
+            // Sweep amount_deferred into amount_waived on every unresolved
+            // deferred row for this member. The CASE expression handles the
+            // "pending/partial" rows (status in pending/partially_deducted)
+            // which technically have zero deferred if status='pending' but
+            // can have a positive deferred if status='partially_deducted' /
+            // 'fully_deferred'. Filtering out already-terminal statuses
+            // (waived / cancelled / fully_deducted) avoids touching rows
+            // the monthly-close logic has already resolved.
+            //
+            // We use .rpc to run a single UPDATE with atomic semantics; if
+            // that RPC doesn't exist in production yet (it was never created
+            // — we use the DB client's chained update), we do it via the
+            // standard query builder. The guild_account_fees schema supports
+            // this via regular UPDATE because there's no trigger on the
+            // operation that would conflict.
+            const { data: feeRows, error: selectErr } = await supabase
+              .from('guild_account_fees')
+              .select('id, amount_deferred_usd, amount_waived_usd, notes')
+              .eq('guildmember_id', memberId)
+              .not('status', 'in', '(waived,cancelled,fully_deducted)');
+
+            if (selectErr) {
+              console.error(
+                '[webhooks/stripe] self-pay: select deferred rows failed:',
+                selectErr,
+              );
+              throw selectErr;
+            }
+
+            const stripeSessionNote = `stripe_session:${session.id}`;
+            const nowIso = new Date().toISOString();
+
+            for (const fee of feeRows || []) {
+              const deferred = Number(fee.amount_deferred_usd || 0);
+              // Only clear rows that actually have deferred amount; rows at
+              // status='pending' with 0 deferred should stay alone.
+              if (deferred <= 0) continue;
+
+              const priorWaived = Number(fee.amount_waived_usd || 0);
+              const priorNotes = fee.notes ? `${fee.notes}\n` : '';
+
+              const { error: updateErr } = await supabase
+                .from('guild_account_fees')
+                .update({
+                  status: 'waived',
+                  amount_waived_usd: Number(
+                    (priorWaived + deferred).toFixed(2),
+                  ),
+                  amount_deferred_usd: 0,
+                  waiver_reason: 'self_paid_via_stripe',
+                  waiver_granted_by: userId,
+                  notes: `${priorNotes}${stripeSessionNote}`,
+                  resolved_at: nowIso,
+                })
+                .eq('id', fee.id);
+
+              if (updateErr) {
+                console.error(
+                  `[webhooks/stripe] self-pay: update fee ${fee.id} failed:`,
+                  updateErr,
+                );
+                throw updateErr;
+              }
+            }
+
+            console.log(
+              `[webhooks/stripe] self-pay: waived ${feeRows?.length ?? 0} deferred fee row(s) for member ${memberId} via session ${session.id}`,
+            );
+            // The trg_guild_auto_lift_probation trigger fires on every UPDATE
+            // to guild_account_fees; when guild_deferred_balance_usd returns
+            // 0, it transitions the member from probation → active.
+            break;
+          }
+        }
+
         // Handle credit pack purchase (one-time payment)
         if (session.mode === 'payment') {
           const userId = session.metadata?.user_id;

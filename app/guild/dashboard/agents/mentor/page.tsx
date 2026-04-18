@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import MentorChat from './MentorChat';
+import { ProbationBanner } from '@/components/guild/ProbationBanner';
+import { isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Mentor — Penworth Guild' };
@@ -14,10 +16,38 @@ export default async function MentorPage() {
   const admin = createAdminClient();
   const { data: member } = await admin
     .from('guild_members')
-    .select('id, display_name, status')
+    .select('id, display_name, status, primary_language')
     .eq('user_id', user.id)
     .maybeSingle();
   if (!member) redirect('/guild/dashboard');
+
+  // Resolve locale for the banner — read from the member's language preference
+  // so the probation message appears in the member's tongue.
+  const rawLang = (member.primary_language || 'en').toLowerCase();
+  const locale: Locale = isSupportedLocale(rawLang) ? rawLang : 'en';
+
+  // Probation gate — if the member is not active, show the takeover banner
+  // and skip loading any mentor data. This matches the API-level gate.
+  if (member.status !== 'active') {
+    const { data: balanceRaw } = await admin.rpc('guild_deferred_balance_usd', {
+      p_guildmember_id: member.id,
+    });
+    const deferredBalance = Number(balanceRaw ?? 0);
+    return (
+      <div className="mx-auto max-w-3xl px-6 py-10">
+        <nav className="mb-4 text-xs text-neutral-500">
+          <Link href="/guild/dashboard/agents" className="hover:text-neutral-900">
+            ← AI Agents
+          </Link>
+        </nav>
+        <ProbationBanner
+          deferredBalance={deferredBalance}
+          variant="full"
+          locale={locale}
+        />
+      </div>
+    );
+  }
 
   const weekOf = currentWeekOf();
 

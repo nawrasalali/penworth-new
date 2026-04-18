@@ -11,6 +11,7 @@ import {
   MentorSession,
   MentorTurn,
 } from '@/lib/guild/agents/mentor';
+import { requireAgentAccess } from '@/lib/guild/require-agent-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,11 +25,9 @@ const MAX_TURNS_PER_SIDE = 12; // hard cap — ~24 messages total
  * Appends the user's message, asks Claude for the next reply, persists both.
  */
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const gate = await requireAgentAccess();
+  if (!gate.ok) return gate.response;
+  const { user, admin } = gate;
 
   let body: any;
   try { body = await req.json(); } catch {
@@ -41,7 +40,6 @@ export async function POST(req: NextRequest) {
   if (userMessage.length < 1) return NextResponse.json({ error: 'message required' }, { status: 400 });
   if (userMessage.length > 4000) return NextResponse.json({ error: 'message too long (4000 char max)' }, { status: 400 });
 
-  const admin = createAdminClient();
   const member = await resolveGuildMember(admin, user.id);
   if (!member) return NextResponse.json({ error: 'not a Guild member' }, { status: 403 });
 
