@@ -43,18 +43,18 @@ export async function POST(request: NextRequest) {
     // Load application + interview state
     const { data: app } = await admin
       .from('guild_applications')
-      .select('id, full_name, primary_language, voice_interview_id, application_status')
+      .select('id, full_name, primary_language, application_interview_id, application_status')
       .eq('id', applicationId)
       .single();
 
-    if (!app || !app.voice_interview_id) {
+    if (!app || !app.application_interview_id) {
       return NextResponse.json({ error: 'Interview not found' }, { status: 404 });
     }
 
     const { data: interview } = await admin
-      .from('guild_voice_interviews')
+      .from('guild_application_interviews')
       .select('*')
-      .eq('id', app.voice_interview_id)
+      .eq('id', app.application_interview_id)
       .single();
 
     if (!interview) {
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
 
     // Persist
     await admin
-      .from('guild_voice_interviews')
+      .from('guild_application_interviews')
       .update({
         transcript: JSON.stringify(state),
         duration_seconds: Math.round(elapsedMs / 1000),

@@ -27,17 +27,17 @@ interface ReviewPayload {
  *   invited_to_interview           ← this endpoint lives here
  *     ↓ member books + conducts voice interview
  *   interview_scheduled → interview_completed
- *     ↓ admin grades rubric_result = 'pass'
- *   accepted                       ← finalized via the interview-rubric endpoint
+ *     ↓ admin grades rubric_result = 'pass' via /api/guild/admin/grade-rubric
+ *     ↓ admin then finalizes via /api/guild/admin/finalize-acceptance
+ *   accepted
  *
  * Actions:
  *   - accept  → calls guild_invite_to_interview RPC (pending_review → invited_to_interview)
  *               then sends the voice-interview booking invitation
  *   - decline → sets application_status = 'declined', sends polite decline email
  *
- * The legacy 'invite' action is gone. The rubric-pass transition that actually
- * creates the guild_members row (and reveals the referral code) is handled by
- * POST /api/guild/admin/interview-rubric.
+ * The legacy 'invite' action is gone. Grading and finalization are each their
+ * own endpoint now — see grade-rubric and finalize-acceptance.
  */
 export async function POST(request: NextRequest) {
   // Verify admin

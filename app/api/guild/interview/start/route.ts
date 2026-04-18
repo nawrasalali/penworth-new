@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 /**
  * POST /api/guild/interview/start
  *
- * Starts a voice interview. Creates the guild_voice_interviews row if one
+ * Starts a voice interview. Creates the guild_application_interviews row if one
  * does not exist, generates the interviewer's opening message, returns the
  * text and an MP3 base64-encoded for the browser to play.
  *
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     // Check if interview record already exists
     let { data: interview } = await admin
-      .from('guild_voice_interviews')
+      .from('guild_application_interviews')
       .select('*')
       .eq('application_id', application_id)
       .maybeSingle();
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     if (!interview) {
       // Create the interview record
       const { data: created, error: createError } = await admin
-        .from('guild_voice_interviews')
+        .from('guild_application_interviews')
         .insert({
           application_id,
           language: app.primary_language,
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
       await admin
         .from('guild_applications')
         .update({
-          voice_interview_id: created.id,
+          application_interview_id: created.id,
           application_status: 'interview_scheduled',
         })
         .eq('id', application_id);
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     // Persist state to the interview record
     await admin
-      .from('guild_voice_interviews')
+      .from('guild_application_interviews')
       .update({
         transcript: JSON.stringify(state),
         conducted_at: new Date(state.started_at).toISOString(),
