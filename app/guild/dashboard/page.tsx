@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { ProbationBanner } from '@/components/guild/ProbationBanner';
+import { ShowcaseGrantsCard } from '@/components/guild/ShowcaseGrantsCard';
 import { isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
 export const dynamic = 'force-dynamic';
@@ -121,6 +122,10 @@ export default async function GuildDashboardPage() {
           member={member}
         />
       </div>
+
+      {/* Phase 1E: Special Pro showcase grants — 5-tile grid showing per-category
+          state. Query is self-contained in the component. */}
+      <ShowcaseGrantsCard memberId={member.id} locale={locale} />
     </div>
   );
 }
