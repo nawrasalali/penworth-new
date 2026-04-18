@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { BookOpen, CheckCircle2 } from 'lucide-react';
 import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
+import { mapAuthError, mapAuthErrorKey } from '@/lib/auth/error-map';
 
 function ForgotPasswordForm() {
   const [email, setEmail] = useState('');
@@ -34,13 +35,12 @@ function ForgotPasswordForm() {
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
       if (error) {
         console.error('[forgot-password] resetPasswordForEmail failed:', error);
-        // We intentionally show the success state even on failure for accounts
-        // that don't exist — don't leak which emails are registered. Only
-        // surface the error if it's clearly a transport-level problem.
-        // Supabase returns a specific error shape for non-existent users;
-        // for safety we treat everything non-transport as silent success.
-        if (error.message?.toLowerCase().includes('rate')) {
-          setErrorMsg(error.message);
+        // Show the success state even on failure for accounts that don't
+        // exist — don't leak which emails are registered. The only error
+        // we expose is rate-limiting, since that's user-correctable (wait
+        // and retry) and the user needs to know their attempt didn't land.
+        if (mapAuthErrorKey(error) === 'auth.err.rateLimit') {
+          setErrorMsg(mapAuthError(error, locale));
           setLoading(false);
           return;
         }

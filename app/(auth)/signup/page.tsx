@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { BookOpen, Check } from 'lucide-react';
 import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
+import { mapAuthError } from '@/lib/auth/error-map';
 
 function SignupForm() {
   const [fullName, setFullName] = useState('');
@@ -46,7 +47,8 @@ function SignupForm() {
       });
 
       if (error) {
-        setError(error.message);
+        console.error('[signup] signUp failed:', error);
+        setError(mapAuthError(error, locale));
         return;
       }
 
@@ -81,7 +83,8 @@ function SignupForm() {
     });
 
     if (error) {
-      setError(error.message);
+      console.error('[signup] signInWithOAuth failed:', error);
+      setError(mapAuthError(error, locale));
     }
   };
 

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { BookOpen } from 'lucide-react';
 import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
+import { mapAuthError } from '@/lib/auth/error-map';
 
 function LoginForm() {
   const [email, setEmail] = useState('');
@@ -43,14 +44,14 @@ function LoginForm() {
       });
 
       if (error) {
-        // Log the full error to the browser console so support can read the
-        // real reason code, not just the user-facing message. Real-world
-        // failure modes we've seen: "Email not confirmed" (user skipped the
-        // verification email), "Invalid login credentials" (typo / wrong
-        // password), rate-limit after repeated attempts. The message bubbles
-        // up as-is so users see Supabase's own wording.
+        // Log the raw error to the console for support diagnostics, but show
+        // the user a friendly localised message via mapAuthError. Common cases
+        // handled: rate limit ("come back in 5 min"), invalid credentials,
+        // email not confirmed, network issue. Unknown errors fall back to
+        // the generic friendly message — we never surface Supabase's raw
+        // text to end users.
         console.error('[login] signInWithPassword failed:', error);
-        setError(error.message);
+        setError(mapAuthError(error, locale));
         return;
       }
 
@@ -80,7 +81,8 @@ function LoginForm() {
     });
 
     if (error) {
-      setError(error.message);
+      console.error('[login] signInWithOAuth failed:', error);
+      setError(mapAuthError(error, locale));
     }
   };
 
