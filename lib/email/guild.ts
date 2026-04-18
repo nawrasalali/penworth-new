@@ -64,36 +64,38 @@ export async function sendGuildApplicationReceivedEmail(params: {
 }
 
 // ---------------------------------------------------------------------------
-// Voice interview invitation
+// Voice interview invitation (sent when admin Accepts a pending application)
 // ---------------------------------------------------------------------------
 
-export async function sendGuildInterviewInviteEmail(params: {
+export async function sendGuildInterviewInvitationEmail(params: {
   email: string;
   fullName: string;
-  bookingUrl: string;
+  applicationId: string;
   language: string;
 }) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
+  const bookingUrl = `${appUrl}/guild/interview/schedule?application=${encodeURIComponent(params.applicationId)}`;
   return sendGuildEmail({
     to: params.email,
-    subject: 'Schedule your Penworth Guild interview',
-    html: interviewInviteTemplate(params.fullName, params.bookingUrl, params.language),
+    subject: "You're invited to interview for The Penworth Guild",
+    html: interviewInvitationTemplate(params.fullName, bookingUrl, params.language),
   });
 }
 
 // ---------------------------------------------------------------------------
-// Acceptance
+// Post-interview code reveal (sent when admin passes the rubric)
 // ---------------------------------------------------------------------------
 
-export async function sendGuildAcceptanceEmail(params: {
+export async function sendGuildPostInterviewCodeEmail(params: {
   email: string;
-  fullName: string;
+  displayName: string;
   referralCode: string;
-  dashboardUrl: string;
+  tier: string;
 }) {
   return sendGuildEmail({
     to: params.email,
     subject: 'Welcome to The Penworth Guild',
-    html: acceptanceTemplate(params.fullName, params.referralCode, params.dashboardUrl),
+    html: postInterviewCodeTemplate(params.displayName, params.referralCode, params.tier),
   });
 }
 
@@ -145,7 +147,7 @@ function wrapEmail(body: string): string {
       ${body}
       <hr />
       <div class="muted">
-        The Penworth Guild · Penworth.ai · A.C.N. 675 668 710 PTY LTD · Adelaide, Australia<br />
+        The Penworth Guild &middot; A.C.N. 675 668 710 PTY LTD &middot; Adelaide, Australia<br />
         &ldquo;The craft advances through those who advance the craft.&rdquo;
       </div>
     </div>
@@ -205,7 +207,7 @@ function autoDeclinedTemplate(fullName: string): string {
   `);
 }
 
-function interviewInviteTemplate(fullName: string, bookingUrl: string, language: string): string {
+function interviewInvitationTemplate(fullName: string, bookingUrl: string, language: string): string {
   const firstName = extractFirstName(fullName);
   const languageName = LANGUAGE_NAMES[language] || 'your native language';
   return wrapEmail(`
@@ -213,7 +215,7 @@ function interviewInviteTemplate(fullName: string, bookingUrl: string, language:
       You're invited to interview, ${escape(firstName)}.
     </h1>
     <p style="font-size: 16px; line-height: 1.6; color: #c9c2b0;">
-      Your application has passed the first round. The next step is a <strong>10-minute voice interview</strong> with the Guild's AI interviewer.
+      Your application has passed the first round. The next step is a <strong>10-minute voice interview</strong> with the Guild's AI interviewer. This is the gate that decides whether you join the Guild.
     </p>
     <div style="background: #0f1424; border: 1px solid #1e2436; border-radius: 8px; padding: 24px; margin: 24px 0;">
       <div style="color: #d4af37; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px;">
@@ -222,27 +224,28 @@ function interviewInviteTemplate(fullName: string, bookingUrl: string, language:
       <ul style="font-size: 15px; line-height: 1.7; color: #c9c2b0; padding-left: 20px; margin: 0;">
         <li>Conducted in <strong>${escape(languageName)}</strong></li>
         <li>Takes 10 minutes</li>
-        <li>No knowledge to study for — it's a real conversation</li>
+        <li>No knowledge to study for &mdash; it's a real conversation</li>
         <li>You can reschedule up to twice</li>
       </ul>
     </div>
     <div style="margin: 32px 0;">
-      <a href="${bookingUrl}" class="btn">Schedule My Interview</a>
+      <a href="${bookingUrl}" class="btn">Book your voice interview</a>
     </div>
     <p class="muted">
-      The interview covers your background, your motivation, who you'd introduce to Penworth, and your understanding of the product. Speak naturally — we're not testing you on anything.
+      The interview covers your background, your motivation, who you'd introduce to Penworth, and your understanding of the product. Speak naturally &mdash; we're not testing you on anything. Your referral code is revealed only after the Guild Council confirms your acceptance.
     </p>
   `);
 }
 
-function acceptanceTemplate(fullName: string, referralCode: string, dashboardUrl: string): string {
-  const firstName = extractFirstName(fullName);
+function postInterviewCodeTemplate(displayName: string, referralCode: string, tier: string): string {
+  const firstName = extractFirstName(displayName);
+  const tierLabel = TIER_LABELS[tier] || 'Apprentice';
   return wrapEmail(`
     <h1 class="serif" style="font-size: 36px; line-height: 1.2; margin: 0 0 16px;">
       Welcome to the Guild, <span class="gold">${escape(firstName)}</span>.
     </h1>
     <p style="font-size: 18px; line-height: 1.6; color: #e7e2d4;">
-      You are now an <strong>Apprentice</strong> of The Penworth Guild.
+      You are now ${tierLabel === 'Apprentice' ? 'an' : 'a'} <strong>${escape(tierLabel)}</strong> of The Penworth Guild.
     </p>
     <p style="font-size: 16px; line-height: 1.6; color: #c9c2b0;">
       The Guild Council reviewed your interview and voted to accept you. Your dashboard is live. Your seven AI agents are ready. Your first steps await.
@@ -255,23 +258,12 @@ function acceptanceTemplate(fullName: string, referralCode: string, dashboardUrl
         ${escape(referralCode)}
       </div>
       <div class="muted" style="margin-top: 12px; font-size: 13px;">
-        Share this code with anyone. When they subscribe to Penworth, you earn 20% for 12 months.
+        Share this code with anyone. When they subscribe to Penworth, you earn commission for 12 months.
       </div>
     </div>
     <div style="margin: 32px 0;">
-      <a href="${dashboardUrl}" class="btn">Enter Your Dashboard</a>
+      <a href="https://guild.penworth.ai/dashboard" class="btn">Enter your dashboard</a>
     </div>
-    <p style="font-size: 15px; line-height: 1.6; color: #c9c2b0;">
-      <strong>First, do three things:</strong>
-    </p>
-    <ol style="font-size: 15px; line-height: 1.8; color: #c9c2b0; padding-left: 20px;">
-      <li>Complete the 10-minute onboarding flow inside your dashboard.</li>
-      <li>Write your first Penworth document (free — included with Apprentice tier) so you can speak from experience.</li>
-      <li>Meet Scout, your first AI agent. It audits the online presence you shared with us and builds your first growth plan.</li>
-    </ol>
-    <p class="muted">
-      Your tier: Apprentice · Your commission rate: 20% · Your ladder: Apprentice → Journeyman → Artisan → Master → Fellow.
-    </p>
   `);
 }
 
@@ -311,6 +303,14 @@ const LANGUAGE_NAMES: Record<string, string> = {
   bn: 'Bengali',
   ru: 'Russian',
   zh: 'Chinese',
+};
+
+const TIER_LABELS: Record<string, string> = {
+  apprentice: 'Apprentice',
+  journeyman: 'Journeyman',
+  artisan: 'Artisan',
+  master: 'Master',
+  fellow: 'Fellow',
 };
 
 /**

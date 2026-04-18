@@ -263,9 +263,18 @@ function ApplicationCard({ app }: { app: ApplicationRow }) {
         {/* Actions */}
         {['pending_review'].includes(app.application_status) && (
           <div className="mt-6 flex flex-wrap gap-3 border-t border-border pt-6">
-            <ReviewButton applicationId={app.id} action="invite" label="Invite to Interview" variant="primary" />
-            <ReviewButton applicationId={app.id} action="accept" label="Accept Directly" variant="success" />
+            <ReviewButton applicationId={app.id} action="accept" label="Accept → Invite to Interview" variant="success" />
             <ReviewButton applicationId={app.id} action="decline" label="Decline" variant="destructive" />
+          </div>
+        )}
+        {['invited_to_interview', 'interview_scheduled'].includes(app.application_status) && (
+          <div className="mt-6 rounded-md border border-border bg-background p-4 text-xs text-muted-foreground">
+            Awaiting voice interview. Post-interview grading is done via the rubric endpoint.
+          </div>
+        )}
+        {app.application_status === 'interview_completed' && (
+          <div className="mt-6 rounded-md border border-border bg-background p-4 text-xs text-muted-foreground">
+            Interview complete. Grade via <code>POST /api/guild/admin/interview-rubric</code> with <code>rubric_result: &apos;pass&apos;</code> to finalize acceptance.
           </div>
         )}
         {app.decision_reason && (

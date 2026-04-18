@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import {
-  sendGuildInterviewInviteEmail,
-  sendGuildAcceptanceEmail,
+  sendGuildInterviewInvitationEmail,
   sendGuildDeclineEmail,
 } from '@/lib/email/guild';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type Action = 'invite' | 'accept' | 'decline';
+type Action = 'accept' | 'decline';
 
 interface ReviewPayload {
   application_id: string;
@@ -17,15 +16,28 @@ interface ReviewPayload {
   decision_reason: string | null;
 }
 
-const GUILD_URL = 'https://guild.penworth.ai';
-
 /**
  * POST /api/guild/admin/review
  *
- * Admin-only endpoint. Processes a decision on an application.
- * - invite  → status: invited_to_interview, sends interview booking email
- * - accept  → creates guild_members row, sends welcome email
- * - decline → status: declined, sends polite decline email
+ * Admin-only endpoint. Processes a decision on a Guild application.
+ *
+ * The state machine (as of Apr 2026):
+ *   pending_review
+ *     ↓ admin clicks Accept in the review UI
+ *   invited_to_interview           ← this endpoint lives here
+ *     ↓ member books + conducts voice interview
+ *   interview_scheduled → interview_completed
+ *     ↓ admin grades rubric_result = 'pass'
+ *   accepted                       ← finalized via the interview-rubric endpoint
+ *
+ * Actions:
+ *   - accept  → calls guild_invite_to_interview RPC (pending_review → invited_to_interview)
+ *               then sends the voice-interview booking invitation
+ *   - decline → sets application_status = 'declined', sends polite decline email
+ *
+ * The legacy 'invite' action is gone. The rubric-pass transition that actually
+ * creates the guild_members row (and reveals the referral code) is handled by
+ * POST /api/guild/admin/interview-rubric.
  */
 export async function POST(request: NextRequest) {
   // Verify admin
@@ -57,16 +69,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'application_id and action are required' }, { status: 400 });
   }
 
-  if (!['invite', 'accept', 'decline'].includes(payload.action)) {
+  if (!['accept', 'decline'].includes(payload.action)) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   }
 
   const admin = createAdminClient();
 
-  // Load application
+  // Load the application — we need it for the decline email and to fail fast
+  // on missing rows before making the RPC call.
   const { data: app, error: loadError } = await admin
     .from('guild_applications')
-    .select('*')
+    .select('id, email, full_name, primary_language, application_status')
     .eq('id', payload.application_id)
     .single();
 
@@ -74,22 +87,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Application not found' }, { status: 404 });
   }
 
-  if (
-    !['pending_review', 'interview_completed'].includes(app.application_status) &&
-    payload.action !== 'decline'
-  ) {
-    return NextResponse.json(
-      {
-        error: `Cannot ${payload.action} an application in status "${app.application_status}"`,
-      },
-      { status: 400 },
-    );
-  }
-
   try {
-    if (payload.action === 'invite') {
-      return await handleInvite(admin, app, user.id);
-    }
     if (payload.action === 'accept') {
       return await handleAccept(admin, app, user.id);
     }
@@ -106,154 +104,33 @@ export async function POST(request: NextRequest) {
 
 // ---------------------------------------------------------------------------
 
-async function handleInvite(admin: any, app: any, adminUserId: string) {
-  // Update status
-  const { error } = await admin
-    .from('guild_applications')
-    .update({
-      application_status: 'invited_to_interview',
-      decided_by: adminUserId,
-      decided_at: new Date().toISOString(),
-    })
-    .eq('id', app.id);
+async function handleAccept(admin: any, app: any, adminUserId: string) {
+  // Transition pending_review → invited_to_interview via the RPC.
+  // The RPC enforces the correct source state and is idempotent on re-calls.
+  const { data: result, error } = await admin.rpc('guild_invite_to_interview', {
+    p_application_id: app.id,
+    p_actor_id: adminUserId,
+  });
 
   if (error) {
-    console.error('[invite] Update error:', error);
-    return NextResponse.json({ error: 'Failed to update application' }, { status: 500 });
+    console.error('[accept] RPC error:', error);
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  // Send invitation email — booking URL placeholder until voice interview system is built
-  const bookingUrl = `${GUILD_URL}/interview/schedule?application_id=${app.id}`;
-  await sendGuildInterviewInviteEmail({
-    email: app.email,
+  // Send the voice-interview invitation. The booking URL points at the main
+  // app (new.penworth.ai) — the guild subdomain is marketing-only and has no
+  // /interview/schedule route deployed there.
+  await sendGuildInterviewInvitationEmail({
+    email: result.email ?? app.email,
     fullName: app.full_name,
-    bookingUrl,
+    applicationId: result.application_id ?? app.id,
     language: app.primary_language,
-  });
-
-  return NextResponse.json({ ok: true, status: 'invited_to_interview' });
-}
-
-async function handleAccept(admin: any, app: any, adminUserId: string) {
-  // Check if user already exists with this email
-  const { data: existingProfile } = await admin
-    .from('profiles')
-    .select('id, email')
-    .eq('email', app.email.toLowerCase())
-    .maybeSingle();
-
-  let userId: string;
-  let needsOnboarding = true;
-
-  if (existingProfile) {
-    userId = existingProfile.id;
-  } else {
-    // Create auth user with invite email (Supabase will send password-setup email)
-    const { data: newUser, error: userError } = await admin.auth.admin.inviteUserByEmail(
-      app.email.toLowerCase(),
-      {
-        data: {
-          full_name: app.full_name,
-          guild_member: true,
-        },
-      },
-    );
-    if (userError || !newUser?.user) {
-      console.error('[accept] User creation error:', userError);
-      return NextResponse.json(
-        { error: 'Failed to create user account' },
-        { status: 500 },
-      );
-    }
-    userId = newUser.user.id;
-
-    // Ensure profile row exists
-    await admin.from('profiles').upsert({
-      id: userId,
-      email: app.email.toLowerCase(),
-      full_name: app.full_name,
-    });
-  }
-
-  // Generate referral code from name
-  const referralCode = generateReferralCode(app.full_name);
-
-  // Create guild_members row
-  const { data: member, error: memberError } = await admin
-    .from('guild_members')
-    .insert({
-      user_id: userId,
-      application_id: app.id,
-      tier: 'apprentice',
-      tier_since: new Date().toISOString(),
-      referral_code: referralCode,
-      display_name: app.full_name,
-      primary_market: app.country,
-      primary_language: app.primary_language,
-      status: 'active',
-      payout_method: 'pending',
-    })
-    .select('id, referral_code')
-    .single();
-
-  if (memberError) {
-    console.error('[accept] Member creation error:', memberError);
-    return NextResponse.json(
-      { error: `Failed to create Guildmember: ${memberError.message}` },
-      { status: 500 },
-    );
-  }
-
-  // Record the initial tier promotion
-  await admin.from('guild_tier_promotions').insert({
-    guildmember_id: member.id,
-    from_tier: null,
-    to_tier: 'apprentice',
-    promotion_reason: 'initial_acceptance',
-    evidence: { accepted_by: adminUserId, application_id: app.id },
-    promoted_by: adminUserId,
-  });
-
-  // Update application
-  await admin
-    .from('guild_applications')
-    .update({
-      application_status: 'accepted',
-      decided_by: adminUserId,
-      decided_at: new Date().toISOString(),
-    })
-    .eq('id', app.id);
-
-  // Seed default agent contexts
-  const agents = ['scout', 'coach', 'creator', 'mentor', 'analyst', 'strategist', 'advisor', 'shared'];
-  await admin.from('guild_agent_context').insert(
-    agents.map((agent) => ({
-      guildmember_id: member.id,
-      agent_name: agent,
-      context: {
-        initialized_at: new Date().toISOString(),
-        applicant_name: app.full_name,
-        applicant_country: app.country,
-        applicant_language: app.primary_language,
-        social_links: app.social_links,
-        motivation: app.motivation_statement,
-      },
-    })),
-  );
-
-  // Send welcome email
-  await sendGuildAcceptanceEmail({
-    email: app.email,
-    fullName: app.full_name,
-    referralCode: member.referral_code,
-    dashboardUrl: `${GUILD_URL}/dashboard`,
   });
 
   return NextResponse.json({
     ok: true,
-    status: 'accepted',
-    member_id: member.id,
-    referral_code: member.referral_code,
+    status: 'invited_to_interview',
+    already_invited: result.already_invited ?? false,
   });
 }
 
@@ -284,21 +161,4 @@ async function handleDecline(
   });
 
   return NextResponse.json({ ok: true, status: 'declined' });
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function generateReferralCode(fullName: string): string {
-  // Take first name, remove diacritics, uppercase, and append a short random suffix
-  const firstName = fullName.trim().split(/\s+/)[0] || 'GUILD';
-  const normalized = firstName
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .toUpperCase()
-    .slice(0, 10) || 'GUILD';
-  const suffix = Math.floor(Math.random() * 9000 + 1000); // 4-digit random
-  return `GUILD-${normalized}${suffix}`;
 }
