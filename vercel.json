@@ -11,6 +11,10 @@
     {
       "path": "/api/guild/cron/monthly-close",
       "schedule": "30 13 1 * *"
+    },
+    {
+      "path": "/api/cron/stripe-reconcile",
+      "schedule": "0 2 * * *"
     }
   ]
 }

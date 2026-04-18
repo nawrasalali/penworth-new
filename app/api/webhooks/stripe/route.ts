@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createAdminClient } from '@/lib/supabase/server';
+import {
+  recordStripeEvent,
+  markStripeEventProcessed,
+  markStripeEventFailed,
+  markStripeEventSkipped,
+} from '@/lib/stripe/webhook-idempotency';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia',
@@ -31,7 +37,26 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    switch (event.type) {
+    // Idempotency gate — see lib/stripe/webhook-idempotency.ts.
+    // Note: the /api/stripe/webhook route also runs this gate. Because both
+    // webhooks share a single stripe_webhook_events table keyed by
+    // stripe_event_id, whichever one processes an event first will record
+    // it; the other will see it as a duplicate and return early. This is
+    // fine — the two routes historically handled different subsets (main
+    // = subscriptions + Guild commissions, this = credit packs), but the
+    // shared gate prevents any accidental double-processing if Stripe
+    // ever routes the same event to both endpoints.
+    const gate = await recordStripeEvent(supabase, event, 'webhook');
+    if (!gate.shouldProcess) {
+      console.log(
+        `[webhooks/stripe] Skipping event ${event.id} (${event.type}): ${gate.reason}`,
+      );
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+
+    let handled = true;
+    try {
+      switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         
@@ -173,8 +198,19 @@ export async function POST(request: NextRequest) {
       }
 
       default:
+        handled = false;
         // Unhandled event type
         console.log(`Unhandled event type: ${event.type}`);
+      }
+    } catch (innerErr) {
+      await markStripeEventFailed(supabase, event.id, innerErr);
+      throw innerErr; // rethrow to outer catch for 500 response
+    }
+
+    if (handled) {
+      await markStripeEventProcessed(supabase, event.id);
+    } else {
+      await markStripeEventSkipped(supabase, event.id, `unhandled event type: ${event.type}`);
     }
 
     return NextResponse.json({ received: true });
