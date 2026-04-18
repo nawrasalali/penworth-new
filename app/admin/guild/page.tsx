@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import ReviewButton from './ReviewButton';
+import GradingQueue, { type GradingQueueRow } from './GradingQueue';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,6 +68,18 @@ export default async function GuildAdminPage({
   });
   statusCounts.all = counts?.length || 0;
 
+  // Interview grading queue: single view query returning both "to grade" and
+  // "ready to accept" rows. Split in-memory to avoid two round trips.
+  const { data: gradingRowsRaw } = await admin
+    .from('v_guild_interview_grading_queue')
+    .select('*')
+    .or('ready_to_grade.eq.true,ready_to_accept.eq.true')
+    .order('conducted_at', { ascending: true, nullsFirst: false });
+
+  const gradingRows = (gradingRowsRaw || []) as GradingQueueRow[];
+  const toGrade = gradingRows.filter((r) => r.ready_to_grade);
+  const readyToAccept = gradingRows.filter((r) => r.ready_to_accept);
+
   const filters = [
     { key: 'pending_review', label: 'Pending Review' },
     { key: 'invited_to_interview', label: 'Interview Invited' },
@@ -99,6 +112,9 @@ export default async function GuildAdminPage({
           <div>total applications</div>
         </div>
       </div>
+
+      {/* Interview Grading Queue — rows needing Council action on rubric / finalization */}
+      <GradingQueue toGrade={toGrade} readyToAccept={readyToAccept} />
 
       {/* Filter pills */}
       <div className="mb-8 flex flex-wrap gap-2">
@@ -274,7 +290,7 @@ function ApplicationCard({ app }: { app: ApplicationRow }) {
         )}
         {app.application_status === 'interview_completed' && (
           <div className="mt-6 rounded-md border border-border bg-background p-4 text-xs text-muted-foreground">
-            Interview complete. Grade via <code>POST /api/guild/admin/interview-rubric</code> with <code>rubric_result: &apos;pass&apos;</code> to finalize acceptance.
+            Interview complete. Grade via the <strong>Interview Grading Queue</strong> at the top of this page.
           </div>
         )}
         {app.decision_reason && (
