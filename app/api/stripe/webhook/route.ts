@@ -199,13 +199,16 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       .eq('id', orgMember.org_id);
   }
 
-  // Log transaction
+  // Log transaction. Note: credit_transactions schema is {user_id, amount,
+  // transaction_type, reference_id, notes} — NOT {type, description, metadata}.
+  // Must use allowed enum 'purchase' (subscription_activation is not in the
+  // CHECK constraint).
   await supabase.from('credit_transactions').insert({
     user_id: userId,
     amount: limits.monthlyCredits,
-    type: 'subscription_activation',
-    description: `Activated ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan`,
-    metadata: { subscriptionId, priceId },
+    transaction_type: 'purchase',
+    reference_id: null,
+    notes: `Activated ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan · subscription ${subscriptionId}`,
   });
 
   console.log(`Subscription activated: ${userId} -> ${plan}`);
@@ -266,17 +269,13 @@ async function handleCreditPackPurchase(userId: string, session: Stripe.Checkout
     .update({ credits_purchased: newPurchased })
     .eq('id', userId);
 
-  // Log transaction
+  // Log transaction. Schema: {user_id, amount, transaction_type, reference_id, notes}
   await supabase.from('credit_transactions').insert({
     user_id: userId,
     amount: pack.credits,
-    type: 'credit_purchase',
-    description: `Purchased ${pack.name} pack (${pack.credits.toLocaleString()} credits)`,
-    metadata: { 
-      packId, 
-      price: pack.price,
-      sessionId: session.id,
-    },
+    transaction_type: 'purchase',
+    reference_id: null,
+    notes: `Purchased ${pack.name} pack (${pack.credits.toLocaleString()} credits) · session ${session.id} · $${pack.price}`,
   });
 
   console.log(`Credit pack purchased: ${userId} +${pack.credits} credits`);
@@ -367,13 +366,14 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
       .eq('id', orgId);
   }
 
-  // Log
+  // Log. Using 'admin_adjustment' as a catch-all for non-purchase lifecycle
+  // events since the CHECK constraint doesn't allow subscription_canceled.
   await supabase.from('credit_transactions').insert({
     user_id: userId,
     amount: 0,
-    type: 'subscription_canceled',
-    description: 'Subscription canceled - reverted to Free plan',
-    metadata: { subscriptionId: subscription.id },
+    transaction_type: 'admin_adjustment',
+    reference_id: null,
+    notes: `Subscription canceled - reverted to Free plan · subscription ${subscription.id}`,
   });
 
   console.log(`Subscription canceled: ${userId} -> free`);
@@ -428,13 +428,14 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
     })
     .eq('id', userId);
 
-  // Log
+  // Log. 'admin_adjustment' is the catch-all enum value for lifecycle
+  // events not in the CHECK constraint's allowed set.
   await supabase.from('credit_transactions').insert({
     user_id: userId,
     amount: newCredits,
-    type: 'billing_cycle_reset',
-    description: `Monthly credits reset (${plan.charAt(0).toUpperCase() + plan.slice(1)} plan)`,
-    metadata: { invoiceId: invoice.id },
+    transaction_type: 'admin_adjustment',
+    reference_id: null,
+    notes: `Monthly credits reset (${plan.charAt(0).toUpperCase() + plan.slice(1)} plan) · invoice ${invoice.id}`,
   });
 
   console.log(`Billing cycle reset: ${userId} credits=${newCredits}`);
