@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { originForLanguage, isSupportedLang } from '@/lib/lang-routing';
+import { isSupportedLang } from '@/lib/lang-routing';
 import { LEGAL_DOCUMENTS, LEGAL_DOCUMENT_KEYS, type LegalDocumentKey } from '@/lib/legal/documents';
 
 /**
@@ -64,6 +64,8 @@ export async function GET(request: Request) {
   if (code) {
     const { error, data } = await supabase.auth.exchangeCodeForSession(code);
     if (!error && data?.user) {
+      // Persist the sign-up language on first OAuth callback. Idempotent
+      // for returning users — we only update when a lang param is present.
       if (isSupportedLang(langParam)) {
         await supabase
           .from('profiles')
@@ -71,42 +73,29 @@ export async function GET(request: Request) {
           .eq('id', data.user.id);
       }
 
-      let lang: string | null = langParam;
-      if (!isSupportedLang(lang)) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('preferred_language')
-          .eq('id', data.user.id)
-          .single();
-        lang = profile?.preferred_language ?? 'en';
-      }
-
       await recordConsentIfFirstTime(request, supabase, data.user.id);
 
-      const targetOrigin = originForLanguage(origin, lang);
-      return NextResponse.redirect(`${targetOrigin}${redirect}`);
+      // Always return to the current origin. Language subdomains are
+      // static landing pages; the authenticated app lives here. The
+      // in-app shell reads profiles.preferred_language for its locale.
+      return NextResponse.redirect(`${origin}${redirect}`);
     }
   }
 
-  // No code but session is already established (password login): resolve lang
-  // from URL param and redirect.
+  // No code but session is already established (password login): redirect.
   if (skipCode) {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      let lang: string | null = langParam;
-      if (!isSupportedLang(lang)) {
-        const { data: profile } = await supabase
+      if (isSupportedLang(langParam)) {
+        await supabase
           .from('profiles')
-          .select('preferred_language')
-          .eq('id', user.id)
-          .single();
-        lang = profile?.preferred_language ?? 'en';
+          .update({ preferred_language: langParam })
+          .eq('id', user.id);
       }
 
       await recordConsentIfFirstTime(request, supabase, user.id);
 
-      const targetOrigin = originForLanguage(origin, lang);
-      return NextResponse.redirect(`${targetOrigin}${redirect}`);
+      return NextResponse.redirect(`${origin}${redirect}`);
     }
   }
 

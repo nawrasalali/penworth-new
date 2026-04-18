@@ -1,7 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { originForLanguage, isSupportedLang } from '@/lib/lang-routing';
+import { isSupportedLang } from '@/lib/lang-routing';
 import { createReferralOnSignup } from '@/lib/guild/commissions';
 
 export async function GET(request: Request) {
@@ -26,45 +26,31 @@ export async function GET(request: Request) {
           .eq('id', data.user.id);
       }
 
-      let lang: string | null = langParam;
-      if (!isSupportedLang(lang)) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('preferred_language')
-          .eq('id', data.user.id)
-          .single();
-        lang = profile?.preferred_language ?? 'en';
-      }
-
       // Try to attach a Guild referral if a code was captured prior to signup.
       // Only runs on signup (not every login) — idempotent on duplicate attempts.
       await attachGuildReferralIfAny(data.user.id);
 
-      const targetOrigin = originForLanguage(origin, lang);
-      return NextResponse.redirect(`${targetOrigin}${redirect}`);
+      // Always return to current origin. Language subdomains are static
+      // landing pages; the authenticated app only lives on this host.
+      return NextResponse.redirect(`${origin}${redirect}`);
     }
   }
 
-  // No code but session is already established (password login): resolve lang
-  // from URL param and redirect.
+  // No code but session is already established (password login): redirect.
   if (skipCode) {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      let lang: string | null = langParam;
-      if (!isSupportedLang(lang)) {
-        const { data: profile } = await supabase
+      if (isSupportedLang(langParam)) {
+        await supabase
           .from('profiles')
-          .select('preferred_language')
-          .eq('id', user.id)
-          .single();
-        lang = profile?.preferred_language ?? 'en';
+          .update({ preferred_language: langParam })
+          .eq('id', user.id);
       }
 
       // Best-effort referral attachment on first authenticated callback
       await attachGuildReferralIfAny(user.id);
 
-      const targetOrigin = originForLanguage(origin, lang);
-      return NextResponse.redirect(`${targetOrigin}${redirect}`);
+      return NextResponse.redirect(`${origin}${redirect}`);
     }
   }
 

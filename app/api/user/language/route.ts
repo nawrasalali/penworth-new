@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { originForLanguage, isSupportedLang } from '@/lib/lang-routing';
+import { isSupportedLang } from '@/lib/lang-routing';
 
 /**
  * POST /api/user/language
  * body: { language: 'ar' | 'es' | ... }
  *
- * Updates the user's preferred_language, then returns the origin of their
- * new language subdomain. The client is expected to window.location.href to
- * `${redirectUrl}/dashboard` so the session cookie follows via the parent
- * domain and the new shell renders in the chosen language.
+ * Updates the user's preferred_language. The client can reload to pick up
+ * the new locale — the in-app shell reads preferred_language on every
+ * render, so a full-page nav isn't strictly required, but reloading is
+ * simpler than propagating the change to every mounted component.
+ *
+ * Language subdomains (es.penworth.ai etc.) are static landing pages and
+ * don't host the authenticated app, so the redirectUrl always stays on
+ * the current origin.
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -33,11 +37,10 @@ export async function POST(request: NextRequest) {
   }
 
   const origin = new URL(request.url).origin;
-  const targetOrigin = originForLanguage(origin, language);
 
   return NextResponse.json({
     success: true,
     language,
-    redirectUrl: `${targetOrigin}/dashboard`,
+    redirectUrl: `${origin}/dashboard`,
   });
 }
