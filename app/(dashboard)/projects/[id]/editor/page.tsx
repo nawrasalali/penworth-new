@@ -1080,6 +1080,7 @@ function EditorContentNew() {
             onViewPDF={handleViewPDF}
             onDownload={handleDownload}
             onPublish={handlePublish}
+            locale={locale}
           />
         );
 

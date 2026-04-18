@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { AuthorInfo, CoverConfig, CREDIT_COSTS, KDP_SPECS } from '@/types/agent-workflow';
 import { cn } from '@/lib/utils';
+import { t, type Locale, type StringKey } from '@/lib/i18n/strings';
 import {
   BookOpen,
   Upload,
@@ -41,21 +42,25 @@ interface PublishScreenProps {
   onViewPDF: () => void;
   onDownload: () => void;
   onPublish: () => void;
+  locale?: Locale;
 }
 
-const COVER_SUGGESTIONS = [
-  'Professional and modern with abstract shapes',
-  'Elegant with subtle textures and clean typography',
-  'Bold and eye-catching with vibrant colors',
-  'Minimalist with focus on negative space',
-  'Warm and inviting with soft gradients',
+// Re-uses the same suggestion keys as CoverDesignScreen so translators only
+// maintain one set. The prompt text sent to Ideogram is the localised string,
+// which Ideogram handles across all 11 languages.
+const COVER_SUGGESTION_KEYS: StringKey[] = [
+  'cover.suggestion.professional',
+  'cover.suggestion.elegant',
+  'cover.suggestion.bold',
+  'cover.suggestion.minimalist',
+  'cover.suggestion.warm',
 ];
 
-const DOCUMENT_STYLES = [
-  { id: 'professional', name: 'Professional Report' },
-  { id: 'whitepaper', name: 'White Paper' },
-  { id: 'thesis', name: 'Academic Thesis' },
-  { id: 'proposal', name: 'Business Proposal' },
+const DOCUMENT_STYLE_KEYS: { id: string; labelKey: StringKey }[] = [
+  { id: 'professional', labelKey: 'pubScreen.preview.docStyle.professional' },
+  { id: 'whitepaper', labelKey: 'pubScreen.preview.docStyle.whitepaper' },
+  { id: 'thesis', labelKey: 'pubScreen.preview.docStyle.thesis' },
+  { id: 'proposal', labelKey: 'pubScreen.preview.docStyle.proposal' },
 ];
 
 export function PublishScreen({
@@ -74,7 +79,8 @@ export function PublishScreen({
   onExtractFromLinkedIn,
   onViewPDF,
   onDownload,
-  onPublish
+  onPublish,
+  locale = 'en',
 }: PublishScreenProps) {
   // If the author info was already collected (e.g. in the Cover Design agent
   // step), skip the author phase — no one should have to fill it in twice.
@@ -131,37 +137,37 @@ export function PublishScreen({
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <User className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-xl font-bold">Author Information</h1>
+          <h1 className="text-xl font-bold">{t('pubScreen.author.title', locale)}</h1>
           <p className="text-muted-foreground">
-            Set up your author profile for the document
+            {t('pubScreen.author.subtitle', locale)}
           </p>
         </div>
         
         {/* Author Name */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">Author Name *</label>
+          <label className="block text-sm font-medium mb-2">{t('pubScreen.author.nameLabel', locale)}</label>
           <Input
             value={authorInfo.name}
             onChange={(e) => onUpdateAuthorInfo({ name: e.target.value })}
-            placeholder="Your full name as it will appear on the book"
+            placeholder={t('pubScreen.author.namePlaceholder', locale)}
           />
         </div>
         
         {/* Title/Credentials */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">Title/Credentials</label>
+          <label className="block text-sm font-medium mb-2">{t('pubScreen.author.titleLabel', locale)}</label>
           <Input
             value={authorInfo.title}
             onChange={(e) => onUpdateAuthorInfo({ title: e.target.value })}
-            placeholder="e.g., PhD, CEO of XYZ, Bestselling Author"
+            placeholder={t('pubScreen.author.titlePlaceholder', locale)}
           />
         </div>
         
         {/* About the Author */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">About the Author</label>
+          <label className="block text-sm font-medium mb-2">{t('pubScreen.author.aboutLabel', locale)}</label>
           <p className="text-xs text-muted-foreground mb-2">
-            Write about yourself, or import from LinkedIn/CV
+            {t('pubScreen.author.aboutHelp', locale)}
           </p>
           
           {/* Import Options */}
@@ -170,7 +176,7 @@ export function PublishScreen({
               <Input
                 value={linkedInUrl}
                 onChange={(e) => setLinkedInUrl(e.target.value)}
-                placeholder="LinkedIn profile URL"
+                placeholder={t('pubScreen.author.linkedinPlaceholder', locale)}
                 className="flex-1"
               />
               <Button 
@@ -185,7 +191,7 @@ export function PublishScreen({
             <Button variant="outline" size="sm" asChild>
               <label className="cursor-pointer">
                 <Upload className="h-4 w-4 mr-1" />
-                CV
+                {t('pubScreen.author.cvButton', locale)}
                 <input
                   type="file"
                   className="hidden"
@@ -203,7 +209,7 @@ export function PublishScreen({
               <Textarea
                 value={aboutDraft}
                 onChange={(e) => setAboutDraft(e.target.value)}
-                placeholder="Write a compelling author bio..."
+                placeholder={t('pubScreen.author.bioPlaceholder', locale)}
                 className="min-h-[150px]"
               />
               <div className="flex gap-2">
@@ -215,7 +221,7 @@ export function PublishScreen({
                     setAboutDraft(authorInfo.aboutAuthor || '');
                   }}
                 >
-                  Cancel
+                  {t('pubScreen.author.cancel', locale)}
                 </Button>
                 <Button 
                   size="sm"
@@ -224,7 +230,7 @@ export function PublishScreen({
                     setEditingAbout(false);
                   }}
                 >
-                  Save
+                  {t('pubScreen.author.save', locale)}
                 </Button>
               </div>
             </div>
@@ -237,7 +243,7 @@ export function PublishScreen({
                 <p className="text-sm">{authorInfo.aboutAuthor}</p>
               ) : (
                 <p className="text-sm text-muted-foreground italic">
-                  Click to write your author bio...
+                  {t('pubScreen.author.clickToWrite', locale)}
                 </p>
               )}
             </div>
@@ -251,7 +257,7 @@ export function PublishScreen({
             disabled={!authorInfo.name}
             size="lg"
           >
-            {needsCover ? 'Continue to Cover Design' : 'Continue to Preview'}
+            {needsCover ? t('pubScreen.author.continueToCover', locale) : t('pubScreen.author.continueToPreview', locale)}
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -264,9 +270,9 @@ export function PublishScreen({
     return (
       <div className="flex-1 flex flex-col p-6 overflow-hidden">
         <div className="mb-4 text-center">
-          <h1 className="text-xl font-bold">Book Cover Design</h1>
+          <h1 className="text-xl font-bold">{t('pubScreen.cover.title', locale)}</h1>
           <p className="text-sm text-muted-foreground">
-            Create stunning covers with AI (First generation FREE)
+            {t('pubScreen.cover.subtitle', locale)}
           </p>
         </div>
         
@@ -275,14 +281,14 @@ export function PublishScreen({
           <div className="rounded-xl border bg-card p-4">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
               <ImageIcon className="h-4 w-4" />
-              Front Cover
+              {t('pubScreen.cover.front', locale)}
             </h3>
             
             {coverConfig.frontCoverUrl ? (
               <div className="relative aspect-[2/3] bg-muted rounded-lg overflow-hidden mb-3">
                 <img 
                   src={coverConfig.frontCoverUrl} 
-                  alt="Front cover"
+                  alt={t('pubScreen.cover.front', locale)}
                   className="w-full h-full object-cover"
                 />
                 {/* Title Overlay */}
@@ -294,7 +300,7 @@ export function PublishScreen({
                 {/* Author Overlay */}
                 <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
                   <div className="bg-black/40 backdrop-blur-sm px-3 py-1 rounded text-center">
-                    <p className="text-white text-sm">by {authorInfo.name}</p>
+                    <p className="text-white text-sm">{t('pubScreen.cover.byByline', locale)} {authorInfo.name}</p>
                   </div>
                 </div>
               </div>
@@ -302,7 +308,7 @@ export function PublishScreen({
               <div className="aspect-[2/3] bg-muted rounded-lg flex items-center justify-center mb-3">
                 <div className="text-center text-muted-foreground">
                   <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No cover generated yet</p>
+                  <p className="text-sm">{t('pubScreen.cover.noCoverYet', locale)}</p>
                 </div>
               </div>
             )}
@@ -312,19 +318,22 @@ export function PublishScreen({
               <Textarea
                 value={coverPrompt}
                 onChange={(e) => setCoverPrompt(e.target.value)}
-                placeholder="Describe your ideal cover (or leave blank for AI suggestion)..."
+                placeholder={t('pubScreen.cover.promptPlaceholder', locale)}
                 className="min-h-[80px]"
               />
               <div className="flex flex-wrap gap-1">
-                {COVER_SUGGESTIONS.map((suggestion, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setCoverPrompt(suggestion)}
-                    className="text-xs px-2 py-1 rounded-full bg-muted hover:bg-muted/80 transition-colors"
-                  >
-                    {suggestion.split(' ').slice(0, 3).join(' ')}...
-                  </button>
-                ))}
+                {COVER_SUGGESTION_KEYS.map((key, idx) => {
+                  const suggestion = t(key, locale);
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setCoverPrompt(suggestion)}
+                      className="text-xs px-2 py-1 rounded-full bg-muted hover:bg-muted/80 transition-colors"
+                    >
+                      {suggestion.split(' ').slice(0, 3).join(' ')}…
+                    </button>
+                  );
+                })}
               </div>
             </div>
             
@@ -338,12 +347,12 @@ export function PublishScreen({
               ) : coverConfig.frontCoverUrl ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Regenerate ({CREDIT_COSTS.FRONT_COVER_REGENERATE} credits)
+                  {t('pubScreen.cover.regenerate', locale)} ({CREDIT_COSTS.FRONT_COVER_REGENERATE} {t('pubScreen.cover.credits', locale)})
                 </>
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Generate Cover (FREE)
+                  {t('pubScreen.cover.generateFree', locale)}
                 </>
               )}
             </Button>
@@ -353,21 +362,21 @@ export function PublishScreen({
           <div className="rounded-xl border bg-card p-4">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
               <ImageIcon className="h-4 w-4" />
-              Back Cover
+              {t('pubScreen.cover.back', locale)}
             </h3>
             
             {coverConfig.backCoverUrl ? (
               <div className="relative aspect-[2/3] bg-muted rounded-lg overflow-hidden mb-3">
                 <img 
                   src={coverConfig.backCoverUrl} 
-                  alt="Back cover"
+                  alt={t('pubScreen.cover.back', locale)}
                   className="w-full h-full object-cover"
                 />
                 {/* Book Description Overlay */}
                 <div className="absolute inset-0 flex flex-col justify-between p-4">
                   <div className="bg-black/50 backdrop-blur-sm p-3 rounded">
                     <p className="text-white text-xs line-clamp-6">
-                      [Book description will appear here]
+                      {t('pubScreen.cover.descriptionPlaceholder', locale)}
                     </p>
                   </div>
                   
@@ -397,19 +406,19 @@ export function PublishScreen({
               <div className="aspect-[2/3] bg-muted rounded-lg flex items-center justify-center mb-3">
                 <div className="text-center text-muted-foreground">
                   <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Generate front cover first</p>
+                  <p className="text-sm">{t('pubScreen.cover.generateFrontFirst', locale)}</p>
                 </div>
               </div>
             )}
             
             {/* Author Photo Upload */}
             <div className="mb-3">
-              <label className="text-sm font-medium">Author Photo (optional)</label>
+              <label className="text-sm font-medium">{t('pubScreen.cover.authorPhotoLabel', locale)}</label>
               <div className="flex gap-2 mt-1">
                 <Button variant="outline" size="sm" className="flex-1" asChild>
                   <label className="cursor-pointer">
                     <Upload className="mr-2 h-4 w-4" />
-                    Upload Photo
+                    {t('pubScreen.cover.uploadPhoto', locale)}
                     <input
                       type="file"
                       className="hidden"
@@ -434,12 +443,12 @@ export function PublishScreen({
               ) : coverConfig.backCoverUrl ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Regenerate ({CREDIT_COSTS.BACK_COVER_REGENERATE} credits)
+                  {t('pubScreen.cover.regenerate', locale)} ({CREDIT_COSTS.BACK_COVER_REGENERATE} {t('pubScreen.cover.credits', locale)})
                 </>
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Generate Back Cover (FREE)
+                  {t('pubScreen.cover.generateBackFree', locale)}
                 </>
               )}
             </Button>
@@ -453,7 +462,7 @@ export function PublishScreen({
             disabled={!coverConfig.frontCoverUrl}
             size="lg"
           >
-            Continue to Preview
+            {t('pubScreen.cover.continueToPreview', locale)}
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -468,9 +477,9 @@ export function PublishScreen({
         <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
           <BookOpen className="h-8 w-8 text-green-500" />
         </div>
-        <h1 className="text-xl font-bold">Your Document is Ready!</h1>
+        <h1 className="text-xl font-bold">{t('pubScreen.preview.title', locale)}</h1>
         <p className="text-muted-foreground">
-          Final KDP-Ready Publication
+          {t('pubScreen.preview.subtitle', locale)}
         </p>
       </div>
       
@@ -482,7 +491,7 @@ export function PublishScreen({
             <div className="w-48 mx-auto mb-6 shadow-2xl rounded-lg overflow-hidden">
               <img 
                 src={coverConfig.frontCoverUrl}
-                alt="Book cover"
+                alt={t('pubScreen.cover.front', locale)}
                 className="w-full"
               />
             </div>
@@ -490,16 +499,19 @@ export function PublishScreen({
           
           {/* Document Summary */}
           <div className="inline-block text-left bg-card rounded-lg border p-4 mb-6">
-            <h3 className="font-semibold mb-2">Document Summary</h3>
+            <h3 className="font-semibold mb-2">{t('pubScreen.preview.summaryHeader', locale)}</h3>
             <ul className="text-sm space-y-1 text-muted-foreground">
-              <li>• {chapterCount} Chapters | {wordCount.toLocaleString()} words | {pageCount} pages</li>
-              <li>• Format: 6" × 9" (KDP Standard)</li>
-              <li>• ISBN: Ready for assignment</li>
+              <li>• {t('pubScreen.preview.chaptersWordsPages', locale)
+                .replace('{chapters}', String(chapterCount))
+                .replace('{words}', wordCount.toLocaleString())
+                .replace('{pages}', String(pageCount))}</li>
+              <li>• {t('pubScreen.preview.formatLine', locale)}</li>
+              <li>• {t('pubScreen.preview.isbnLine', locale)}</li>
             </ul>
             
             {isFreeTier && (
               <div className="mt-3 pt-3 border-t text-xs text-amber-600 dark:text-amber-400">
-                ⚠️ Free tier: Document includes "by penworth.ai" watermark
+                {t('pubScreen.preview.watermarkWarning', locale)}
               </div>
             )}
           </div>
@@ -508,15 +520,15 @@ export function PublishScreen({
           {!isBook && (
             <div className="mb-6">
               <p className="text-sm text-muted-foreground mb-2">
-                Choose document style:
+                {t('pubScreen.preview.styleChooseHeader', locale)}
               </p>
               <div className="flex flex-wrap justify-center gap-2">
-                {DOCUMENT_STYLES.map((style) => (
+                {DOCUMENT_STYLE_KEYS.map((style) => (
                   <button
                     key={style.id}
                     className="px-3 py-1.5 rounded-full border text-sm hover:bg-primary/10 hover:border-primary transition-colors"
                   >
-                    {style.name}
+                    {t(style.labelKey, locale)}
                   </button>
                 ))}
               </div>
@@ -533,19 +545,18 @@ export function PublishScreen({
                 <Globe className="h-5 w-5 text-primary" />
               </div>
               <div className="text-left flex-1 min-w-0">
-                <h3 className="font-semibold">Publish to Penworth Store</h3>
+                <h3 className="font-semibold">{t('pubScreen.preview.storeCardTitle', locale)}</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Your book goes live instantly at penworth.ai/marketplace.
-                  Free, worldwide, one click.
+                  {t('pubScreen.preview.storeCardBody', locale)}
                 </p>
               </div>
             </div>
             <Button onClick={onPublish} size="lg" className="w-full">
               <Rocket className="mr-2 h-4 w-4" />
-              Publish Now
+              {t('pubScreen.preview.publishNow', locale)}
             </Button>
             <p className="text-[10px] text-muted-foreground text-center mt-2">
-              Published listings can be edited or unpublished from your dashboard
+              {t('pubScreen.preview.storeCardFooter', locale)}
             </p>
           </div>
 
@@ -553,17 +564,16 @@ export function PublishScreen({
           <div className="flex flex-wrap justify-center gap-2">
             <Button variant="outline" size="sm" onClick={onViewPDF}>
               <Eye className="mr-2 h-3.5 w-3.5" />
-              View PDF
+              {t('pubScreen.preview.viewPdf', locale)}
             </Button>
             <Button variant="outline" size="sm" onClick={onDownload}>
               <Download className="mr-2 h-3.5 w-3.5" />
-              Download
+              {t('pubScreen.preview.download', locale)}
             </Button>
           </div>
 
           <p className="mt-4 text-xs text-muted-foreground">
-            External platforms (Amazon KDP, IngramSpark, Draft2Digital, +13 more)
-            — use Download to submit manually for now.
+            {t('pubScreen.preview.externalCaption', locale)}
           </p>
         </div>
       </div>
