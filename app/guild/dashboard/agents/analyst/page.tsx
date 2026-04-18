@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { formatDistanceToNow } from 'date-fns';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import AnalystRefresh from './AnalystRefresh';
+import AdminRegenerateButton from './AdminRegenerateButton';
 import { ProbationBanner } from '@/components/guild/ProbationBanner';
 import { isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
@@ -21,6 +23,20 @@ interface AnalystReport {
   data_quality_notes: string[];
 }
 
+interface WeeklyEnvelope {
+  cadence: 'weekly';
+  generated_at: string;
+  week_starting: string;
+  week_ending: string;
+  report: AnalystReport;
+  metrics: {
+    new_referrals: number;
+    new_commissions_usd: number;
+    funnel_conversion_pct: number | null;
+  };
+  next_cadence_run_at: string;
+}
+
 export default async function AnalystPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -33,6 +49,14 @@ export default async function AnalystPage() {
     .eq('user_id', user.id)
     .maybeSingle();
   if (!member) redirect('/guild/dashboard');
+
+  // Is this user an admin? Controls visibility of the regen button.
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .maybeSingle();
+  const isAdmin = profile?.is_admin === true;
 
   const rawLang = (member.primary_language || 'en').toLowerCase();
   const locale: Locale = isSupportedLocale(rawLang) ? rawLang : 'en';
@@ -66,14 +90,37 @@ export default async function AnalystPage() {
     .eq('agent_name', 'analyst')
     .maybeSingle();
 
-  const reports = (ctxRow?.context as any)?.reports as
-    | Record<string, AnalystReport>
+  // Prefer the weekly_report envelope per Phase 2 D2 storage shape.
+  // Fall back to the legacy daily cache (reports map) when weekly
+  // hasn't run yet for this member — keeps the page useful during the
+  // gap between deploy and first Monday-cron run.
+  const ctx = ctxRow?.context as
+    | { weekly_report?: WeeklyEnvelope; reports?: Record<string, AnalystReport> }
     | undefined;
+
+  const weeklyEnvelope = ctx?.weekly_report ?? null;
+  const reports = ctx?.reports;
   const reportDates = reports ? Object.keys(reports).sort().reverse() : [];
-  const today = new Date().toISOString().slice(0, 10);
-  const latestDate = reportDates[0] ?? null;
-  const latest = latestDate ? reports![latestDate] : null;
-  const isFresh = latestDate === today;
+
+  // Resolve the "primary" report we render:
+  //   1. Weekly envelope if present — canonical path post-Phase-2.6
+  //   2. Most recent entry in the daily map — fallback for the deploy gap
+  const primaryReport: AnalystReport | null = weeklyEnvelope
+    ? weeklyEnvelope.report
+    : reportDates[0]
+      ? reports![reportDates[0]]
+      : null;
+
+  // Display metadata — a single timestamp + relative label for the UI.
+  const primaryGeneratedAt: string | null = weeklyEnvelope
+    ? weeklyEnvelope.generated_at
+    : reportDates[0]
+      ? `${reportDates[0]}T00:00:00Z`
+      : null;
+
+  const primaryRelativeLabel = primaryGeneratedAt
+    ? formatDistanceToNow(new Date(primaryGeneratedAt), { addSuffix: true })
+    : null;
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -96,29 +143,47 @@ export default async function AnalystPage() {
             job.
           </p>
         </div>
-        <AnalystRefresh hasExisting={!!latest} isFresh={isFresh} />
+        <div className="flex items-center gap-2">
+          <AnalystRefresh
+            hasExisting={!!primaryReport}
+            isFresh={!!weeklyEnvelope}
+          />
+          {isAdmin && (
+            <AdminRegenerateButton memberId={member.id} />
+          )}
+        </div>
       </header>
 
-      {!latest ? (
+      {!primaryReport ? (
         <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-6 py-10 text-center">
           <div className="mb-2 text-sm font-medium text-neutral-900">
             No report yet
           </div>
           <p className="mx-auto max-w-md text-sm text-neutral-600">
-            Click <span className="font-medium">Run analysis</span> to generate
-            your first report. The Analyst reads your referral and commission
-            data from the last 12 weeks.
+            The Analyst runs weekly (Monday morning). Your first report
+            will appear then — or click{' '}
+            <span className="font-medium">Run analysis</span> to generate
+            one now.
           </p>
         </div>
       ) : (
-        <ReportView
-          report={latest}
-          date={latestDate!}
-          isFresh={isFresh}
-        />
+        <>
+          {weeklyEnvelope && (
+            <WeeklyMetricsStrip envelope={weeklyEnvelope} />
+          )}
+          <ReportView
+            report={primaryReport}
+            relativeLabel={primaryRelativeLabel!}
+            source={weeklyEnvelope ? 'weekly' : 'daily'}
+          />
+        </>
       )}
 
-      {reportDates.length > 1 && (
+      {/* Legacy daily history — only show when we're displaying a
+          daily-cache report AND there's more than one. The weekly
+          envelope doesn't carry history; that's by design, as the cron
+          overwrites week-over-week rather than accumulating. */}
+      {!weeklyEnvelope && reportDates.length > 1 && (
         <section className="mt-10">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-neutral-500">
             Previous reports
@@ -145,21 +210,57 @@ export default async function AnalystPage() {
   );
 }
 
+function WeeklyMetricsStrip({ envelope }: { envelope: WeeklyEnvelope }) {
+  const { metrics, week_starting, week_ending } = envelope;
+  return (
+    <div className="mb-5 rounded-xl border border-neutral-200 bg-neutral-50/50 px-5 py-4">
+      <div className="mb-2 text-xs uppercase tracking-widest text-neutral-500">
+        Week of {week_starting} — {week_ending}
+      </div>
+      <div className="grid grid-cols-3 gap-4 text-sm">
+        <Metric label="New referrals" value={String(metrics.new_referrals)} />
+        <Metric
+          label="Commissions earned"
+          value={`$${metrics.new_commissions_usd.toFixed(2)}`}
+        />
+        <Metric
+          label="Funnel conversion"
+          value={
+            metrics.funnel_conversion_pct != null
+              ? `${metrics.funnel_conversion_pct.toFixed(1)}%`
+              : '—'
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-xs text-neutral-500">{label}</div>
+      <div className="mt-0.5 text-xl font-semibold text-neutral-900">{value}</div>
+    </div>
+  );
+}
+
 function ReportView({
   report,
-  date,
-  isFresh,
+  relativeLabel,
+  source,
 }: {
   report: AnalystReport;
-  date: string;
-  isFresh: boolean;
+  relativeLabel: string;
+  source: 'weekly' | 'daily';
 }) {
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-neutral-200 bg-white p-6">
         <div className="mb-3 flex items-center justify-between text-xs text-neutral-500">
           <span>
-            Generated {date} {isFresh ? '· fresh' : '· cached'}
+            Last updated {relativeLabel}
+            {source === 'weekly' ? ' · weekly cadence' : ' · on-demand'}
           </span>
           <span>
             Period {report.period.start} → {report.period.end}
