@@ -2,7 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-init — see lib/email/guild.ts for rationale
+let resendSingleton: Resend | null = null;
+function getResend(): Resend {
+  if (!resendSingleton) {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) {
+      throw new Error('RESEND_API_KEY is not set');
+    }
+    resendSingleton = new Resend(key);
+  }
+  return resendSingleton;
+}
 
 /**
  * GET /api/collaborators?projectId=xxx - Get collaborators for a project
@@ -196,7 +207,7 @@ export async function POST(request: NextRequest) {
 
     // Send invite email
     try {
-      await resend.emails.send({
+      await getResend().emails.send({
         from: 'Penworth <support@penworth.ai>',
         to: email,
         bcc: ['nawras@penworth.ai'],

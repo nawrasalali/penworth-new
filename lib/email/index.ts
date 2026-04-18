@@ -1,7 +1,18 @@
 import { Resend } from 'resend';
 import { emailTemplates } from './templates';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-init — see lib/email/guild.ts for rationale
+let resendSingleton: Resend | null = null;
+function getResend(): Resend {
+  if (!resendSingleton) {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) {
+      throw new Error('RESEND_API_KEY is not set');
+    }
+    resendSingleton = new Resend(key);
+  }
+  return resendSingleton;
+}
 
 // All user-facing email is branded from support@ so replies land in the same
 // inbox the user would think to write to if they hit a problem. Marketing or
@@ -24,7 +35,7 @@ interface SendEmailOptions {
 
 async function sendEmail({ to, subject, html, replyTo = REPLY_TO }: SendEmailOptions) {
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: FROM_EMAIL,
       to: Array.isArray(to) ? to : [to],
       subject,

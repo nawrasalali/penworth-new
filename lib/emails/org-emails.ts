@@ -1,6 +1,17 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-init — see lib/email/guild.ts for rationale
+let resendSingleton: Resend | null = null;
+function getResend(): Resend {
+  if (!resendSingleton) {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) {
+      throw new Error('RESEND_API_KEY is not set');
+    }
+    resendSingleton = new Resend(key);
+  }
+  return resendSingleton;
+}
 
 // support@ rather than noreply@ so replies route to the real inbox. Users
 // who reply to a 'noreply' address get nothing back; we'd rather catch the
@@ -117,7 +128,7 @@ export async function sendOrgInviteEmail(to: string, data: OrgInviteEmailData) {
     </p>
   `;
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM_EMAIL,
     bcc: FOUNDER_BCC,
     to,
@@ -167,7 +178,7 @@ export async function sendWelcomeToOrgEmail(to: string, data: WelcomeToOrgEmailD
     </table>
   `;
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM_EMAIL,
     bcc: FOUNDER_BCC,
     to,
@@ -219,7 +230,7 @@ export async function sendRoleChangeEmail(to: string, data: RoleChangeEmailData)
     </p>
   `;
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM_EMAIL,
     bcc: FOUNDER_BCC,
     to,
@@ -268,7 +279,7 @@ export async function sendRemovedFromOrgEmail(to: string, data: RemovedFromOrgEm
     </table>
   `;
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM_EMAIL,
     bcc: FOUNDER_BCC,
     to,
@@ -327,7 +338,7 @@ export async function sendCoAuthorInviteEmail(to: string, data: CoAuthorInviteEm
     </p>
   `;
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM_EMAIL,
     bcc: FOUNDER_BCC,
     to,
@@ -411,7 +422,7 @@ export async function sendOrgDigestEmail(to: string, data: OrgDigestEmailData) {
     </table>
   `;
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM_EMAIL,
     bcc: FOUNDER_BCC,
     to,

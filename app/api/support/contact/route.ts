@@ -18,7 +18,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@/lib/supabase/server';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-init — see lib/email/guild.ts for rationale
+let resendSingleton: Resend | null = null;
+function getResend(): Resend {
+  if (!resendSingleton) {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) {
+      throw new Error('RESEND_API_KEY is not set');
+    }
+    resendSingleton = new Resend(key);
+  }
+  return resendSingleton;
+}
 
 // In-memory rate limit store. Reset on cold start, which is fine — scraping
 // attacks hit the same instance repeatedly and will be slowed; legitimate
@@ -142,7 +153,7 @@ export async function POST(req: NextRequest) {
 
     const subjectTag = attributedPlan ? `[${attributedPlan}]` : '[anon]';
 
-    await resend.emails.send({
+    await getResend().emails.send({
       from: 'Penworth Support <support@penworth.ai>',
       to: 'support@penworth.ai',
       bcc: ['nawras@penworth.ai'],

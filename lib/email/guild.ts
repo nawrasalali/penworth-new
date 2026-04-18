@@ -1,6 +1,22 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-init: env vars are not guaranteed to be available at module-load
+// during Next build's page-data collection phase. Instantiating Resend at
+// top-level crashes the build with "Missing API key" even when the var
+// is configured in Vercel, because the build's static analysis phase
+// sometimes executes module-load code before envs are injected.
+// Instantiate on first call instead.
+let resendSingleton: Resend | null = null;
+function getResend(): Resend {
+  if (!resendSingleton) {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) {
+      throw new Error('RESEND_API_KEY is not set');
+    }
+    resendSingleton = new Resend(key);
+  }
+  return resendSingleton;
+}
 
 const FROM_EMAIL = 'The Penworth Guild <guild@penworth.ai>';
 const REPLY_TO = 'guild@penworth.ai';
@@ -20,7 +36,7 @@ async function sendGuildEmail(opts: {
   html: string;
 }): Promise<SendResult> {
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: FROM_EMAIL,
       to: [opts.to],
       subject: opts.subject,
