@@ -117,14 +117,18 @@ function PublishingPageContent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       
-      // Get user's tier
+      // Get user's tier (profiles.plan is the actual column — the
+      // old code queried 'subscription_tier' which doesn't exist and
+      // made isFreeTier always return true, letting every user
+      // publish to the Free tier of Penworth Store regardless of
+      // their actual plan).
       const { data: profile } = await supabase
         .from('profiles')
-        .select('subscription_tier')
+        .select('plan')
         .eq('id', user.id)
         .single();
       
-      const isFreeTier = !profile?.subscription_tier || profile.subscription_tier === 'free';
+      const isFreeTier = !profile?.plan || profile.plan === 'free';
       
       // Create marketplace listing
       const { error } = await supabase

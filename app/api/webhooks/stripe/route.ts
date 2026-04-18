@@ -119,13 +119,17 @@ export async function POST(request: NextRequest) {
               })
               .eq('id', orgId);
           } else if (userId) {
-            // For individual subscriptions, update user profile
+            // For individual subscriptions, update user profile.
+            // Note: profiles does NOT have stripe_customer_id /
+            // stripe_subscription_id / subscription_tier columns —
+            // those live on organizations only. For individual users,
+            // the plan name is stored in profiles.plan, and Stripe
+            // identity is tracked via the 'organizations' row that
+            // gets created for every user.
             await supabase
               .from('profiles')
               .update({
-                subscription_tier: tier,
-                stripe_customer_id: customerId,
-                stripe_subscription_id: subscription.id,
+                plan: tier,
               })
               .eq('id', userId);
           }
