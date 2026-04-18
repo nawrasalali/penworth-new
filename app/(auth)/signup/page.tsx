@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { BookOpen, Check } from 'lucide-react';
-import { ConsentCheckbox } from '@/components/auth/ConsentCheckbox';
-import { LEGAL_DOCUMENT_KEYS } from '@/lib/legal/documents';
 import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
 function SignupForm() {
@@ -15,7 +13,6 @@ function SignupForm() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [consentAccepted, setConsentAccepted] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const plan = searchParams.get('plan');
@@ -30,10 +27,6 @@ function SignupForm() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!consentAccepted) {
-      setError(t('auth.consentRequired', locale));
-      return;
-    }
     setLoading(true);
     setError(null);
 
@@ -57,26 +50,17 @@ function SignupForm() {
         return;
       }
 
-      // Best-effort immediate profile update (the auth callback also writes it,
-      // so this is redundant but safer if the trigger has race conditions).
+      // Best-effort immediate profile update (the auth callback also writes
+      // it, so this is redundant but safer if the trigger has race conditions).
+      // We do NOT record legal consent here anymore — that happens via the
+      // first-login modal once the user is fully authenticated. Recording
+      // consent at signup time was fragile: email-verify users didn't have
+      // a session yet, so the POST /api/legal/consent would 401 silently.
       if (signUpData?.user?.id) {
         await supabase
           .from('profiles')
           .update({ preferred_language: lang })
           .eq('id', signUpData.user.id);
-
-        // Record legal consent. Best-effort — if this fails we still continue
-        // (the signup succeeded), but we log the failure so ops can follow up.
-        // The consent API is authenticated, so this needs a session. Email-
-        // verification signups may not have a session yet; in that case the
-        // post-verify callback route will record consent instead.
-        fetch('/api/legal/consent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ documents: LEGAL_DOCUMENT_KEYS }),
-        }).catch((err) => {
-          console.warn('[signup] consent record failed:', err);
-        });
       }
 
       router.push(`/login?lang=${lang}&message=${encodeURIComponent(t('auth.checkEmailForConfirm', locale))}`);
@@ -88,10 +72,6 @@ function SignupForm() {
   };
 
   const handleGoogleSignup = async () => {
-    if (!consentAccepted) {
-      setError(t('auth.consentRequired', locale));
-      return;
-    }
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -184,11 +164,9 @@ function SignupForm() {
               <p className="text-xs text-neutral-500 mt-1.5">{t('auth.passwordMin', locale)}</p>
             </div>
 
-            <ConsentCheckbox locale={locale} onChange={setConsentAccepted} disabled={loading} />
-
             <button
               type="submit"
-              disabled={loading || !consentAccepted}
+              disabled={loading}
               className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 py-3 text-sm font-semibold text-white hover:shadow-lg hover:shadow-amber-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {loading ? t('auth.creatingAccount', locale) : t('auth.createAccount', locale)}
@@ -207,7 +185,6 @@ function SignupForm() {
           <button
             type="button"
             onClick={handleGoogleSignup}
-            disabled={!consentAccepted}
             className="w-full flex items-center justify-center gap-2 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 py-3 text-sm font-medium hover:bg-neutral-50 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24">

@@ -63,5 +63,34 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ok: true, recorded: documents });
+  // When the user has accepted the FULL legal pack (all three documents),
+  // stamp profiles.consent_accepted_at so the first-login modal stops
+  // showing up. This is what makes the modal "only once". We compute
+  // acceptance from consent_records rather than trusting the POST body
+  // alone — that way partial submissions (somehow) don't satisfy the gate.
+  const { data: allRecords } = await supabase
+    .from('consent_records')
+    .select('document_key')
+    .eq('user_id', user.id);
+
+  const acceptedKeys = new Set((allRecords ?? []).map((r) => r.document_key as string));
+  const hasFullPack = LEGAL_DOCUMENT_KEYS.every((k) => acceptedKeys.has(k));
+
+  if (hasFullPack) {
+    // Build a deterministic version string so the Compliance Agent can
+    // later check whether the user's accepted version matches current.
+    const version = LEGAL_DOCUMENT_KEYS
+      .map((k) => `${k}@${LEGAL_DOCUMENTS[k].version}`)
+      .join('|');
+
+    await supabase
+      .from('profiles')
+      .update({
+        consent_accepted_at: new Date().toISOString(),
+        consent_accepted_version: version,
+      })
+      .eq('id', user.id);
+  }
+
+  return NextResponse.json({ ok: true, recorded: documents, fullPackAccepted: hasFullPack });
 }

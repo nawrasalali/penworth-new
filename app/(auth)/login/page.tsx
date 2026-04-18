@@ -43,6 +43,13 @@ function LoginForm() {
       });
 
       if (error) {
+        // Log the full error to the browser console so support can read the
+        // real reason code, not just the user-facing message. Real-world
+        // failure modes we've seen: "Email not confirmed" (user skipped the
+        // verification email), "Invalid login credentials" (typo / wrong
+        // password), rate-limit after repeated attempts. The message bubbles
+        // up as-is so users see Supabase's own wording.
+        console.error('[login] signInWithPassword failed:', error);
         setError(error.message);
         return;
       }
@@ -56,6 +63,7 @@ function LoginForm() {
       router.push(redirect);
       router.refresh();
     } catch (err) {
+      console.error('[login] unexpected exception:', err);
       setError(t('auth.genericError', locale));
     } finally {
       setLoading(false);
