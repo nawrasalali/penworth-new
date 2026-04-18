@@ -15,6 +15,7 @@ import {
   handleSubscriptionCancelled as guildHandleCancellation,
   handleRefund as guildHandleRefund,
 } from '@/lib/guild/commissions';
+import { logAudit } from '@/lib/audit';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -364,6 +365,28 @@ async function handleCreditPackPurchase(userId: string, session: Stripe.Checkout
     notes: `Purchased ${pack.name} pack (${pack.credits.toLocaleString()} credits) · session ${session.id} · $${pack.price}`,
   });
 
+  // Audit trail — credit_pack.purchase. Fire-and-forget so a logAudit
+  // failure cannot break the webhook (Stripe would then retry the whole
+  // event, leading to double-crediting).
+  void logAudit({
+    actorType: 'stripe_webhook',
+    actorUserId: userId,
+    action: 'credit_pack.purchase',
+    entityType: 'credit_transaction',
+    entityId: session.id,
+    after: {
+      credits_added: pack.credits,
+      price_usd: pack.price,
+      pack_id: pack.id,
+      pack_name: pack.name,
+      credits_purchased_new_total: newPurchased,
+    },
+    metadata: {
+      stripe_session_id: session.id,
+      stripe_customer_id: typeof session.customer === 'string' ? session.customer : null,
+    },
+  });
+
   console.log(`Credit pack purchased: ${userId} +${pack.credits} credits`);
 }
 
@@ -417,6 +440,24 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       .eq('id', orgId);
   }
 
+  // Audit trail — subscription.activate (covers both activations and
+  // plan changes; the change_type metadata disambiguates).
+  void logAudit({
+    actorType: 'stripe_webhook',
+    actorUserId: userId,
+    action: 'subscription.activate',
+    entityType: 'subscription',
+    entityId: subscription.id,
+    before: { plan: profile?.plan ?? 'free' },
+    after: { plan, credits_balance: isUpgrade ? limits.monthlyCredits : profile?.credits_balance ?? 0 },
+    metadata: {
+      change_type: isUpgrade ? 'upgrade' : (getPlanRank(plan) < getPlanRank(profile?.plan || 'free') ? 'downgrade' : 'renewal_or_update'),
+      stripe_price_id: priceId,
+      stripe_customer_id: customerId,
+      org_id: orgId,
+    },
+  });
+
   console.log(`Subscription ${isUpgrade ? 'upgraded' : 'changed'}: ${userId} -> ${plan}`);
 }
 
@@ -460,6 +501,23 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     transaction_type: 'admin_adjustment',
     reference_id: null,
     notes: `Subscription canceled - reverted to Free plan · subscription ${subscription.id}`,
+  });
+
+  // Audit trail — subscription.cancel. This is a severity-info event;
+  // routine churn, not an incident. Board reports aggregate monthly
+  // cancels from audit_log.
+  void logAudit({
+    actorType: 'stripe_webhook',
+    actorUserId: userId,
+    action: 'subscription.cancel',
+    entityType: 'subscription',
+    entityId: subscription.id,
+    after: { plan: 'free' },
+    metadata: {
+      stripe_customer_id: customerId,
+      org_id: orgId,
+      cancel_reason: subscription.cancellation_details?.reason ?? null,
+    },
   });
 
   console.log(`Subscription canceled: ${userId} -> free`);
@@ -616,6 +674,30 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
   } catch (err) {
     console.error('[guild] Refund clawback failed:', err);
   }
+
+  // Audit trail — refund.issue. Refunds go through even when the guild
+  // clawback fails (the try/catch above swallows that error), so we log
+  // regardless. Amount is in major units (USD) for human readability
+  // in the investor report, with minor-unit original preserved in
+  // metadata.
+  void logAudit({
+    actorType: 'stripe_webhook',
+    action: 'refund.issue',
+    entityType: 'charge',
+    entityId: charge.id,
+    after: {
+      refund_amount_usd: (charge.amount_refunded ?? 0) / 100,
+      charge_amount_usd: (charge.amount ?? 0) / 100,
+      is_partial: (charge.amount_refunded ?? 0) < (charge.amount ?? 0),
+    },
+    metadata: {
+      stripe_charge_id: charge.id,
+      stripe_invoice_id: invoiceId,
+      refund_amount_cents: charge.amount_refunded,
+      charge_amount_cents: charge.amount,
+      currency: charge.currency,
+    },
+  });
 }
 
 /**
@@ -642,4 +724,29 @@ async function handleChargeDispute(stripe: Stripe, dispute: Stripe.Dispute) {
   } catch (err) {
     console.error('[guild] Dispute clawback failed:', err);
   }
+
+  // Audit trail — refund.issue with severity=warning. Disputes are
+  // always worth a board-report line item: they signal either fraud,
+  // service failure, or user dissatisfaction, all of which investors
+  // care about tracking. dispute.reason is the Stripe-level code
+  // ('fraudulent', 'product_not_received', etc.).
+  void logAudit({
+    actorType: 'stripe_webhook',
+    action: 'refund.issue',
+    entityType: 'dispute',
+    entityId: dispute.id,
+    severity: 'warning',
+    after: {
+      dispute_amount_usd: (dispute.amount ?? 0) / 100,
+      status: dispute.status,
+      reason: dispute.reason,
+    },
+    metadata: {
+      stripe_dispute_id: dispute.id,
+      stripe_charge_id: chargeId,
+      dispute_amount_cents: dispute.amount,
+      currency: dispute.currency,
+      is_charge_refundable: dispute.is_charge_refundable,
+    },
+  });
 }
