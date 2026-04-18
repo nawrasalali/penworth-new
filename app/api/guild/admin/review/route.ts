@@ -4,6 +4,7 @@ import {
   sendGuildInterviewInvitationEmail,
   sendGuildDeclineEmail,
 } from '@/lib/email/guild';
+import { logAuditFromRequest } from '@/lib/audit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -89,10 +90,10 @@ export async function POST(request: NextRequest) {
 
   try {
     if (payload.action === 'accept') {
-      return await handleAccept(admin, app, user.id);
+      return await handleAccept(admin, app, user.id, request);
     }
     if (payload.action === 'decline') {
-      return await handleDecline(admin, app, user.id, payload.decision_reason);
+      return await handleDecline(admin, app, user.id, payload.decision_reason, request);
     }
   } catch (err) {
     console.error('[guild/admin/review]', err);
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
 
 // ---------------------------------------------------------------------------
 
-async function handleAccept(admin: any, app: any, adminUserId: string) {
+async function handleAccept(admin: any, app: any, adminUserId: string, request: NextRequest) {
   // Transition pending_review → invited_to_interview via the RPC.
   // The RPC enforces the correct source state and is idempotent on re-calls.
   const { data: result, error } = await admin.rpc('guild_invite_to_interview', {
@@ -127,6 +128,25 @@ async function handleAccept(admin: any, app: any, adminUserId: string) {
     language: app.primary_language,
   });
 
+  // Audit — guild.invite_to_interview. NOT guild.accept — that's the
+  // final post-rubric event in finalize-acceptance. This is the mid-
+  // pipeline "proceed to voice interview" step.
+  void logAuditFromRequest(request, {
+    actorType: 'admin',
+    actorUserId: adminUserId,
+    action: 'guild.invite_to_interview',
+    entityType: 'guild_application',
+    entityId: app.id,
+    before: { application_status: app.application_status },
+    after: { application_status: 'invited_to_interview' },
+    metadata: {
+      already_invited: result.already_invited ?? false,
+      applicant_email: app.email,
+      applicant_full_name: app.full_name,
+      applicant_language: app.primary_language,
+    },
+  });
+
   return NextResponse.json({
     ok: true,
     status: 'invited_to_interview',
@@ -139,6 +159,7 @@ async function handleDecline(
   app: any,
   adminUserId: string,
   decisionReason: string | null,
+  request: NextRequest,
 ) {
   const { error } = await admin
     .from('guild_applications')
@@ -158,6 +179,28 @@ async function handleDecline(
   await sendGuildDeclineEmail({
     email: app.email,
     fullName: app.full_name,
+  });
+
+  // Audit — guild.decline. Declines are relevant for board reports
+  // (application quality trends, decline-reason patterns) and for
+  // applicants who dispute the decision ('show me every step of the
+  // decision process' → entity timeline via audit_log_entity_idx).
+  void logAuditFromRequest(request, {
+    actorType: 'admin',
+    actorUserId: adminUserId,
+    action: 'guild.decline',
+    entityType: 'guild_application',
+    entityId: app.id,
+    before: { application_status: app.application_status },
+    after: {
+      application_status: 'declined',
+      decision_reason: decisionReason ?? null,
+    },
+    metadata: {
+      applicant_email: app.email,
+      applicant_full_name: app.full_name,
+      applicant_language: app.primary_language,
+    },
   });
 
   return NextResponse.json({ ok: true, status: 'declined' });

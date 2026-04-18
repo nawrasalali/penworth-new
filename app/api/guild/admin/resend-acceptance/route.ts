@@ -4,6 +4,7 @@ import {
   sendGuildInterviewInvitationEmail,
   sendGuildPostInterviewCodeEmail,
 } from '@/lib/email/guild';
+import { logAuditFromRequest } from '@/lib/audit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -103,6 +104,25 @@ export async function POST(request: NextRequest) {
       applicationId: application.id,
       language: application.primary_language,
     });
+
+    // Audit — admin.override. Resends are benign (info severity) but
+    // they DO happen, and an applicant complaining 'I never got the
+    // email' might turn out to be a case where the admin resent 3
+    // times to a typo'd address. The audit trail captures it.
+    void logAuditFromRequest(request, {
+      actorType: 'admin',
+      actorUserId: user.id,
+      action: 'admin.override',
+      entityType: 'guild_application',
+      entityId: application.id,
+      metadata: {
+        kind: 'resend_interview_invitation',
+        sent_to: application.email,
+        email_success: result.success,
+        email_error: result.success ? undefined : String(result.error ?? 'unknown'),
+      },
+    });
+
     return NextResponse.json({
       ok: result.success,
       kind: 'interview_invitation',
@@ -135,6 +155,28 @@ export async function POST(request: NextRequest) {
       referralCode: member.referral_code,
       tier: member.tier,
     });
+
+    // Audit — admin.override for a code-reveal resend. Referral codes
+    // aren't secret per-se (Guild members share them publicly to drive
+    // signups), but resending the welcome email unnecessarily could
+    // cause confusion ('did I lose my membership?'). Board reports
+    // aggregate these as a product-experience signal.
+    void logAuditFromRequest(request, {
+      actorType: 'admin',
+      actorUserId: user.id,
+      action: 'admin.override',
+      entityType: 'guild_application',
+      entityId: application.id,
+      metadata: {
+        kind: 'resend_post_interview_code',
+        sent_to: application.email,
+        referral_code: member.referral_code,
+        tier: member.tier,
+        email_success: result.success,
+        email_error: result.success ? undefined : String(result.error ?? 'unknown'),
+      },
+    });
+
     return NextResponse.json({
       ok: result.success,
       kind: 'post_interview_code',

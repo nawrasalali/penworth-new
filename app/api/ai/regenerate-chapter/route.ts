@@ -5,6 +5,7 @@ import { modelFor, maxTokensFor, calculateCost } from '@/lib/ai/model-router';
 import { loadAgentBrief, formatBriefForPrompt } from '@/lib/ai/agent-brief';
 import { CREDIT_COSTS } from '@/types/agent-workflow';
 import { shouldDeductCreditsForProject } from '@/lib/projects/should-deduct-credits';
+import { logAuditFromRequest } from '@/lib/audit';
 
 const anthropic = new Anthropic();
 
@@ -272,6 +273,45 @@ Rewrite the chapter now.`;
   } catch {
     // usage table optional
   }
+
+  // Audit trail — credit.spend. We treat all three billing branches
+  // (admin-free, grant-billed, normal paid) as the same event type with
+  // the `billing_type` in metadata to disambiguate. A regen that cost
+  // 0 credits because of a showcase grant is still a meaningful event
+  // for investor reporting — it's an agent-action at the platform level.
+  const billingType = profile.is_admin
+    ? 'admin_free'
+    : !deductCredits
+      ? 'grant_billed'
+      : 'credit_spent';
+  const creditsCharged = profile.is_admin ? 0 : deductCredits ? cost : 0;
+
+  void logAuditFromRequest(request, {
+    actorType: 'user',
+    actorUserId: user.id,
+    action: 'credit.spend',
+    entityType: 'chapter',
+    entityId: chapterId,
+    before: {
+      credits_balance: profile.credits_balance,
+      credits_purchased: profile.credits_purchased,
+    },
+    after: {
+      credits_balance: newBalance,
+      credits_purchased: newPurchased,
+      credits_charged: creditsCharged,
+    },
+    metadata: {
+      project_id: projectId,
+      chapter_title: chapter.title,
+      regeneration_count: regenerationCount,
+      billing_type: billingType,
+      model: modelFor('write_chapter'),
+      input_tokens: response.usage.input_tokens,
+      output_tokens: response.usage.output_tokens,
+      cost_usd: calculateCost('write_chapter', response.usage.input_tokens, response.usage.output_tokens),
+    },
+  });
 
   return NextResponse.json({
     success: true,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { logAuditFromRequest, type AuditSeverity } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -171,6 +172,39 @@ export async function POST(req: NextRequest, props: { params: Promise<{ payoutId
       { status: 500 },
     );
   }
+
+  // Audit trail — admin.override. Payouts are real money leaving the
+  // business, so every single state change goes in the append-only log.
+  // Critical-severity transitions:
+  //   'sent'      → money just went out the door (Wise / USDT payment).
+  //   'failed'    → payment attempt failed; triage required.
+  //   'cancelled' → admin reversed a queued/approved payout; the reason
+  //                 is mandatory and captured above.
+  // Other transitions are info-level but still logged for the complete
+  // audit chain (approved, processing, confirmed, re-queue).
+  const severity: AuditSeverity =
+    to === 'sent' || to === 'failed' || to === 'cancelled' ? 'critical' : 'info';
+
+  void logAuditFromRequest(req, {
+    actorType: 'admin',
+    actorUserId: user.id,
+    action: 'admin.override',
+    entityType: 'guild_payout',
+    entityId: payoutId,
+    before: { status: from },
+    after: {
+      status: to,
+      reference_number: reference ?? null,
+      failure_reason: reason ?? null,
+    },
+    metadata: {
+      guildmember_id: current.guildmember_id,
+      payout_month: current.payout_month,
+      amount_usd: current.amount_usd,
+      transition: `${from}→${to}`,
+    },
+    severity,
+  });
 
   return NextResponse.json({
     ok: true,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { logAuditFromRequest } from '@/lib/audit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -91,6 +92,32 @@ export async function POST(request: NextRequest) {
       { status },
     );
   }
+
+  // Audit — guild.grade_rubric. Pass and fail both go through this
+  // single action; the `result` metadata disambiguates. A 'fail' result
+  // auto-transitions the application to 'declined' inside the RPC, so
+  // we ALSO capture that side-effect in the after payload. Not a
+  // separate guild.decline audit call — grading is the causal event.
+  const wasAutoDeclined = payload.result === 'fail';
+  void logAuditFromRequest(request, {
+    actorType: 'admin',
+    actorUserId: user.id,
+    action: 'guild.grade_rubric',
+    entityType: 'guild_interview',
+    entityId: payload.interview_id,
+    after: {
+      rubric_result: payload.result,
+      reviewer_notes: payload.reviewer_notes ?? null,
+      auto_declined_application: wasAutoDeclined,
+      already_graded: (result as any)?.already_graded ?? false,
+    },
+    metadata: {
+      application_id: (result as any)?.application_id,
+      // Rubric grading at 'pass' is a precondition for final acceptance; at
+      // 'fail' it terminates the pipeline. Severity info for both — these
+      // aren't alarms, just important board-report line items.
+    },
+  });
 
   return NextResponse.json(result);
 }

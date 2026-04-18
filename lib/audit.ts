@@ -40,7 +40,8 @@
  *    CREDITS:    credit.grant | credit.spend | credit.refund
  *    STRIPE:     subscription.activate | subscription.cancel
  *                | credit_pack.purchase | refund.issue
- *    GUILD:      guild.apply | guild.accept | guild.decline
+ *    GUILD:      guild.apply | guild.invite_to_interview
+ *                | guild.grade_rubric | guild.accept | guild.decline
  *                | guild.tier_promote | guild.probation_start
  *                | guild.probation_lift | guild.terminate
  *    ADMIN:      admin.impersonate | admin.override | admin.credit_adjust
@@ -88,6 +89,8 @@ export type AuditAction =
   | 'refund.issue'
   // Guild
   | 'guild.apply'
+  | 'guild.invite_to_interview'
+  | 'guild.grade_rubric'
   | 'guild.accept'
   | 'guild.decline'
   | 'guild.tier_promote'
