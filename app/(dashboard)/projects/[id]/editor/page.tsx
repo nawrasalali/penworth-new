@@ -456,12 +456,15 @@ function EditorContentNew() {
   // Start research process — real AI call
   const startResearch = async () => {
     setIsResearching(true);
+    // Step labels are localised to the user's interface language so the
+    // "live research feed" reads naturally. These are user-visible only —
+    // the server-side research call doesn't key off these strings.
     setResearchSteps([
-      { text: 'Reading your interview answers...', completed: false },
-      { text: 'Identifying knowledge gaps...', completed: false },
-      { text: 'Generating credibility-tagged findings...', completed: false },
-      { text: 'Ranking by relevance to your idea...', completed: false },
-      { text: 'Compiling research foundation...', completed: false },
+      { text: t('research.step.reading', locale), completed: false },
+      { text: t('research.step.identifying', locale), completed: false },
+      { text: t('research.step.generating', locale), completed: false },
+      { text: t('research.step.ranking', locale), completed: false },
+      { text: t('research.step.compiling', locale), completed: false },
     ]);
 
     // Animate the steps optimistically while the real call runs
@@ -993,6 +996,7 @@ function EditorContentNew() {
             onUploadFile={handleUploadResearchFile}
             onRemoveResource={handleRemoveResource}
             onApprove={handleApproveResearch}
+            locale={locale}
           />
         );
 

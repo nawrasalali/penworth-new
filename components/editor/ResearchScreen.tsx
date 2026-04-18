@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ResearchResource } from '@/types/agent-workflow';
 import { cn } from '@/lib/utils';
+import { t, type Locale } from '@/lib/i18n/strings';
 import {
   FlaskConical,
   CheckCircle2,
@@ -27,6 +28,7 @@ interface ResearchScreenProps {
   onUploadFile: (file: File) => void;
   onRemoveResource: (id: string) => void;
   onApprove: () => void;
+  locale?: Locale;
 }
 
 export function ResearchScreen({
@@ -37,7 +39,8 @@ export function ResearchScreen({
   onAddUrl,
   onUploadFile,
   onRemoveResource,
-  onApprove
+  onApprove,
+  locale = 'en',
 }: ResearchScreenProps) {
   const [newUrl, setNewUrl] = useState('');
   
@@ -57,14 +60,14 @@ export function ResearchScreen({
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
           <FlaskConical className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-bold">Research In Progress</h1>
+          <h1 className="text-xl font-bold">{t('research.title', locale)}</h1>
         </div>
       </div>
       
       {/* Live Research Feed */}
       <div className="rounded-xl border bg-card p-4 mb-6">
         <h3 className="font-semibold mb-3 text-sm text-muted-foreground">
-          Live Research Feed:
+          {t('research.liveFeed', locale)}
         </h3>
         <div className="space-y-2">
           {researchSteps.map((step, idx) => (
@@ -91,7 +94,7 @@ export function ResearchScreen({
       {/* Select Research to Include */}
       {generatedResources.length > 0 && (
         <div className="mb-6">
-          <h3 className="font-semibold mb-3">Select research to include:</h3>
+          <h3 className="font-semibold mb-3">{t('research.selectInclude', locale)}</h3>
           <div className="space-y-2">
             {generatedResources.map((resource) => (
               <label
@@ -125,7 +128,7 @@ export function ResearchScreen({
       
       {/* Add Your Own Resources */}
       <div className="rounded-xl border bg-muted/30 p-4 mb-6">
-        <h3 className="font-semibold mb-3">Add your own resources:</h3>
+        <h3 className="font-semibold mb-3">{t('research.addYourOwn', locale)}</h3>
         
         {/* URL Input */}
         <div className="flex gap-2 mb-3">
@@ -149,10 +152,10 @@ export function ResearchScreen({
         {/* File Upload */}
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Upload research document</span>
+          <span className="text-sm text-muted-foreground">{t('research.uploadResearchDoc', locale)}</span>
           <Button variant="outline" size="sm" asChild className="ml-auto">
             <label className="cursor-pointer">
-              Choose File
+              {t('research.chooseFile', locale)}
               <input
                 type="file"
                 className="hidden"
@@ -169,7 +172,7 @@ export function ResearchScreen({
         {/* User's Resources */}
         {userResources.length > 0 && (
           <div className="mt-4 space-y-2">
-            <h4 className="text-sm font-medium text-muted-foreground">Your resources:</h4>
+            <h4 className="text-sm font-medium text-muted-foreground">{t('research.yourResources', locale)}</h4>
             {userResources.map((resource) => (
               <div
                 key={resource.id}
@@ -204,14 +207,14 @@ export function ResearchScreen({
           size="lg"
         >
           <CheckCircle2 className="mr-2 h-4 w-4" />
-          Approve Research & Continue
+          {t('research.approveContinue', locale)}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
       
       {selectedCount === 0 && !isResearching && (
         <p className="text-center text-sm text-muted-foreground mt-3">
-          Select at least one research item to continue
+          {t('research.selectAtLeastOne', locale)}
         </p>
       )}
     </div>
