@@ -15,8 +15,10 @@ import {
   Briefcase,
   Coins,
   Crown,
+  Handshake,
 } from 'lucide-react';
 import { formatRelativeTime, formatWordCount, CONTENT_TYPE_LABELS, STATUS_COLORS } from '@/lib/utils';
+import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
 const quickStartTemplates = [
   { icon: BookOpen, label: 'Book', type: 'book', description: 'Write a full book with AI assistance' },
@@ -42,12 +44,15 @@ export default async function DashboardPage() {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Fetch profile with plan and credits
+  // Fetch profile with plan, credits and language preference
   const { data: profile } = await supabase
     .from('profiles')
-    .select('plan, credits_balance, credits_purchased, documents_this_month')
+    .select('plan, credits_balance, credits_purchased, documents_this_month, preferred_language')
     .eq('id', user?.id)
     .single();
+
+  const rawLang = (profile?.preferred_language || 'en').toLowerCase();
+  const locale: Locale = isSupportedLocale(rawLang) ? rawLang : 'en';
 
   const plan = (profile?.plan || 'free') as keyof typeof PLAN_DISPLAY;
   const planInfo = PLAN_DISPLAY[plan];
@@ -165,6 +170,29 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Guild promo banner — links to partner program subdomain */}
+      <a
+        href="https://guild.penworth.ai"
+        rel="noopener noreferrer"
+        className="group mb-8 block rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent hover:from-amber-500/15 hover:via-amber-500/10 transition-colors"
+      >
+        <div className="flex items-center gap-4 p-6">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-amber-500/20">
+            <Handshake className="h-6 w-6 text-amber-600 dark:text-amber-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-base">{t('dashboard.guildCardTitle', locale)}</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {t('dashboard.guildCardBody', locale)}
+            </p>
+          </div>
+          <div className="shrink-0 hidden sm:flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400 group-hover:gap-3 transition-all">
+            {t('dashboard.guildCardCta', locale)}
+            <ArrowRight className="h-4 w-4" />
+          </div>
+        </div>
+      </a>
 
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Recent Projects */}

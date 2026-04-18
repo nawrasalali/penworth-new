@@ -17,6 +17,8 @@ import {
   CreditCard,
   Gift,
   ShieldCheck,
+  Handshake,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
@@ -127,6 +129,26 @@ export function Sidebar({ user, organization, locale = 'en' }: SidebarProps) {
                 </Link>
               );
             })}
+          </div>
+
+          {/* Guild — external link to the partner program */}
+          <div className="pt-3">
+            <a
+              href="https://guild.penworth.ai"
+              rel="noopener noreferrer"
+              className="group flex items-start gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 text-foreground"
+            >
+              <Handshake className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-500 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span>{t('nav.guild', locale)}</span>
+                  <ExternalLink className="h-3 w-3 text-muted-foreground/70 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+                <div className="text-[11px] font-normal text-muted-foreground leading-tight mt-0.5">
+                  {t('nav.guildSubtitle', locale)}
+                </div>
+              </div>
+            </a>
           </div>
 
           {/* Organization Section */}

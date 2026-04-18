@@ -23,6 +23,11 @@ export type StringKey =
   | 'nav.referrals' | 'nav.billing' | 'nav.settings' | 'nav.help'
   | 'nav.commandCenter' | 'nav.organization' | 'nav.members'
   | 'nav.newProject' | 'nav.signOut' | 'nav.userFallback'
+  | 'nav.guild' | 'nav.guildSubtitle'
+  // Dashboard home — Guild promo card
+  | 'dashboard.guildCardTitle' | 'dashboard.guildCardBody' | 'dashboard.guildCardCta'
+  // Footer
+  | 'footer.guild'
   // My Projects page
   | 'projects.title' | 'projects.subtitle' | 'projects.newProject'
   | 'projects.noMatch' | 'projects.createFirst' | 'projects.noneYet' | 'projects.noneYetBody'
@@ -286,6 +291,12 @@ const en: Bundle = {
   'nav.newProject': 'New Project',
   'nav.signOut': 'Sign out',
   'nav.userFallback': 'User',
+  'nav.guild': 'Guild',
+  'nav.guildSubtitle': 'Earn 20–40% commission',
+  'dashboard.guildCardTitle': 'Love Penworth? Get paid to share it',
+  'dashboard.guildCardBody': 'Join the Penworth Guild and earn 20–40% commission for every author you bring in. Lifetime revenue share. No cap.',
+  'dashboard.guildCardCta': 'Join the Guild',
+  'footer.guild': 'Guild',
 
   'projects.title': 'My Projects',
   'projects.subtitle': "Everything you've created, grouped by category.",
@@ -724,6 +735,12 @@ const ar: Bundle = {
   'nav.newProject': 'مشروع جديد',
   'nav.signOut': 'تسجيل الخروج',
   'nav.userFallback': 'المستخدم',
+  'nav.guild': 'النقابة',
+  'nav.guildSubtitle': 'اربح عمولة 20–40٪',
+  'dashboard.guildCardTitle': 'تحب بنوورث؟ احصل على أموال مقابل مشاركتها',
+  'dashboard.guildCardBody': 'انضم إلى نقابة بنوورث واربح عمولة 20–40٪ عن كل كاتب تجلبه. حصة إيرادات مدى الحياة. بلا حد أقصى.',
+  'dashboard.guildCardCta': 'انضم إلى النقابة',
+  'footer.guild': 'النقابة',
 
   'projects.title': 'مشاريعي',
   'projects.subtitle': 'كل ما أنشأته، مصنّفًا حسب الفئة.',
@@ -1162,6 +1179,12 @@ const es: Bundle = {
   'nav.newProject': 'Nuevo Proyecto',
   'nav.signOut': 'Cerrar sesión',
   'nav.userFallback': 'Usuario',
+  'nav.guild': 'Gremio',
+  'nav.guildSubtitle': 'Gana 20–40 % de comisión',
+  'dashboard.guildCardTitle': '¿Te gusta Penworth? Cobra por compartirlo',
+  'dashboard.guildCardBody': 'Únete al Gremio de Penworth y gana 20–40 % de comisión por cada autor que traigas. Reparto de ingresos de por vida. Sin límite.',
+  'dashboard.guildCardCta': 'Unirme al Gremio',
+  'footer.guild': 'Gremio',
 
   'projects.title': 'Mis Proyectos',
   'projects.subtitle': 'Todo lo que has creado, agrupado por categoría.',
@@ -1600,6 +1623,12 @@ const fr: Bundle = {
   'nav.newProject': 'Nouveau projet',
   'nav.signOut': 'Se déconnecter',
   'nav.userFallback': 'Utilisateur',
+  'nav.guild': 'Guilde',
+  'nav.guildSubtitle': 'Gagnez 20–40 % de commission',
+  'dashboard.guildCardTitle': 'Vous aimez Penworth ? Soyez payé pour le partager',
+  'dashboard.guildCardBody': 'Rejoignez la Guilde Penworth et gagnez 20–40 % de commission pour chaque auteur que vous amenez. Partage de revenus à vie. Sans plafond.',
+  'dashboard.guildCardCta': 'Rejoindre la Guilde',
+  'footer.guild': 'Guilde',
 
   'projects.title': 'Mes projets',
   'projects.subtitle': 'Tout ce que vous avez créé, classé par catégorie.',
@@ -2038,6 +2067,12 @@ const pt: Bundle = {
   'nav.newProject': 'Novo Projeto',
   'nav.signOut': 'Sair',
   'nav.userFallback': 'Usuário',
+  'nav.guild': 'Guilda',
+  'nav.guildSubtitle': 'Ganhe 20–40% de comissão',
+  'dashboard.guildCardTitle': 'Gosta da Penworth? Seja pago para compartilhar',
+  'dashboard.guildCardBody': 'Entre na Guilda Penworth e ganhe 20–40% de comissão por cada autor que trouxer. Participação nos lucros vitalícia. Sem limite.',
+  'dashboard.guildCardCta': 'Entrar na Guilda',
+  'footer.guild': 'Guilda',
 
   'projects.title': 'Meus Projetos',
   'projects.subtitle': 'Tudo o que você criou, agrupado por categoria.',
@@ -2476,6 +2511,12 @@ const ru: Bundle = {
   'nav.newProject': 'Новый проект',
   'nav.signOut': 'Выйти',
   'nav.userFallback': 'Пользователь',
+  'nav.guild': 'Гильдия',
+  'nav.guildSubtitle': 'Зарабатывайте 20–40% комиссии',
+  'dashboard.guildCardTitle': 'Нравится Penworth? Получайте деньги за то, что делитесь им',
+  'dashboard.guildCardBody': 'Присоединяйтесь к Гильдии Penworth и зарабатывайте 20–40% комиссии за каждого приведённого автора. Пожизненное участие в доходе. Без ограничений.',
+  'dashboard.guildCardCta': 'Вступить в Гильдию',
+  'footer.guild': 'Гильдия',
 
   'projects.title': 'Мои проекты',
   'projects.subtitle': 'Всё, что вы создали, по категориям.',
@@ -2914,6 +2955,12 @@ const zh: Bundle = {
   'nav.newProject': '新建项目',
   'nav.signOut': '退出登录',
   'nav.userFallback': '用户',
+  'nav.guild': '公会',
+  'nav.guildSubtitle': '赚取 20–40% 佣金',
+  'dashboard.guildCardTitle': '喜欢 Penworth？分享即可赚钱',
+  'dashboard.guildCardBody': '加入 Penworth 公会，每推荐一位作者即可获得 20–40% 佣金。终身分成，无上限。',
+  'dashboard.guildCardCta': '加入公会',
+  'footer.guild': '公会',
 
   'projects.title': '我的项目',
   'projects.subtitle': '您创建的所有内容,按类别分组。',
@@ -3352,6 +3399,12 @@ const bn: Bundle = {
   'nav.newProject': 'নতুন প্রকল্প',
   'nav.signOut': 'সাইন আউট',
   'nav.userFallback': 'ব্যবহারকারী',
+  'nav.guild': 'গিল্ড',
+  'nav.guildSubtitle': '২০–৪০% কমিশন উপার্জন করুন',
+  'dashboard.guildCardTitle': 'Penworth পছন্দ? শেয়ার করে উপার্জন করুন',
+  'dashboard.guildCardBody': 'Penworth গিল্ডে যোগ দিন এবং আপনি যে প্রতিটি লেখককে নিয়ে আসবেন তার জন্য ২০–৪০% কমিশন উপার্জন করুন। আজীবন রাজস্ব ভাগাভাগি। কোনো সীমা নেই।',
+  'dashboard.guildCardCta': 'গিল্ডে যোগ দিন',
+  'footer.guild': 'গিল্ড',
 
   'projects.title': 'আমার প্রকল্প',
   'projects.subtitle': 'আপনি যা তৈরি করেছেন সব, বিভাগ অনুসারে সাজানো।',
@@ -3790,6 +3843,12 @@ const hi: Bundle = {
   'nav.newProject': 'नई परियोजना',
   'nav.signOut': 'साइन आउट',
   'nav.userFallback': 'उपयोगकर्ता',
+  'nav.guild': 'गिल्ड',
+  'nav.guildSubtitle': '20–40% कमीशन कमाएं',
+  'dashboard.guildCardTitle': 'Penworth पसंद है? इसे साझा करके पैसे कमाएं',
+  'dashboard.guildCardBody': 'Penworth गिल्ड में शामिल हों और आपके द्वारा लाए गए प्रत्येक लेखक के लिए 20–40% कमीशन कमाएं। आजीवन राजस्व साझेदारी। कोई सीमा नहीं।',
+  'dashboard.guildCardCta': 'गिल्ड में शामिल हों',
+  'footer.guild': 'गिल्ड',
 
   'projects.title': 'मेरी परियोजनाएँ',
   'projects.subtitle': 'आपकी सभी रचनाएँ, श्रेणी के अनुसार।',
@@ -4228,6 +4287,12 @@ const id: Bundle = {
   'nav.newProject': 'Proyek Baru',
   'nav.signOut': 'Keluar',
   'nav.userFallback': 'Pengguna',
+  'nav.guild': 'Guild',
+  'nav.guildSubtitle': 'Dapatkan komisi 20–40%',
+  'dashboard.guildCardTitle': 'Suka Penworth? Dapatkan bayaran dengan membagikannya',
+  'dashboard.guildCardBody': 'Bergabunglah dengan Penworth Guild dan dapatkan komisi 20–40% untuk setiap penulis yang Anda bawa. Bagi hasil seumur hidup. Tanpa batas.',
+  'dashboard.guildCardCta': 'Bergabung dengan Guild',
+  'footer.guild': 'Guild',
 
   'projects.title': 'Proyek Saya',
   'projects.subtitle': 'Semua yang telah Anda buat, dikelompokkan berdasarkan kategori.',
@@ -4666,6 +4731,12 @@ const vi: Bundle = {
   'nav.newProject': 'Dự án mới',
   'nav.signOut': 'Đăng xuất',
   'nav.userFallback': 'Người dùng',
+  'nav.guild': 'Hội',
+  'nav.guildSubtitle': 'Kiếm hoa hồng 20–40%',
+  'dashboard.guildCardTitle': 'Yêu thích Penworth? Được trả tiền khi chia sẻ',
+  'dashboard.guildCardBody': 'Tham gia Hội Penworth và kiếm hoa hồng 20–40% cho mỗi tác giả bạn giới thiệu. Chia sẻ doanh thu trọn đời. Không giới hạn.',
+  'dashboard.guildCardCta': 'Tham gia Hội',
+  'footer.guild': 'Hội',
 
   'projects.title': 'Dự án của tôi',
   'projects.subtitle': 'Mọi thứ bạn đã tạo, được nhóm theo danh mục.',

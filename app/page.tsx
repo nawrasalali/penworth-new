@@ -241,7 +241,8 @@ const translations = {
     footer: { 
       copyright: '© 2026 A.C.N. 675 668 710 PTY LTD. All rights reserved.', 
       privacy: 'Privacy', 
-      terms: 'Terms' 
+      terms: 'Terms',
+      guild: 'Guild'
     },
   },
   ar: {
@@ -342,7 +343,8 @@ const translations = {
     footer: { 
       copyright: '© 2026 A.C.N. 675 668 710 PTY LTD', 
       privacy: 'الخصوصية', 
-      terms: 'الشروط' 
+      terms: 'الشروط',
+      guild: 'النقابة'
     },
   },
 };
@@ -687,6 +689,7 @@ export default function HomePage() {
             </div>
             <p className="text-sm text-neutral-500">{t.footer.copyright}</p>
             <div className="flex items-center gap-4">
+              <a href="https://guild.penworth.ai" rel="noopener noreferrer" className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors">{t.footer.guild}</a>
               <Link href="/legal/privacy" className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors">{t.footer.privacy}</Link>
               <Link href="/legal/terms" className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors">{t.footer.terms}</Link>
             </div>
