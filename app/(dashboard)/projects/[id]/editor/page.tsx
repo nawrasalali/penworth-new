@@ -1057,6 +1057,7 @@ function EditorContentNew() {
                 approved: true,
               });
             }}
+            locale={locale}
           />
         );
 

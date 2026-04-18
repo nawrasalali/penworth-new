@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { AuthorInfo, CoverConfig, CREDIT_COSTS } from '@/types/agent-workflow';
 import { cn } from '@/lib/utils';
+import { t, type Locale, type StringKey } from '@/lib/i18n/strings';
 import {
   ImageIcon,
   Upload,
@@ -18,13 +19,16 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-const COVER_SUGGESTIONS = [
-  'Professional and modern with abstract shapes',
-  'Elegant with subtle textures and clean typography',
-  'Bold and eye-catching with vibrant colors',
-  'Minimalist with focus on negative space',
-  'Warm and inviting with soft gradients',
-  'Classic hardcover book design with rich colors',
+// The six style-prompt chips are also used as the *text sent to the image
+// model*, so they must be real prompts in the user's language. We key them
+// by id and translate each.
+const COVER_SUGGESTION_KEYS: StringKey[] = [
+  'cover.suggestion.professional',
+  'cover.suggestion.elegant',
+  'cover.suggestion.bold',
+  'cover.suggestion.minimalist',
+  'cover.suggestion.warm',
+  'cover.suggestion.classic',
 ];
 
 interface CoverDesignScreenProps {
@@ -36,6 +40,7 @@ interface CoverDesignScreenProps {
   onGenerateCover: (type: 'front' | 'back', prompt?: string) => Promise<void>;
   onUploadAuthorPhoto: (file: File) => Promise<void>;
   onApproveAndContinue: () => void;
+  locale?: Locale;
 }
 
 export function CoverDesignScreen({
@@ -47,6 +52,7 @@ export function CoverDesignScreen({
   onGenerateCover,
   onUploadAuthorPhoto,
   onApproveAndContinue,
+  locale = 'en',
 }: CoverDesignScreenProps) {
   const [frontPrompt, setFrontPrompt] = useState('');
   const [backPrompt, setBackPrompt] = useState('');
@@ -103,9 +109,9 @@ export function CoverDesignScreen({
         <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
           <ImageIcon className="h-7 w-7 text-primary" />
         </div>
-        <h1 className="text-xl font-bold">Cover Design</h1>
+        <h1 className="text-xl font-bold">{t('cover.title', locale)}</h1>
         <p className="text-sm text-muted-foreground">
-          Design your front and back covers — first generation is free.
+          {t('cover.subtitle', locale)}
         </p>
       </div>
 
@@ -117,18 +123,18 @@ export function CoverDesignScreen({
             <div className="rounded-xl border bg-card p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4" /> Front Cover
+                  <ImageIcon className="h-4 w-4" /> {t('cover.front', locale)}
                 </h3>
                 {!frontIsFirstGen && (
                   <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Coins className="h-3 w-3" /> {CREDIT_COSTS.FRONT_COVER_REGENERATE} credits
+                    <Coins className="h-3 w-3" /> {CREDIT_COSTS.FRONT_COVER_REGENERATE} {t('cover.credits', locale)}
                   </span>
                 )}
               </div>
 
               {coverConfig.frontCoverUrl ? (
                 <div className="relative aspect-[2/3] bg-muted rounded-lg overflow-hidden mb-3">
-                  <img src={coverConfig.frontCoverUrl} alt="Front cover" className="w-full h-full object-cover" />
+                  <img src={coverConfig.frontCoverUrl} alt={t('cover.front', locale)} className="w-full h-full object-cover" />
                   <div className="absolute inset-x-0 top-0 p-3 bg-gradient-to-b from-black/60 to-transparent">
                     <div className="bg-black/40 backdrop-blur-sm px-2 py-1 rounded text-center">
                       <h2 className="text-white font-bold text-base">{bookTitle}</h2>
@@ -136,7 +142,7 @@ export function CoverDesignScreen({
                   </div>
                   <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent">
                     <div className="bg-black/40 backdrop-blur-sm px-2 py-1 rounded text-center">
-                      <p className="text-white text-xs">by {authorInfo.name || 'Author'}</p>
+                      <p className="text-white text-xs">{t('cover.byByline', locale)} {authorInfo.name || t('cover.authorFallback', locale)}</p>
                     </div>
                   </div>
                 </div>
@@ -144,7 +150,7 @@ export function CoverDesignScreen({
                 <div className="aspect-[2/3] bg-muted rounded-lg flex items-center justify-center mb-3">
                   <div className="text-center text-muted-foreground">
                     <ImageIcon className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                    <p className="text-xs">No front cover yet</p>
+                    <p className="text-xs">{t('cover.noFrontYet', locale)}</p>
                   </div>
                 </div>
               )}
@@ -152,19 +158,22 @@ export function CoverDesignScreen({
               <Textarea
                 value={frontPrompt}
                 onChange={(e) => setFrontPrompt(e.target.value)}
-                placeholder="Optional: describe the style you want (e.g. 'minimalist with warm gradients')"
+                placeholder={t('cover.frontPromptPlaceholder', locale)}
                 className="min-h-[60px] text-sm mb-2"
               />
               <div className="flex flex-wrap gap-1 mb-3">
-                {COVER_SUGGESTIONS.slice(0, 3).map((s, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setFrontPrompt(s)}
-                    className="text-[10px] px-2 py-0.5 rounded-full border hover:bg-primary/10 hover:border-primary transition-colors"
-                  >
-                    {s}
-                  </button>
-                ))}
+                {COVER_SUGGESTION_KEYS.slice(0, 3).map((k, i) => {
+                  const s = t(k, locale);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setFrontPrompt(s)}
+                      className="text-[10px] px-2 py-0.5 rounded-full border hover:bg-primary/10 hover:border-primary transition-colors"
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
               </div>
 
               <Button
@@ -173,15 +182,15 @@ export function CoverDesignScreen({
                 onClick={handleGenerateFront}
               >
                 {isGeneratingFront ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating…</>
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t('cover.generating', locale)}</>
                 ) : coverConfig.frontCoverUrl ? (
-                  <><RefreshCw className="h-4 w-4 mr-2" /> Regenerate{!frontIsFirstGen ? ` (${CREDIT_COSTS.FRONT_COVER_REGENERATE} credits)` : ''}</>
+                  <><RefreshCw className="h-4 w-4 mr-2" /> {t('cover.regenerate', locale)}{!frontIsFirstGen ? ` (${CREDIT_COSTS.FRONT_COVER_REGENERATE} ${t('cover.credits', locale)})` : ''}</>
                 ) : (
-                  <><Sparkles className="h-4 w-4 mr-2" /> Generate Front Cover (Free)</>
+                  <><Sparkles className="h-4 w-4 mr-2" /> {t('cover.generateFrontFree', locale)}</>
                 )}
               </Button>
               {!canPayFront && !frontIsFirstGen && (
-                <p className="text-xs text-red-500 mt-1 text-center">Not enough credits to regenerate.</p>
+                <p className="text-xs text-red-500 mt-1 text-center">{t('cover.notEnoughCredits', locale)}</p>
               )}
             </div>
 
@@ -189,24 +198,24 @@ export function CoverDesignScreen({
             <div className="rounded-xl border bg-card p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4" /> Back Cover
+                  <ImageIcon className="h-4 w-4" /> {t('cover.back', locale)}
                 </h3>
                 {!backIsFirstGen && (
                   <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Coins className="h-3 w-3" /> {CREDIT_COSTS.BACK_COVER_REGENERATE} credits
+                    <Coins className="h-3 w-3" /> {CREDIT_COSTS.BACK_COVER_REGENERATE} {t('cover.credits', locale)}
                   </span>
                 )}
               </div>
 
               {coverConfig.backCoverUrl ? (
                 <div className="aspect-[2/3] bg-muted rounded-lg overflow-hidden mb-3">
-                  <img src={coverConfig.backCoverUrl} alt="Back cover" className="w-full h-full object-cover" />
+                  <img src={coverConfig.backCoverUrl} alt={t('cover.back', locale)} className="w-full h-full object-cover" />
                 </div>
               ) : (
                 <div className="aspect-[2/3] bg-muted rounded-lg flex items-center justify-center mb-3">
                   <div className="text-center text-muted-foreground">
                     <ImageIcon className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                    <p className="text-xs">No back cover yet</p>
+                    <p className="text-xs">{t('cover.noBackYet', locale)}</p>
                   </div>
                 </div>
               )}
@@ -214,7 +223,7 @@ export function CoverDesignScreen({
               <Textarea
                 value={backPrompt}
                 onChange={(e) => setBackPrompt(e.target.value)}
-                placeholder="Optional: back cover style preferences"
+                placeholder={t('cover.backPromptPlaceholder', locale)}
                 className="min-h-[60px] text-sm mb-3"
               />
 
@@ -225,15 +234,15 @@ export function CoverDesignScreen({
                 onClick={handleGenerateBack}
               >
                 {isGeneratingBack ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating…</>
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t('cover.generating', locale)}</>
                 ) : coverConfig.backCoverUrl ? (
-                  <><RefreshCw className="h-4 w-4 mr-2" /> Regenerate{!backIsFirstGen ? ` (${CREDIT_COSTS.BACK_COVER_REGENERATE} credits)` : ''}</>
+                  <><RefreshCw className="h-4 w-4 mr-2" /> {t('cover.regenerate', locale)}{!backIsFirstGen ? ` (${CREDIT_COSTS.BACK_COVER_REGENERATE} ${t('cover.credits', locale)})` : ''}</>
                 ) : (
-                  <><Sparkles className="h-4 w-4 mr-2" /> Generate Back Cover (Free)</>
+                  <><Sparkles className="h-4 w-4 mr-2" /> {t('cover.generateBackFree', locale)}</>
                 )}
               </Button>
               {!canPayBack && !backIsFirstGen && (
-                <p className="text-xs text-red-500 mt-1 text-center">Not enough credits to regenerate.</p>
+                <p className="text-xs text-red-500 mt-1 text-center">{t('cover.notEnoughCredits', locale)}</p>
               )}
             </div>
           </div>
@@ -241,7 +250,7 @@ export function CoverDesignScreen({
           {/* AUTHOR CARD */}
           <div className="rounded-xl border bg-card p-5">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <User className="h-4 w-4" /> Author Information
+              <User className="h-4 w-4" /> {t('cover.authorInfoTitle', locale)}
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-[120px_1fr] gap-4">
@@ -269,9 +278,9 @@ export function CoverDesignScreen({
                   onClick={() => photoInputRef.current?.click()}
                 >
                   {isUploadingPhoto ? (
-                    <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Uploading…</>
+                    <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> {t('cover.uploading', locale)}</>
                   ) : (
-                    <><Upload className="h-3 w-3 mr-1" /> Photo</>
+                    <><Upload className="h-3 w-3 mr-1" /> {t('cover.photoButton', locale)}</>
                   )}
                 </Button>
               </div>
@@ -279,20 +288,20 @@ export function CoverDesignScreen({
               {/* Name + Bio */}
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium mb-1">Author Name *</label>
+                  <label className="block text-xs font-medium mb-1">{t('cover.authorNameLabel', locale)}</label>
                   <Input
                     value={authorInfo.name}
                     onChange={(e) => onUpdateAuthorInfo({ name: e.target.value })}
-                    placeholder="Your full name as it will appear on the cover"
+                    placeholder={t('cover.authorNamePlaceholder', locale)}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1">About the Author</label>
+                  <label className="block text-xs font-medium mb-1">{t('cover.aboutAuthorLabel', locale)}</label>
                   <Textarea
                     value={aboutDraft}
                     onChange={(e) => setAboutDraft(e.target.value)}
                     onBlur={() => onUpdateAuthorInfo({ aboutAuthor: aboutDraft })}
-                    placeholder="Write a short bio (appears on back cover and publishing pages)"
+                    placeholder={t('cover.aboutAuthorPlaceholder', locale)}
                     className="min-h-[80px]"
                   />
                 </div>
@@ -308,15 +317,15 @@ export function CoverDesignScreen({
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               {coverConfig.frontCoverUrl ? <Check className="h-3.5 w-3.5 text-green-500" /> : <span className="h-3.5 w-3.5 rounded-full border border-muted-foreground/40" />}
-              Front cover
+              {t('cover.footerFront', locale)}
             </span>
             <span className="flex items-center gap-1">
               {coverConfig.backCoverUrl ? <Check className="h-3.5 w-3.5 text-green-500" /> : <span className="h-3.5 w-3.5 rounded-full border border-muted-foreground/40" />}
-              Back cover
+              {t('cover.footerBack', locale)}
             </span>
             <span className="flex items-center gap-1">
               {authorReady ? <Check className="h-3.5 w-3.5 text-green-500" /> : <span className="h-3.5 w-3.5 rounded-full border border-muted-foreground/40" />}
-              Author info
+              {t('cover.footerAuthor', locale)}
             </span>
           </div>
           <Button
@@ -324,7 +333,7 @@ export function CoverDesignScreen({
             disabled={!bothCoversReady || !authorReady}
             onClick={onApproveAndContinue}
           >
-            Approve & Continue to Publish
+            {t('cover.approveContinue', locale)}
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
