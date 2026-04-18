@@ -22,7 +22,7 @@ export async function getWatermarkStatus(
 ): Promise<WatermarkStatus> {
   const { data: profile } = await supabase
     .from('profiles')
-    .select('subscription_tier, has_purchased_credits, has_referred_users')
+    .select('plan, has_purchased_credits, has_referred_users')
     .eq('id', userId)
     .single();
 
@@ -31,7 +31,10 @@ export async function getWatermarkStatus(
     return { shouldShowWatermark: true, reason: 'free_with_watermark' };
   }
 
-  const tier = profile.subscription_tier || 'free';
+  // 'plan' is the actual column on profiles — 'free' | 'pro' | 'max' | 'enterprise'.
+  // (Previous code queried 'subscription_tier' which doesn't exist; that made
+  // every paid user fall into the 'free' branch and show the watermark.)
+  const tier = profile.plan || 'free';
 
   // Paid tiers never have watermark
   if (tier !== 'free') {
@@ -66,7 +69,7 @@ export async function canCreateDocument(
 ): Promise<{ allowed: boolean; reason: string }> {
   const { data: profile } = await supabase
     .from('profiles')
-    .select('subscription_tier, credits_balance, credits_purchased, free_document_used_at, created_at')
+    .select('plan, credits_balance, credits_purchased, free_document_used_at, created_at')
     .eq('id', userId)
     .single();
 
@@ -74,7 +77,7 @@ export async function canCreateDocument(
     return { allowed: false, reason: 'Profile not found' };
   }
 
-  const tier = profile.subscription_tier || 'free';
+  const tier = profile.plan || 'free';
 
   // Paid tiers: check credits balance
   if (tier !== 'free') {

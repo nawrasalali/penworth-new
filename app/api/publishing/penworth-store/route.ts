@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { creditReferralIfEligible } from '@/lib/referrals';
 
 /**
  * Publish a completed project to Penworth Store (the 17th platform Penworth
@@ -164,9 +165,35 @@ export async function POST(request: NextRequest) {
     await supabase.from('project_publications').insert(pubPayload);
   }
 
+  // Track whether this is the first time the project is being published.
+  // This gates the referral-credit hook below — re-publishing an already-
+  // published book must not re-credit the referrer.
+  const isFirstPublish = project.status !== 'published';
+
   // Also flip the project's own status to 'published' if not already
-  if (project.status !== 'published') {
+  if (isFirstPublish) {
     await supabase.from('projects').update({ status: 'published' }).eq('id', projectId);
+  }
+
+  // Referral crediting. If this user was referred by someone, the referrer
+  // earns credits the first time this user publishes a document. The helper
+  // is idempotent (checks pending status, uses optimistic concurrency) so a
+  // future re-publish or a concurrent request can't double-credit. Wrapped
+  // in try/catch because publishing success must not depend on referral
+  // state — a failure here is logged, not surfaced.
+  if (isFirstPublish) {
+    try {
+      const result = await creditReferralIfEligible(supabase, user.id);
+      if (result.credited) {
+        console.log('[penworth-store/publish] Credited referrer', {
+          referrerId: result.referrerId,
+          creditsAwarded: result.creditsAwarded,
+          refereeId: user.id,
+        });
+      }
+    } catch (err) {
+      console.error('[penworth-store/publish] Referral credit hook failed:', err);
+    }
   }
 
   return NextResponse.json({
