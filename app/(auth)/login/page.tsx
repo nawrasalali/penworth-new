@@ -37,7 +37,7 @@ function LoginForm() {
 
     try {
       const supabase = createClient();
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -47,29 +47,12 @@ function LoginForm() {
         return;
       }
 
-      // If the user just came from ar.penworth.ai, send them home to ar.penworth.ai
-      // by hitting the callback route which reads preferred_language and rewrites
-      // the origin. Fall back to local redirect for English/no-lang users so we
-      // don't force an unnecessary full-page nav.
-      if (lang && lang !== 'en') {
-        window.location.href = `${window.location.origin}/auth/callback?${callbackQuery}&skip_code=1`;
-        return;
-      }
-
-      // Also check the user's stored preferred_language in case they're returning
-      // on the English host but signed up through another language originally.
-      if (data?.user?.id) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('preferred_language')
-          .eq('id', data.user.id)
-          .single();
-        if (profile?.preferred_language && profile.preferred_language !== 'en') {
-          window.location.href = `${window.location.origin}/auth/callback?redirect=${redirect}&lang=${profile.preferred_language}&skip_code=1`;
-          return;
-        }
-      }
-
+      // Language subdomains (es.penworth.ai, ar.penworth.ai, etc.) are
+      // static marketing landing pages — they don't host the authenticated
+      // app. Everyone who successfully signs in stays on this origin
+      // regardless of lang. The in-app shell localises based on
+      // profiles.preferred_language, which we persist via the normal
+      // signup flow and via the OAuth callback when lang is in the URL.
       router.push(redirect);
       router.refresh();
     } catch (err) {
