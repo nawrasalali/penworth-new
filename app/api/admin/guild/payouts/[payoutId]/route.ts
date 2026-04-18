@@ -35,10 +35,8 @@ const ALLOWED_TRANSITIONS: Record<Status, Status[]> = {
  * admin user in approved_by on approve, sets sent_at / confirmed_at on
  * sent / confirmed, and stores failure_reason on failed / cancelled.
  */
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { payoutId: string } },
-) {
+export async function POST(req: NextRequest, props: { params: Promise<{ payoutId: string }> }) {
+  const params = await props.params;
   const { payoutId } = params;
 
   // Authz — we gate on profiles.is_admin explicitly, in addition to the

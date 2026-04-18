@@ -30,11 +30,12 @@ const GRANT_CATEGORY_LABEL: Record<string, string> = {
   technical: 'Technical',
 };
 
-export default async function ProjectDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function ProjectDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = await createClient();
 
   const { data: project, error } = await supabase

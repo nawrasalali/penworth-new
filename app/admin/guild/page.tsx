@@ -25,11 +25,12 @@ interface ApplicationRow {
   decided_at: string | null;
 }
 
-export default async function GuildAdminPage({
-  searchParams,
-}: {
-  searchParams: { status?: string };
-}) {
+export default async function GuildAdminPage(
+  props: {
+    searchParams: Promise<{ status?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   // Verify admin (layout already does this, but we re-check for safety)
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

@@ -14,11 +14,12 @@ export const metadata = {
  * Shows the applicant what to expect and a "Begin Interview" button that
  * launches the live interview session.
  */
-export default async function InterviewSchedulePage({
-  searchParams,
-}: {
-  searchParams: { application_id?: string };
-}) {
+export default async function InterviewSchedulePage(
+  props: {
+    searchParams: Promise<{ application_id?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const { application_id } = searchParams;
 
   if (!application_id) {

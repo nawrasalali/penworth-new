@@ -74,11 +74,12 @@ function statusBadge(status: Status): string {
   return map[status];
 }
 
-export default async function AdminGuildPayoutsPage({
-  searchParams,
-}: {
-  searchParams: { status?: string; month?: string };
-}) {
+export default async function AdminGuildPayoutsPage(
+  props: {
+    searchParams: Promise<{ status?: string; month?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   // The /admin layout already enforces is_admin — no need to re-check here.
   const admin = createAdminClient();
 

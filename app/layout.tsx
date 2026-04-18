@@ -11,24 +11,24 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Penworth - AI Book Writing Platform',
+    default: 'Penworth - AI Document Writing Platform',
     template: '%s | Penworth',
   },
-  description: 'From idea to published book in 48 hours. Penworth transforms your expertise into professionally written, publication-ready books with AI.',
-  keywords: ['AI writing', 'book writing', 'AI author', 'publish book', 'write book with AI'],
+  description: 'From idea to final document in hours. Books, academic papers, business plans — Penworth transforms your expertise into professionally written, publication-ready documents with AI.',
+  keywords: ['AI writing', 'document writing', 'book writing', 'business plan', 'academic writing', 'AI author', 'publish with AI'],
   authors: [{ name: 'Penworth' }],
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: 'https://new.penworth.ai',
     siteName: 'Penworth',
-    title: 'Penworth - AI Book Writing Platform',
-    description: 'From idea to published book in 48 hours. Write your book with AI.',
+    title: 'Penworth - AI Document Writing Platform',
+    description: 'From idea to final document in hours. Write with AI.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Penworth - AI Book Writing Platform',
-    description: 'From idea to published book in 48 hours. Write your book with AI.',
+    title: 'Penworth - AI Document Writing Platform',
+    description: 'From idea to final document in hours. Write with AI.',
   },
   robots: {
     index: true,

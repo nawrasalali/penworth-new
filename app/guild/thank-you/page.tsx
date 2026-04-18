@@ -1,10 +1,11 @@
 import Link from 'next/link';
 
-export default function ThankYouPage({
-  searchParams,
-}: {
-  searchParams: { id?: string };
-}) {
+export default async function ThankYouPage(
+  props: {
+    searchParams: Promise<{ id?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   return (
     <div className="mx-auto max-w-3xl px-6 py-24 text-center">
       <div className="mb-10 inline-flex h-20 w-20 items-center justify-center rounded-full border border-[#d4af37]/30 bg-[#d4af37]/5">

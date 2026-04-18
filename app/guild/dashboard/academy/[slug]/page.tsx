@@ -18,7 +18,8 @@ function tierLabel(tier: string): string {
   return tier.charAt(0).toUpperCase() + tier.slice(1);
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }) {
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const admin = createAdminClient();
   const { data } = await admin
     .from('guild_academy_modules')
@@ -28,7 +29,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   return { title: data?.title ?? 'Academy Module' };
 }
 
-export default async function AcademyModulePage({ params }: { params: { slug: string } }) {
+export default async function AcademyModulePage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const supabase = await createClient();
   const {
     data: { user },
