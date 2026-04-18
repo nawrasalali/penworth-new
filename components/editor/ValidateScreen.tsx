@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ValidationScore } from '@/types/agent-workflow';
 import { getValidationRubric } from '@/lib/ai/interview-questions';
+import { applyRubricLocale } from '@/lib/ai/rubric-i18n';
 import { cn } from '@/lib/utils';
 import { t, type Locale, type StringKey } from '@/lib/i18n/strings';
 import {
@@ -78,13 +79,16 @@ export function ValidateScreen({
   const [score, setScore] = useState<ValidationScore | null>(null);
   const [proposal, setProposal] = useState<ProposedIdea | null>(null);
 
-  // Doc-type-aware copy: different document types see different intro, labels,
-  // and placeholders on the Validate screen. Cheap lookup — no network. These
-  // rubric strings are NOT currently translated — they live in
-  // lib/ai/interview-questions.ts and require a separate per-doc-type
-  // translation pass. For now they render in English regardless of locale;
-  // the surrounding chrome respects the user's language.
-  const rubric = useMemo(() => getValidationRubric(contentType), [contentType]);
+  // Doc-type-aware copy: different document types see different intro,
+  // labels, and placeholders on the Validate screen. `applyRubricLocale`
+  // overlays the user's language onto the user-visible fields (intro,
+  // inputLabel, inputPlaceholder, buttonLabel); the source rubric's
+  // `expertise` and `criteria` are preserved verbatim for the server-side
+  // AI prompt (which is English-only by design).
+  const rubric = useMemo(
+    () => applyRubricLocale(getValidationRubric(contentType), locale),
+    [contentType, locale],
+  );
 
   const handleValidate = async () => {
     if (!topic.trim()) return;
