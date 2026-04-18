@@ -141,13 +141,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Log the credit transaction
+    // Log the credit transaction.
+    // Schema is {user_id, amount, transaction_type, reference_id, notes}
+    // — NOT {type, description, metadata}. Previous code silently no-op'd
+    // because Supabase drops unknown columns on insert.
+    // transaction_type must match the CHECK constraint enum:
+    // referral_bonus, welcome_bonus, share_unlock, book_generation, export,
+    // purchase, admin_adjustment, promo_code, publishing, publishing_refund
     await supabase.from('credit_transactions').insert({
       user_id: user.id,
       amount: -creditCost,
-      type: 'document_generation',
-      description: `Generated document: ${project.title}`,
-      metadata: { projectId, plan },
+      transaction_type: 'book_generation',
+      reference_id: projectId,
+      notes: `Generated document: ${project.title} (plan: ${plan})`,
     });
 
     // Trigger Inngest function for durable writing (any document type)

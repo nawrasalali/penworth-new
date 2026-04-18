@@ -130,7 +130,11 @@ function PublishingPageContent() {
       
       const isFreeTier = !profile?.plan || profile.plan === 'free';
       
-      // Create marketplace listing
+      // Create marketplace listing.
+      // Schema note: 'status' = 'published' serves as the publish-state
+      // flag. There is no 'published_at' column — the created_at timestamp
+      // captures when status transitioned to 'published' in practice
+      // because rows are inserted straight into that state.
       const { error } = await supabase
         .from('marketplace_listings')
         .insert({
@@ -139,7 +143,6 @@ function PublishingPageContent() {
           title: project.title,
           description: project.description,
           status: 'published',
-          published_at: new Date().toISOString(),
           is_free_tier: isFreeTier,
           word_count: project.metadata?.word_count || 0,
           chapter_count: project.metadata?.chapter_count || 0,

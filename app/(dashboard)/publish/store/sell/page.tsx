@@ -141,19 +141,35 @@ export default function SellPage() {
         return sum + (ch.content?.split(/\s+/).length || 0);
       }, 0) || 0;
 
+      // Create marketplace listing.
+      //
+      // Schema alignment fixes (previously 5 fields were silently dropped
+      // on every submission, causing listings to be unlinked from their
+      // seller and lose price data):
+      //
+      // 1. author_id  → seller_id    (schema uses seller_id)
+      // 2. author_name                → dropped; resolved via profiles join on read
+      // 3. category                   → prepended to tags array; no dedicated column
+      // 4. price (float dollars)      → price_cents (integer cents)
+      // 5. currency: 'USD'            → dropped; store is USD-only
+      //
+      // Category is preserved by prepending it to tags so the 'category'
+      // constant in the UI still maps to something queryable in the DB.
+      const priceCents = Math.round((parseFloat(price) || 0) * 100);
+      const listingTags = category
+        ? [category.toLowerCase(), ...tags]
+        : tags;
+
       const { data, error } = await supabase
         .from('marketplace_listings')
         .insert({
           project_id: selectedProject.id,
-          author_id: user.id,
-          author_name: user.user_metadata?.full_name || 'Anonymous',
+          seller_id: user.id,
           title,
           description,
           long_description: longDescription,
-          category,
-          tags,
-          price: parseFloat(price) || 0,
-          currency: 'USD',
+          tags: listingTags,
+          price_cents: priceCents,
           sample_content: sampleContent,
           word_count: wordCount,
           chapter_count: selectedProject.chapters?.length || 0,
