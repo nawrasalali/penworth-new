@@ -1,0 +1,92 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/admin/require-admin';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+/**
+ * POST /api/admin/known-issues — create a new pattern.
+ *
+ * Validation lives in validateKnownIssuePayload for reuse by the PATCH
+ * route. auto_fix_tier must be 1/2/3 if auto_fix_tool is set.
+ */
+export async function POST(request: NextRequest) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
+
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const validation = validateKnownIssuePayload(body);
+  if (!validation.ok) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from('nora_known_issues')
+    .insert({
+      pattern_slug: body.pattern_slug.trim(),
+      title: body.title.trim(),
+      surface: body.surface === 'all' ? null : body.surface || null,
+      symptom_keywords: body.symptom_keywords ?? [],
+      diagnostic_sql: body.diagnostic_sql ?? null,
+      resolution_playbook: body.resolution_playbook ?? null,
+      auto_fix_tool: body.auto_fix_tool ?? null,
+      auto_fix_tier: body.auto_fix_tier ?? null,
+      escalate_after_attempts: body.escalate_after_attempts ?? 2,
+      active: body.active !== false,
+    })
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === '23505') {
+      return NextResponse.json(
+        { error: 'A pattern with that slug already exists' },
+        { status: 409 },
+      );
+    }
+    if (error.code === '23514') {
+      return NextResponse.json(
+        { error: `Check constraint violated: ${error.message}` },
+        { status: 400 },
+      );
+    }
+    console.error('[POST /api/admin/known-issues] insert error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ data }, { status: 201 });
+}
+
+export function validateKnownIssuePayload(
+  body: any,
+): { ok: true } | { ok: false; error: string } {
+  if (typeof body.pattern_slug !== 'string' || body.pattern_slug.trim().length === 0) {
+    return { ok: false, error: 'pattern_slug is required' };
+  }
+  if (typeof body.title !== 'string' || body.title.trim().length === 0) {
+    return { ok: false, error: 'title is required' };
+  }
+  if (body.symptom_keywords && !Array.isArray(body.symptom_keywords)) {
+    return { ok: false, error: 'symptom_keywords must be an array' };
+  }
+  if (body.auto_fix_tool && body.auto_fix_tier !== null && body.auto_fix_tier !== undefined) {
+    if (![1, 2, 3].includes(body.auto_fix_tier)) {
+      return { ok: false, error: 'auto_fix_tier must be 1, 2, or 3' };
+    }
+  }
+  if (body.escalate_after_attempts !== undefined) {
+    const n = Number(body.escalate_after_attempts);
+    if (!Number.isInteger(n) || n < 1 || n > 10) {
+      return { ok: false, error: 'escalate_after_attempts must be an integer 1-10' };
+    }
+  }
+  return { ok: true };
+}
