@@ -13,8 +13,22 @@ import {
   MoreVertical,
   Trash2,
   GripVertical,
+  Sparkles,
 } from 'lucide-react';
 import { formatDate, formatWordCount, CONTENT_TYPE_LABELS, STATUS_COLORS } from '@/lib/utils';
+
+/**
+ * Maps a Guild showcase-grant macro category to a human label for the
+ * project-header billing badge. Must stay in sync with the 5 categories
+ * seeded by trg_guild_members_create_showcase_grants.
+ */
+const GRANT_CATEGORY_LABEL: Record<string, string> = {
+  book: 'Book',
+  business: 'Business',
+  academic: 'Academic',
+  legal: 'Legal',
+  technical: 'Technical',
+};
 
 export default async function ProjectDetailPage({
   params,
@@ -32,6 +46,22 @@ export default async function ProjectDetailPage({
 
   if (error || !project) {
     notFound();
+  }
+
+  // Phase 1E Task 1E.4: if this project was created with a showcase grant,
+  // fetch the grant's category so we can label the billing badge. Single
+  // lightweight select by primary key — FK index (partial) on projects.grant_id
+  // (migration 014) keeps this fast. Only runs when billing_type is grant.
+  let grantCategory: string | null = null;
+  if (project.billing_type === 'showcase_grant' && project.grant_id) {
+    const { data: grantRow } = await supabase
+      .from('guild_showcase_grants')
+      .select('category')
+      .eq('id', project.grant_id)
+      .maybeSingle();
+    if (grantRow?.category) {
+      grantCategory = grantRow.category;
+    }
   }
 
   // Sort chapters by order_index
@@ -61,6 +91,12 @@ export default async function ProjectDetailPage({
               <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[project.status]?.bg || 'bg-neutral-100'} ${STATUS_COLORS[project.status]?.text || 'text-neutral-600'}`}>
                 {project.status.replace('_', ' ')}
               </span>
+              {grantCategory && (
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-[#d4af37]/15 text-[#8a7a2a] border border-[#d4af37]/30">
+                  <Sparkles className="h-3 w-3" />
+                  Special Pro — {GRANT_CATEGORY_LABEL[grantCategory] ?? grantCategory} grant
+                </span>
+              )}
             </div>
             {project.description && (
               <p className="text-muted-foreground max-w-2xl">{project.description}</p>
