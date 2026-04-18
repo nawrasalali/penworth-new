@@ -18,7 +18,7 @@ export default function ReviewButton({
   variant,
 }: {
   applicationId: string;
-  action: 'invite' | 'accept' | 'decline';
+  action: 'accept' | 'decline';
   label: string;
   variant: Variant;
 }) {
