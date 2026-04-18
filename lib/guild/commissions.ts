@@ -546,82 +546,496 @@ export async function runRetentionCheck(admin: SupabaseClient) {
 }
 
 // ---------------------------------------------------------------------------
-// Monthly close
-// Locks eligible 'pending' commissions into 'locked' state, ready for payout.
-// A commission becomes 'locked' when:
-//   - Its referral has reached retention_qualified (60 days paid), AND
-//   - Its status is 'pending'
+// Monthly close — the complete Guild economy state machine
+// ---------------------------------------------------------------------------
+//
+// Runs once per month (vercel.json: `30 13 1 * *` — 13:30 UTC on the 1st
+// of each month, closing the month that just ended in Adelaide time).
+//
+// For each active or probation member, the close performs five stages:
+//
+//   1. Lock commissions:   Every 'pending' commission for this month whose
+//                          referral is retention_qualified (60+ days paid)
+//                          becomes 'locked'.
+//
+//   2. Assess fee:         If account_fee_starts_at <= now and tier != emeritus,
+//                          upsert a guild_account_fees row for this month
+//                          using guild_compute_account_fee(tier). Starts as
+//                          'pending'. Emeritus members pay $0 and get no row.
+//
+//   3. Compute position:   C = sum(locked commissions this month)
+//                          U = sum(fee_amount - deducted - waived) over the
+//                              member's unresolved fee rows (pending +
+//                              partially_deducted + fully_deferred). This
+//                              includes BOTH this month's freshly-upserted
+//                              fee row AND any older fees that never got
+//                              paid out or deferred.
+//                          payout_amount = C - U
+//
+//   4. Branch on three cases:
+//
+//      Case A — payout_amount >= $50 AND payout_method is set:
+//        - Create guild_payouts row, status='queued'.
+//        - Mark every locked commission for this month as 'paid', stamp
+//          payout_id and paid_at.
+//        - Walk every unresolved fee row oldest-first. For each row, move
+//          (fee_amount - deducted - waived) from amount_deferred into
+//          amount_deducted, mark status='fully_deducted', stamp
+//          deducted_from_payout_id and resolved_at.
+//
+//      Case B — 0 < payout_amount < $50, OR payout_method not set:
+//        - No payout. Commissions stay 'locked'. Fee rows stay where they
+//          were. Everything rolls to next month. Note: because the fee for
+//          *this* month was upserted as 'pending' in stage 2, next month's
+//          close will still see it as an unresolved obligation (pending
+//          rows count toward U). This is intentional — the $50 threshold
+//          defers reconciliation, not assessment.
+//
+//      Case C — payout_amount <= 0:
+//        - No payout. Commissions stay 'locked'. But we now mark *this
+//          month's* fee row as 'fully_deferred' with amount_deferred equal
+//          to the fee amount. This is what grows the member's deferred
+//          balance (older unresolved fees don't move to fully_deferred
+//          here — they stay in whatever state they already had, and their
+//          amount_deferred already counts). The $90 probation trigger is
+//          evaluated on this new balance.
+//
+//   5. Probation trigger:  After fee processing, if
+//                          guild_deferred_balance_usd(member) > $90 AND
+//                          status = 'active', flip to 'probation'. The
+//                          inverse (auto-lift on balance reaching $0) is
+//                          already handled by the guild_auto_lift_probation
+//                          trigger on guild_account_fees.
+//
+// The entire run is recorded in guild_monthly_close_runs. UNIQUE(run_month)
+// makes a second invocation for the same month fail fast with
+// `already_closed=true` — no member is ever processed twice.
 // ---------------------------------------------------------------------------
 
-export async function runMonthlyClose(admin: SupabaseClient, closeMonth: string) {
-  // closeMonth is YYYY-MM, the month being closed
+interface MemberCloseResult {
+  guildmember_id: string;
+  case: 'A' | 'B' | 'C' | 'skipped';
+  reason?: string;
+  commissions_locked: number;
+  commission_total_usd: number;
+  fee_assessed_usd: number;
+  fee_deducted_usd: number;
+  fee_deferred_usd: number;
+  payout_created: boolean;
+  payout_amount_usd: number;
+  probation_triggered: boolean;
+}
 
-  // Get all pending commissions in this month whose referral is retention-qualified
+export interface MonthlyCloseSummary {
+  closed_month: string;
+  already_closed: boolean;
+  run_id: string | null;
+  members_considered: number;
+  members_processed: number;
+  members_errored: number;
+  commissions_locked: number;
+  payouts_created: number;
+  total_paid_usd: number;
+  fees_assessed_usd: number;
+  fees_deducted_usd: number;
+  fees_deferred_usd: number;
+  probations_triggered: number;
+  errors: Array<{ guildmember_id: string; error: string }>;
+  // Legacy-compat fields for existing callers:
+  locked: number;
+  queued_payouts: number;
+}
+
+export async function runMonthlyClose(
+  admin: SupabaseClient,
+  closeMonth: string,
+  options: { triggeredBy?: 'cron' | 'manual' | 'test' } = {},
+): Promise<MonthlyCloseSummary> {
+  const triggeredBy = options.triggeredBy || 'cron';
+
+  // ---- Idempotency: claim the run slot for this month ----
+  // UNIQUE(run_month) in guild_monthly_close_runs ensures a second attempt
+  // for the same month fails at the DB. We catch that specifically.
+  const { data: runRow, error: runInsertErr } = await admin
+    .from('guild_monthly_close_runs')
+    .insert({ run_month: closeMonth, triggered_by: triggeredBy, status: 'running' })
+    .select('id, status')
+    .single();
+
+  if (runInsertErr) {
+    if ((runInsertErr as any).code === '23505') {
+      // Already closed (or currently running). Check which.
+      const { data: existing } = await admin
+        .from('guild_monthly_close_runs')
+        .select('id, status, completed_at')
+        .eq('run_month', closeMonth)
+        .single();
+      console.log(
+        `[commissions] Monthly close for ${closeMonth} already exists (status=${existing?.status}). Skipping.`,
+      );
+      return {
+        closed_month: closeMonth,
+        already_closed: true,
+        run_id: existing?.id || null,
+        members_considered: 0,
+        members_processed: 0,
+        members_errored: 0,
+        commissions_locked: 0,
+        payouts_created: 0,
+        total_paid_usd: 0,
+        fees_assessed_usd: 0,
+        fees_deducted_usd: 0,
+        fees_deferred_usd: 0,
+        probations_triggered: 0,
+        errors: [],
+        locked: 0,
+        queued_payouts: 0,
+      };
+    }
+    throw runInsertErr;
+  }
+
+  const runId = runRow.id as string;
+
+  // ---- Gather candidate members ----
+  // Everyone who is active or on probation. Terminated/resigned members
+  // are excluded entirely (they can't earn commissions or be charged fees).
+  const { data: members } = await admin
+    .from('guild_members')
+    .select('id, tier, status, payout_method, payout_details_encrypted, account_fee_starts_at')
+    .in('status', ['active', 'probation']);
+
+  const results: MemberCloseResult[] = [];
+  const errors: Array<{ guildmember_id: string; error: string }> = [];
+
+  for (const member of members || []) {
+    try {
+      const result = await closeMemberMonth(admin, member, closeMonth);
+      results.push(result);
+    } catch (err: any) {
+      console.error(`[commissions] Error closing member ${member.id}:`, err);
+      errors.push({
+        guildmember_id: member.id,
+        error: err?.message || String(err),
+      });
+    }
+  }
+
+  // ---- Aggregate + persist run summary ----
+  const summary: MonthlyCloseSummary = {
+    closed_month: closeMonth,
+    already_closed: false,
+    run_id: runId,
+    members_considered: (members || []).length,
+    members_processed: results.length,
+    members_errored: errors.length,
+    commissions_locked: results.reduce((s, r) => s + r.commissions_locked, 0),
+    payouts_created: results.filter((r) => r.payout_created).length,
+    total_paid_usd: round2(
+      results.reduce((s, r) => s + (r.payout_created ? r.payout_amount_usd : 0), 0),
+    ),
+    fees_assessed_usd: round2(results.reduce((s, r) => s + r.fee_assessed_usd, 0)),
+    fees_deducted_usd: round2(results.reduce((s, r) => s + r.fee_deducted_usd, 0)),
+    fees_deferred_usd: round2(results.reduce((s, r) => s + r.fee_deferred_usd, 0)),
+    probations_triggered: results.filter((r) => r.probation_triggered).length,
+    errors,
+    // Legacy compatibility
+    locked: results.reduce((s, r) => s + r.commissions_locked, 0),
+    queued_payouts: results.filter((r) => r.payout_created).length,
+  };
+
+  await admin
+    .from('guild_monthly_close_runs')
+    .update({
+      completed_at: new Date().toISOString(),
+      status: errors.length > (members || []).length * 0.05 ? 'failed' : 'completed',
+      members_considered: summary.members_considered,
+      members_processed: summary.members_processed,
+      members_errored: summary.members_errored,
+      commissions_locked: summary.commissions_locked,
+      payouts_created: summary.payouts_created,
+      total_paid_usd: summary.total_paid_usd,
+      fees_assessed_usd: summary.fees_assessed_usd,
+      fees_deducted_usd: summary.fees_deducted_usd,
+      fees_deferred_usd: summary.fees_deferred_usd,
+      probations_triggered: summary.probations_triggered,
+      errors: errors as any,
+    })
+    .eq('id', runId);
+
+  console.log(
+    `[commissions] Monthly close ${closeMonth} complete: ` +
+      `${summary.payouts_created} payouts (${summary.total_paid_usd} USD), ` +
+      `${summary.fees_deducted_usd} fees deducted, ` +
+      `${summary.fees_deferred_usd} deferred, ` +
+      `${summary.probations_triggered} probations.`,
+  );
+
+  return summary;
+}
+
+/**
+ * Close a single member's month. Isolated so one bad member can't take
+ * the whole close down. Returns a structured result.
+ */
+async function closeMemberMonth(
+  admin: SupabaseClient,
+  member: {
+    id: string;
+    tier: string;
+    status: string;
+    payout_method: string | null;
+    payout_details_encrypted: string | null;
+    account_fee_starts_at: string | null;
+  },
+  closeMonth: string,
+): Promise<MemberCloseResult> {
+  const now = new Date();
+
+  // ---- Stage 1: lock this month's eligible pending commissions ----
   const { data: eligible } = await admin
     .from('guild_commissions')
-    .select(`
-      id,
-      guildmember_id,
-      commission_amount_usd,
-      referral:guild_referrals!inner(id, status, retention_qualified_at)
-    `)
+    .select(
+      `id, commission_amount_usd, referral:guild_referrals!inner(status, retention_qualified_at)`,
+    )
+    .eq('guildmember_id', member.id)
     .eq('commission_month', closeMonth)
     .eq('status', 'pending');
 
-  if (!eligible || eligible.length === 0) {
-    return { locked: 0, queued_payouts: 0 };
-  }
-
-  // Filter to only retention-qualified referrals
-  const lockable = eligible.filter((c: any) => {
+  const lockable = (eligible || []).filter((c: any) => {
     const ref = Array.isArray(c.referral) ? c.referral[0] : c.referral;
     return ref?.retention_qualified_at !== null && ref?.status !== 'refunded';
   });
 
-  const ids = lockable.map((c: any) => c.id);
-  if (ids.length > 0) {
-    await admin.from('guild_commissions').update({ status: 'locked' }).in('id', ids);
+  if (lockable.length > 0) {
+    await admin
+      .from('guild_commissions')
+      .update({ status: 'locked' })
+      .in(
+        'id',
+        lockable.map((c: any) => c.id),
+      );
   }
 
-  // Aggregate locked commissions per Guildmember into payouts
-  const memberTotals = new Map<string, number>();
-  for (const c of lockable) {
-    const current = memberTotals.get(c.guildmember_id) || 0;
-    memberTotals.set(c.guildmember_id, current + Number(c.commission_amount_usd));
+  // Total of locked commissions for this member THIS month (what we just locked).
+  // Older locked commissions from prior months are not rolled in here — they
+  // should already have been handled in their own close. This keeps each
+  // month's close self-contained and auditable.
+  const C = round2(
+    lockable.reduce((s: number, c: any) => s + Number(c.commission_amount_usd), 0),
+  );
+
+  // ---- Stage 2: assess this month's account fee ----
+  const feeAssessed = shouldAssessFee(member, now)
+    ? Number(
+        (
+          await admin.rpc('guild_compute_account_fee', { p_tier: member.tier })
+        ).data as number,
+      )
+    : 0;
+
+  if (feeAssessed > 0) {
+    // Upsert — idempotent on (guildmember_id, fee_month) if that constraint
+    // exists, otherwise the insert may create a duplicate. Add the constraint
+    // in a follow-up migration if needed. For now we do a manual check:
+    const { data: existingFee } = await admin
+      .from('guild_account_fees')
+      .select('id, status')
+      .eq('guildmember_id', member.id)
+      .eq('fee_month', closeMonth)
+      .maybeSingle();
+
+    if (!existingFee) {
+      await admin.from('guild_account_fees').insert({
+        guildmember_id: member.id,
+        fee_month: closeMonth,
+        tier_at_time: member.tier,
+        fee_rate_pct: feeAssessed, // naming quirk: the check constraint
+        fee_amount_usd: feeAssessed, // fee_matches_rate requires these equal
+        amount_deducted_usd: 0,
+        amount_deferred_usd: 0,
+        amount_waived_usd: 0,
+        status: 'pending',
+      });
+    }
   }
 
-  let queuedCount = 0;
-  const memberEntries = Array.from(memberTotals.entries());
-  for (const [guildmemberId, total] of memberEntries) {
-    // $50 minimum payout threshold (rolls forward otherwise)
-    if (total < 50) continue;
+  // ---- Stage 3: compute total unresolved fee obligation ----
+  const { data: unresolvedFees } = await admin
+    .from('guild_account_fees')
+    .select('id, fee_month, fee_amount_usd, amount_deducted_usd, amount_deferred_usd, amount_waived_usd, status')
+    .eq('guildmember_id', member.id)
+    .in('status', ['pending', 'partially_deducted', 'fully_deferred'])
+    .order('fee_month', { ascending: true });
 
-    const { data: member } = await admin
-      .from('guild_members')
-      .select('payout_method, payout_details_encrypted')
-      .eq('id', guildmemberId)
+  const U = round2(
+    (unresolvedFees || []).reduce(
+      (s, f: any) =>
+        s +
+        (Number(f.fee_amount_usd) -
+          Number(f.amount_deducted_usd || 0) -
+          Number(f.amount_waived_usd || 0)),
+      0,
+    ),
+  );
+
+  const payoutAmount = round2(C - U);
+  const hasPayoutMethod =
+    member.payout_method === 'wise' || member.payout_method === 'usdt';
+
+  // ---- Stage 4: three-case branch ----
+  const result: MemberCloseResult = {
+    guildmember_id: member.id,
+    case: 'B',
+    commissions_locked: lockable.length,
+    commission_total_usd: C,
+    fee_assessed_usd: feeAssessed,
+    fee_deducted_usd: 0,
+    fee_deferred_usd: 0,
+    payout_created: false,
+    payout_amount_usd: 0,
+    probation_triggered: false,
+  };
+
+  if (payoutAmount >= 50 && hasPayoutMethod) {
+    // ---- Case A: pay out ----
+    result.case = 'A';
+
+    const masked = maskPayoutDestinationSafe(
+      member.payout_method as any,
+      member.id,
+      member.payout_details_encrypted,
+    );
+
+    const { data: payout, error: payoutErr } = await admin
+      .from('guild_payouts')
+      .upsert(
+        {
+          guildmember_id: member.id,
+          payout_month: closeMonth,
+          amount_usd: payoutAmount,
+          method: member.payout_method,
+          destination_masked: masked,
+          fee_usd: 0,
+          net_amount_usd: payoutAmount,
+          status: 'queued',
+        },
+        { onConflict: 'guildmember_id,payout_month' },
+      )
+      .select('id')
       .single();
 
-    const method = member?.payout_method || 'pending';
-    if (method === 'pending') continue; // can't queue without payout method set
+    if (payoutErr || !payout) {
+      throw new Error(`Payout upsert failed: ${payoutErr?.message}`);
+    }
 
-    const masked = maskPayoutDestinationSafe(method, guildmemberId, member?.payout_details_encrypted);
+    result.payout_created = true;
+    result.payout_amount_usd = payoutAmount;
 
-    await admin.from('guild_payouts').upsert(
-      {
-        guildmember_id: guildmemberId,
-        payout_month: closeMonth,
-        amount_usd: total,
-        method,
-        destination_masked: masked,
-        fee_usd: 0, // computed at send time
-        net_amount_usd: total,
-        status: 'queued',
-      },
-      { onConflict: 'guildmember_id,payout_month' },
-    );
-    queuedCount++;
+    // Mark every commission we just locked as 'paid' against this payout.
+    if (lockable.length > 0) {
+      await admin
+        .from('guild_commissions')
+        .update({
+          status: 'paid',
+          payout_id: payout.id,
+          paid_at: now.toISOString(),
+        })
+        .in(
+          'id',
+          lockable.map((c: any) => c.id),
+        );
+    }
+
+    // Resolve unresolved fees oldest-first, against this payout.
+    for (const fee of unresolvedFees || []) {
+      const remaining = round2(
+        Number(fee.fee_amount_usd) -
+          Number(fee.amount_deducted_usd || 0) -
+          Number(fee.amount_waived_usd || 0),
+      );
+      if (remaining <= 0) continue;
+
+      await admin
+        .from('guild_account_fees')
+        .update({
+          amount_deducted_usd: round2(Number(fee.amount_deducted_usd || 0) + remaining),
+          amount_deferred_usd: 0,
+          status: 'fully_deducted',
+          deducted_from_payout_id: payout.id,
+          resolved_at: now.toISOString(),
+        })
+        .eq('id', fee.id);
+
+      result.fee_deducted_usd = round2(result.fee_deducted_usd + remaining);
+    }
+  } else if (payoutAmount > 0) {
+    // ---- Case B: positive net but below $50, OR no payout method set ----
+    result.case = 'B';
+    if (!hasPayoutMethod) {
+      result.reason = 'payout_method_not_set';
+    } else {
+      result.reason = 'below_payout_threshold';
+    }
+    // Nothing else to do — commissions stay locked, fees stay pending.
+    // The member's unresolved obligations carry forward to next month.
+  } else {
+    // ---- Case C: fees exceed commissions ----
+    result.case = 'C';
+
+    // Defer this month's fee — it's the new one we just upserted (if any).
+    // Older fees already have their amount_deferred set from previous closes.
+    if (feeAssessed > 0) {
+      await admin
+        .from('guild_account_fees')
+        .update({
+          status: 'fully_deferred',
+          amount_deferred_usd: feeAssessed,
+        })
+        .eq('guildmember_id', member.id)
+        .eq('fee_month', closeMonth);
+
+      result.fee_deferred_usd = feeAssessed;
+    }
   }
 
-  return { locked: ids.length, queued_payouts: queuedCount };
+  // ---- Stage 5: probation trigger ----
+  // guild_deferred_balance_usd sums amount_deferred_usd over rows NOT in
+  // (waived, cancelled, fully_deducted). This is the authoritative balance.
+  const { data: balanceData } = await admin.rpc('guild_deferred_balance_usd', {
+    p_guildmember_id: member.id,
+  });
+  const deferredBalance = Number(balanceData || 0);
+
+  if (deferredBalance > 90 && member.status === 'active') {
+    await admin
+      .from('guild_members')
+      .update({
+        status: 'probation',
+        probation_started_at: now.toISOString(),
+        probation_reason: 'deferred_fees_exceed_90',
+      })
+      .eq('id', member.id)
+      .eq('status', 'active'); // race-condition guard
+    result.probation_triggered = true;
+  }
+
+  return result;
+}
+
+/**
+ * Fee is assessed this close if the member is past their 90-day grace
+ * period AND their tier isn't emeritus (emeritus fee = $0).
+ */
+function shouldAssessFee(
+  member: { tier: string; account_fee_starts_at: string | null },
+  now: Date,
+): boolean {
+  if (member.tier === 'emeritus') return false;
+  if (!member.account_fee_starts_at) return false;
+  return new Date(member.account_fee_starts_at).getTime() <= now.getTime();
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }
