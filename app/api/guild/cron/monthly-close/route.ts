@@ -49,7 +49,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      closed_month: month,
       ran_at: new Date().toISOString(),
       ...result,
     });

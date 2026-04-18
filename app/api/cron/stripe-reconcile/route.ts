@@ -125,9 +125,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const uniqueTypes = Array.from(new Set(missing.map((m) => m.type)));
     console.warn(
       `[stripe-reconcile] Found ${missing.length} missing events in last ${hours}h ` +
-        `(over ${stripeEventIds.length} total). Types: ${[...new Set(missing.map((m) => m.type))].join(', ')}`,
+        `(over ${stripeEventIds.length} total). Types: ${uniqueTypes.join(', ')}`,
     );
 
     if (dryRun) {
