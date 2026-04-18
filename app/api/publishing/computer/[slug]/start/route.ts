@@ -96,6 +96,7 @@ export async function POST(
     userId: user.id,
     amount: PUBLISHING_CREDIT_COSTS.computer_use,
     reason: `Penworth Computer: ${platform.name}`,
+    projectId,
   });
   if (!debit.ok) {
     return NextResponse.json(

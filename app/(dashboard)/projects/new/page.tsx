@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
@@ -168,6 +167,31 @@ const CATEGORIES: Category[] = [
 // PAGE
 // =============================================================================
 
+/**
+ * Maps the CategoryId (UI-layer grouping) to the Guild showcase-grant macro
+ * category used by guild_showcase_grants.category. MUST stay in sync with
+ * public.guild_content_type_to_category() in the database — but we don't
+ * need to replicate the full content_type mapping here because the new-
+ * project flow already selects the UI category first (CategoryId), and that
+ * CategoryId maps cleanly to a macro.
+ *
+ * UI 'books'    → macro 'book'
+ * UI 'business' → macro 'business'
+ * UI 'academic' → macro 'academic'
+ * UI 'legal'    → macro 'legal'
+ * UI 'technical'→ macro 'technical'
+ * UI 'creative' → no grant eligibility (DB function returns NULL for
+ *                 most creative types unless they map to 'book')
+ * UI 'other'    → no grant eligibility (DB function returns NULL)
+ */
+const CATEGORY_ID_TO_GRANT_MACRO: Partial<Record<CategoryId, string>> = {
+  books: 'book',
+  business: 'business',
+  academic: 'academic',
+  legal: 'legal',
+  technical: 'technical',
+};
+
 function NewProjectContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -177,44 +201,87 @@ function NewProjectContent() {
   );
   const [creatingType, setCreatingType] = useState<ContentType | null>(null);
 
+  // Phase 1E Task 1E.3: load Guild showcase-grant availability. We fetch
+  // once on mount; grants don't change mid-flow. If the user is not a
+  // Guildmember, unused_categories stays empty and no banner is shown.
+  const [unusedGrantCategories, setUnusedGrantCategories] = useState<string[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/guild/my-grants');
+        if (!res.ok) return;
+        const json = await res.json();
+        if (cancelled) return;
+        if (json.is_member && Array.isArray(json.unused_categories)) {
+          setUnusedGrantCategories(json.unused_categories);
+        }
+      } catch {
+        // silent — banner is cosmetic, not a gate
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   /**
-   * On subtype click: create a draft project immediately, then route straight
-   * to the editor (the Validate agent). No title/description form in between.
+   * Whether the currently-selected UI category has an unused grant.
+   * Renders the banner at the top of the Step 2 (subtype selection) view.
+   * On Step 1 (category selection) we don't yet know what the user will
+   * pick so we don't show a banner — the Guild dashboard card is the
+   * entry point that advertises grant availability.
+   */
+  const hasGrantForSelected =
+    selectedCategory !== null &&
+    CATEGORY_ID_TO_GRANT_MACRO[selectedCategory] !== undefined &&
+    unusedGrantCategories.includes(CATEGORY_ID_TO_GRANT_MACRO[selectedCategory]!);
+  const grantCategoryLabel =
+    selectedCategory !== null
+      ? CATEGORIES.find((c) => c.id === selectedCategory)?.label ?? selectedCategory
+      : '';
+
+  /**
+   * On subtype click: create a draft project immediately via /api/projects
+   * (server endpoint). Routing through the server is required so the Phase
+   * 1E grant-consume hook in the POST handler can attempt to consume a
+   * showcase grant for this project. A direct Supabase insert from the
+   * client would bypass that hook entirely.
+   *
+   * Then route straight to the editor (the Validate agent). No title/
+   * description form in between.
    */
   const handleSelectType = async (type: ContentType, label: string) => {
     if (creatingType) return;
     setCreatingType(type);
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Untitled ${label}`,        // Validate agent overrides this when idea is chosen
+          description: '',
+          content_type: type,
+          visibility: 'private',
+        }),
+      });
+
+      if (res.status === 401) {
         toast.error('Please log in to create a project');
         router.push('/auth/login');
         return;
       }
 
-      const { data: project, error } = await supabase
-        .from('projects')
-        .insert({
-          user_id: user.id,
-          title: `Untitled ${label}`,        // Validate agent overrides this when idea is chosen
-          description: '',
-          content_type: type,
-          visibility: 'private',
-          status: 'draft',
-        })
-        .select()
-        .single();
-
-      if (error || !project) {
-        console.error('Project creation error:', error);
-        toast.error(error?.message || 'Failed to create project');
+      const json = await res.json();
+      if (!res.ok || !json.data) {
+        console.error('Project creation error:', json);
+        toast.error(json.error || 'Failed to create project');
         setCreatingType(null);
         return;
       }
 
       // Jump straight into the Validate agent — skip the detail page entirely.
-      router.push(`/projects/${project.id}/editor`);
+      router.push(`/projects/${json.data.id}/editor`);
     } catch (err) {
       console.error(err);
       toast.error('Failed to create project. Please try again.');
@@ -291,6 +358,26 @@ function NewProjectContent() {
           </div>
         </div>
       </div>
+
+      {/* Phase 1E Task 1E.3: grant-available banner. Shown only when the
+          current user is a Guildmember with an unused grant for this
+          macro category. The grant is actually consumed server-side in
+          /api/projects POST — the banner is purely informational here. */}
+      {hasGrantForSelected && (
+        <div className="mb-6 rounded-lg border border-[#d4af37]/40 bg-[#d4af37]/10 p-4">
+          <div className="flex items-start gap-3">
+            <Sparkles className="h-5 w-5 shrink-0 text-[#d4af37]" />
+            <div className="min-w-0">
+              <div className="font-medium text-[#d4af37]">
+                Your Special Pro grant for {grantCategoryLabel} is available
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                This document will be created at no cost to your credit balance.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {category.options.map((opt) => {

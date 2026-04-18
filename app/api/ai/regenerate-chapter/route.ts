@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { modelFor, maxTokensFor, calculateCost } from '@/lib/ai/model-router';
 import { loadAgentBrief, formatBriefForPrompt } from '@/lib/ai/agent-brief';
 import { CREDIT_COSTS } from '@/types/agent-workflow';
+import { shouldDeductCreditsForProject } from '@/lib/projects/should-deduct-credits';
 
 const anthropic = new Anthropic();
 
@@ -69,8 +70,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
   }
 
+  // Phase 1E: project may be showcase-grant-billed, in which case chapter
+  // regeneration is also free (the grant waives per-project credit spend).
+  const deductCredits = await shouldDeductCreditsForProject(supabase, projectId);
+
   const totalCredits = (profile.credits_balance || 0) + (profile.credits_purchased || 0);
-  if (totalCredits < cost && !profile.is_admin) {
+  if (deductCredits && totalCredits < cost && !profile.is_admin) {
     return NextResponse.json(
       {
         error: `Not enough credits. Chapter regeneration costs ${cost} credits.`,
@@ -86,7 +91,7 @@ export async function POST(request: NextRequest) {
   // Prefer monthly balance, fall back to purchased.
   let newBalance = profile.credits_balance || 0;
   let newPurchased = profile.credits_purchased || 0;
-  if (!profile.is_admin) {
+  if (deductCredits && !profile.is_admin) {
     if (newBalance >= cost) {
       newBalance -= cost;
     } else {
@@ -104,9 +109,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Helper: refund if the rest of the flow fails
+  // Helper: refund if the rest of the flow fails.
+  // No-op for admins and for grant-billed projects (nothing was debited).
   const refundCredits = async () => {
-    if (profile.is_admin) return;
+    if (profile.is_admin || !deductCredits) return;
     await supabase
       .from('profiles')
       .update({
@@ -229,11 +235,23 @@ Rewrite the chapter now.`;
   }
 
   try {
-    if (!profile.is_admin) {
+    if (profile.is_admin) {
+      // no row for admins
+    } else if (!deductCredits) {
+      // Grant-billed: log an amount=0 row for audit trail.
+      await supabase.from('credit_transactions').insert({
+        user_id: user.id,
+        amount: 0,
+        transaction_type: 'book_generation',
+        reference_id: projectId,
+        notes: `Chapter regeneration: ${chapter.title} (grant-billed, no credits deducted)`,
+      });
+    } else {
       await supabase.from('credit_transactions').insert({
         user_id: user.id,
         amount: -cost,
         transaction_type: 'book_generation',
+        reference_id: projectId,
         notes: `Chapter regeneration: ${chapter.title}`,
       });
     }

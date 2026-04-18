@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { shouldDeductCreditsForProject } from '@/lib/projects/should-deduct-credits';
 
 /**
  * Shared credit debit / refund primitive for publishing operations.
@@ -11,6 +12,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * Admins bypass all deduction (is_admin=true in profiles). Free-tier users
  * can publish if they have enough credits from top-ups; the `canBuyCredits`
  * rule in lib/plans.ts already permits that.
+ *
+ * Phase 1E: optional projectId. When supplied, we check
+ * should_deduct_credits_for_project first — if the project is Guild-
+ * showcase-grant-billed, we skip the debit (and its refund/transaction
+ * rows) entirely and return an ok=true, isAdmin-style bypass. Same shape
+ * as admin bypass so callers don't branch: the grant simply acts like an
+ * admin pass for that specific project.
  *
  * Deduction order: monthly credits_balance first, then credits_purchased.
  * This maximises rollover headroom for Max-tier subscribers.
@@ -38,7 +46,27 @@ export async function debitPublishingCredits(args: {
   userId: string;
   amount: number;
   reason: string; // goes into credit_transactions.notes
-}): Promise<DebitResult | DebitFailure> {  const { supabase, userId, amount, reason } = args;
+  /** When supplied, triggers the Phase 1E grant check. If the project is
+   *  grant-billed, this function becomes a no-op (no debit, no refund, no
+   *  credit_transactions row). Omit only when no project context exists. */
+  projectId?: string;
+}): Promise<DebitResult | DebitFailure> {
+  const { supabase, userId, amount, reason, projectId } = args;
+
+  // Phase 1E: if the project is showcase-grant-billed, short-circuit BEFORE
+  // touching the profile. Treat identically to an admin pass — caller gets
+  // an ok=true back with a no-op refund, and no credit_transactions row is
+  // created (the grant consumption is already logged via guild_showcase_grants).
+  if (projectId) {
+    const deduct = await shouldDeductCreditsForProject(supabase, projectId);
+    if (!deduct) {
+      return {
+        ok: true,
+        isAdmin: false,
+        refund: async () => undefined,
+      };
+    }
+  }
 
   const { data: profile, error: profileErr } = await supabase
     .from('profiles')

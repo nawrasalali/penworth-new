@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 
 // GET /api/projects - List user's projects
 export async function GET(request: NextRequest) {
@@ -104,7 +104,68 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ data: project }, { status: 201 });
+    // Phase 1E: attempt to consume a Guild showcase grant for this project.
+    // The RPC is atomic and returns {consumed: true, grant_id, category}
+    // on success or {consumed: false, reason} on any non-applicable state
+    // (not a member, wrong status, content_type not mapped, no unused grant
+    // for that category). Uses FOR UPDATE SKIP LOCKED internally so two
+    // simultaneous project creations for the same category cannot both win.
+    //
+    // On consume: UPDATE the project row to tag it billing_type='showcase_grant'
+    // so downstream generation/regen/publishing skip credit deduction via the
+    // shouldDeductCreditsForProject helper. The helper is self-healing — if
+    // this UPDATE fails between the consume and the return, the helper's
+    // second branch (EXISTS guild_showcase_grants status='used') still causes
+    // downstream deduction to be skipped. See migration 014 for the RPC body.
+    const admin = createAdminClient();
+    const { data: grantResult, error: grantErr } = await admin.rpc(
+      'guild_consume_showcase_grant',
+      {
+        p_user_id: user.id,
+        p_content_type: project.content_type,
+        p_project_id: project.id,
+      },
+    );
+
+    if (grantErr) {
+      // Non-fatal: the project exists, the user just didn't get a grant.
+      // Log loudly so we notice if the RPC is failing systematically.
+      console.error(
+        '[projects/POST] guild_consume_showcase_grant RPC error (non-fatal):',
+        { projectId: project.id, userId: user.id, error: grantErr },
+      );
+    }
+
+    // jsonb return type — TS sees any; use defensive checks.
+    const grant = (grantResult as { consumed?: boolean; grant_id?: string } | null) || null;
+    let projectOut = project;
+
+    if (grant?.consumed && grant.grant_id) {
+      const { data: updated, error: tagErr } = await admin
+        .from('projects')
+        .update({
+          billing_type: 'showcase_grant',
+          grant_id: grant.grant_id,
+        })
+        .eq('id', project.id)
+        .select()
+        .single();
+
+      if (tagErr) {
+        // The grant is consumed (guild_showcase_grants.status='used' with
+        // project_id set), but we failed to tag the project. The helper's
+        // self-healing branch will still cause downstream credits to be
+        // skipped, so this is non-fatal — but log it so we can reconcile.
+        console.error(
+          '[projects/POST] Failed to tag project as grant-billed (self-healing fallback will cover):',
+          { projectId: project.id, grantId: grant.grant_id, error: tagErr },
+        );
+      } else if (updated) {
+        projectOut = updated;
+      }
+    }
+
+    return NextResponse.json({ data: projectOut }, { status: 201 });
   } catch (error) {
     console.error('Projects POST error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
