@@ -144,6 +144,18 @@ export default async function AdminPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link
+            href="/admin/guild"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted"
+          >
+            <ShieldCheck className="h-3.5 w-3.5" /> Guild review
+          </Link>
+          <Link
+            href="/admin/guild/payouts"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted"
+          >
+            <DollarSign className="h-3.5 w-3.5" /> Guild payouts
+          </Link>
+          <Link
             href="/admin/computer"
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted"
           >
