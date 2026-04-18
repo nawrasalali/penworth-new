@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { createClient as createBrowserSupabase } from '@/lib/supabase/client';
 
 const COUNTRIES = [
   'Australia', 'United States', 'United Kingdom', 'Canada', 'New Zealand',
@@ -69,6 +70,30 @@ export default function GuildApplyPage() {
     referred_by_code: '',
     agreed_to_terms: false,
   });
+
+  // Session awareness: if the visitor is already signed in to Penworth,
+  // pre-fill and lock the email so the application cannot be submitted
+  // under a different address than the one they'll sign in with.
+  // authedEmail === null  → not signed in (or still loading)
+  // authedEmail === ''    → session check completed, not authenticated
+  // authedEmail === 'x@y' → authenticated, email locked to this value
+  const [authedEmail, setAuthedEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createBrowserSupabase();
+    let cancelled = false;
+    supabase.auth.getUser().then(({ data }) => {
+      if (cancelled) return;
+      const email = data.user?.email || '';
+      setAuthedEmail(email);
+      if (email) {
+        setForm((f) => ({ ...f, email }));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -184,12 +209,49 @@ export default function GuildApplyPage() {
                 type="email"
                 value={form.email}
                 onChange={(e) => update('email', e.target.value)}
+                readOnly={!!authedEmail}
+                disabled={!!authedEmail}
                 placeholder="you@example.com"
-                className="w-full rounded-md border border-[#2a3149] bg-[#0a0e1a] px-4 py-3 text-[#e7e2d4] placeholder-[#6b6452] outline-none focus:border-[#d4af37]"
+                className={`w-full rounded-md border border-[#2a3149] px-4 py-3 text-[#e7e2d4] placeholder-[#6b6452] outline-none focus:border-[#d4af37] ${
+                  authedEmail
+                    ? 'cursor-not-allowed bg-[#0f1424] opacity-75'
+                    : 'bg-[#0a0e1a]'
+                }`}
               />
-              <p className="mt-2 text-xs text-[#6b6452]">
-                Used for your Guildmember account and all Guild communications.
-              </p>
+              {authedEmail ? (
+                <p className="mt-2 text-xs text-[#8a8370]">
+                  Applying as <span className="text-[#e7e2d4]">{authedEmail}</span>.{' '}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const supabase = createBrowserSupabase();
+                      await supabase.auth.signOut();
+                      setAuthedEmail('');
+                      setForm((f) => ({ ...f, email: '' }));
+                      router.refresh();
+                    }}
+                    className="text-[#d4af37] hover:underline"
+                  >
+                    Sign out
+                  </button>{' '}
+                  to apply with a different address.
+                </p>
+              ) : authedEmail === '' ? (
+                <p className="mt-2 text-xs text-[#6b6452]">
+                  Used for your Guildmember account and all Guild communications.
+                  {' '}
+                  <Link
+                    href="/login?next=/guild/apply"
+                    className="text-[#d4af37] hover:underline"
+                  >
+                    Already have a Penworth account? Sign in first →
+                  </Link>
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-[#6b6452]">
+                  Used for your Guildmember account and all Guild communications.
+                </p>
+              )}
             </Field>
 
             <div className="grid gap-6 md:grid-cols-2">

@@ -4,6 +4,12 @@ import { createClient } from '@supabase/supabase-js';
 import { PLAN_LIMITS, CREDIT_PACKS } from '@/lib/plans';
 import { getStripeOrError, getWebhookSecretOrError } from '@/lib/stripe/client';
 import {
+  recordStripeEvent,
+  markStripeEventProcessed,
+  markStripeEventFailed,
+  markStripeEventSkipped,
+} from '@/lib/stripe/webhook-idempotency';
+import {
   recordFirstPayment,
   recordRenewalPayment,
   handleSubscriptionCancelled as guildHandleCancellation,
@@ -36,7 +42,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
+  // Idempotency gate: record this event before any handler runs. If the
+  // same stripe_event_id has already been processed, skip — Stripe can
+  // retry deliveries and we must never double-commission or double-grant.
+  const gate = await recordStripeEvent(supabase, event, 'webhook');
+  if (!gate.shouldProcess) {
+    console.log(
+      `[stripe/webhook] Skipping event ${event.id} (${event.type}): ${gate.reason}`,
+    );
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+
   try {
+    let handled = true;
     switch (event.type) {
       case 'checkout.session.completed':
         await handleCheckoutCompleted(stripe, event.data.object as Stripe.Checkout.Session);
@@ -67,12 +85,20 @@ export async function POST(request: NextRequest) {
         break;
 
       default:
+        handled = false;
         console.log(`Unhandled event type: ${event.type}`);
+    }
+
+    if (handled) {
+      await markStripeEventProcessed(supabase, event.id);
+    } else {
+      await markStripeEventSkipped(supabase, event.id, `unhandled event type: ${event.type}`);
     }
 
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('Webhook handler error:', error);
+    await markStripeEventFailed(supabase, event.id, error);
     return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 });
   }
 }

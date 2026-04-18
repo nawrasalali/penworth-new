@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { sendGuildApplicationReceivedEmail } from '@/lib/email/guild';
 
 export const runtime = 'nodejs';
@@ -21,10 +21,31 @@ interface ApplicationPayload {
  * POST /api/guild/apply
  * Public endpoint. Anyone may submit an application.
  * Runs automated review scoring, persists, and emails the applicant.
+ *
+ * Security note: if the visitor is authenticated, we ignore any email
+ * value in the request body and use their session email instead. This
+ * is defense-in-depth — the client already locks the email field when
+ * authenticated (see app/guild/apply/page.tsx), but a malicious or
+ * buggy client cannot bypass that lock server-side.
  */
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as ApplicationPayload;
+
+    // If the caller is authenticated, force body.email to their session email.
+    // This prevents a signed-in user from submitting an application under a
+    // different address than the one linked to their Penworth account.
+    try {
+      const userClient = await createClient();
+      const { data: userData } = await userClient.auth.getUser();
+      if (userData.user?.email) {
+        body.email = userData.user.email;
+      }
+    } catch (authErr) {
+      // No session is fine — unauthenticated applications are allowed.
+      // We log and continue with whatever email was in the body.
+      console.log('[guild/apply] No session; using body email.', authErr);
+    }
 
     // Server-side validation (client validation is not trusted)
     const validation = validateApplication(body);
@@ -113,6 +134,27 @@ export async function POST(request: NextRequest) {
 
     if (insertError || !inserted) {
       console.error('[guild/apply] Insert error:', insertError);
+
+      // Postgres unique_violation (SQLSTATE 23505) is raised by the
+      // guild_applications_before_insert trigger when the applicant is
+      // already an active Guildmember. Translate to a clean 409.
+      if (insertError && (insertError as any).code === '23505') {
+        // Trigger HINT distinguishes the Guildmember case from any future
+        // unique_violation (e.g. if we add a UNIQUE(user_id,status) index).
+        const hint = ((insertError as any).hint || '').toLowerCase();
+        const isGuildmember = hint.includes('guildmember') ||
+          ((insertError as any).message || '').toLowerCase().includes('already an active guild member');
+
+        return NextResponse.json(
+          {
+            error: isGuildmember
+              ? 'You are already an active Guildmember. Visit your Guild dashboard instead of re-applying.'
+              : 'You already have an application in review. Check your email for updates or visit /guild/apply/status.',
+          },
+          { status: 409 },
+        );
+      }
+
       return NextResponse.json(
         { error: 'Unable to save your application. Please try again in a moment.' },
         { status: 500 },
