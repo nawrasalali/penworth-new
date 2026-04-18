@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { inngest } from '@/inngest/client';
 import { PLAN_LIMITS, CREDIT_COSTS, getDocumentLimit } from '@/lib/plans';
+import { shouldDeductCreditsForProject } from '@/lib/projects/should-deduct-credits';
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,73 +89,113 @@ export async function POST(request: NextRequest) {
     const totalCredits = creditsBalance + (profile.credits_purchased || 0);
     const documentLimit = getDocumentLimit(plan);
 
-    // Check credit balance - this IS the document limit check
-    // 1000 credits = 1 document, so insufficient credits = document limit reached
-    if (totalCredits < creditCost) {
-      const upgradeMessage = plan === 'free' 
-        ? 'Upgrade to Pro for more documents and the ability to purchase credit packs.'
-        : 'Purchase a credit pack to continue.';
-      
-      return NextResponse.json(
-        { 
-          error: `You've used your ${documentLimit} document${documentLimit > 1 ? 's' : ''} for this month. ${upgradeMessage}`,
-          code: 'INSUFFICIENT_CREDITS',
-          creditsAvailable: totalCredits,
-          creditsNeeded: creditCost,
-          documentsUsed: documentsThisMonth,
-          documentLimit,
-          canBuyCredits: limits.canBuyCredits,
-        },
-        { status: 403 }
-      );
-    }
+    // Phase 1E: determine if this project is grant-billed before touching
+    // credits. Ship-safe default: grant covers the credit cost but NOT the
+    // monthly documents_this_month quota — grants are a "free document"
+    // benefit against the credit ledger, not extra document slots.
+    const deductCredits = await shouldDeductCreditsForProject(supabase, projectId);
 
-    // Deduct credits (monthly first, then purchased)
+    // Hoisted out of the branch so the success response can always report
+    // the user's post-operation balance. For grant-billed projects these
+    // stay equal to the pre-operation balance (no credits were debited).
     let newCreditsBalance = creditsBalance;
     let newCreditsPurchased = profile.credits_purchased || 0;
 
-    if (creditsBalance >= creditCost) {
-      // Use monthly credits
-      newCreditsBalance = creditsBalance - creditCost;
+    if (deductCredits) {
+      // Check credit balance - this IS the document limit check
+      // 1000 credits = 1 document, so insufficient credits = document limit reached
+      if (totalCredits < creditCost) {
+        const upgradeMessage = plan === 'free'
+          ? 'Upgrade to Pro for more documents and the ability to purchase credit packs.'
+          : 'Purchase a credit pack to continue.';
+
+        return NextResponse.json(
+          {
+            error: `You've used your ${documentLimit} document${documentLimit > 1 ? 's' : ''} for this month. ${upgradeMessage}`,
+            code: 'INSUFFICIENT_CREDITS',
+            creditsAvailable: totalCredits,
+            creditsNeeded: creditCost,
+            documentsUsed: documentsThisMonth,
+            documentLimit,
+            canBuyCredits: limits.canBuyCredits,
+          },
+          { status: 403 }
+        );
+      }
+
+      // Deduct credits (monthly first, then purchased)
+      if (creditsBalance >= creditCost) {
+        // Use monthly credits
+        newCreditsBalance = creditsBalance - creditCost;
+      } else {
+        // Use remaining monthly + purchased
+        const fromPurchased = creditCost - creditsBalance;
+        newCreditsBalance = 0;
+        newCreditsPurchased = (profile.credits_purchased || 0) - fromPurchased;
+      }
+
+      // Update profile with new credits and document count
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          credits_balance: newCreditsBalance,
+          credits_purchased: newCreditsPurchased,
+          documents_this_month: documentsThisMonth + 1,
+        })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('Failed to deduct credits:', updateError);
+        return NextResponse.json(
+          { error: 'Failed to process credits' },
+          { status: 500 }
+        );
+      }
+
+      // Log the credit transaction.
+      // Schema is {user_id, amount, transaction_type, reference_id, notes}
+      // — NOT {type, description, metadata}. Previous code silently no-op'd
+      // because Supabase drops unknown columns on insert.
+      // transaction_type must match the CHECK constraint enum:
+      // referral_bonus, welcome_bonus, share_unlock, book_generation, export,
+      // purchase, admin_adjustment, promo_code, publishing, publishing_refund
+      await supabase.from('credit_transactions').insert({
+        user_id: user.id,
+        amount: -creditCost,
+        transaction_type: 'book_generation',
+        reference_id: projectId,
+        notes: `Generated document: ${project.title} (plan: ${plan})`,
+      });
     } else {
-      // Use remaining monthly + purchased
-      const fromPurchased = creditCost - creditsBalance;
-      newCreditsBalance = 0;
-      newCreditsPurchased = (profile.credits_purchased || 0) - fromPurchased;
+      // Grant-billed: the Guild showcase grant covers the credit cost.
+      // Still increment the monthly document counter (quota is a slot
+      // allotment, grant covers only the credit ledger) and log an
+      // amount=0 transaction for audit trail so the user's ledger shows
+      // the document was generated with attribution.
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          documents_this_month: documentsThisMonth + 1,
+        })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('Failed to increment documents_this_month:', updateError);
+        return NextResponse.json(
+          { error: 'Failed to update usage counter' },
+          { status: 500 }
+        );
+      }
+
+      await supabase.from('credit_transactions').insert({
+        user_id: user.id,
+        amount: 0,
+        transaction_type: 'book_generation',
+        reference_id: projectId,
+        notes: `Generated document: ${project.title} (grant-billed, no credits deducted)`,
+      });
     }
 
-    // Update profile with new credits and document count
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({
-        credits_balance: newCreditsBalance,
-        credits_purchased: newCreditsPurchased,
-        documents_this_month: documentsThisMonth + 1,
-      })
-      .eq('id', user.id);
-
-    if (updateError) {
-      console.error('Failed to deduct credits:', updateError);
-      return NextResponse.json(
-        { error: 'Failed to process credits' },
-        { status: 500 }
-      );
-    }
-
-    // Log the credit transaction.
-    // Schema is {user_id, amount, transaction_type, reference_id, notes}
-    // — NOT {type, description, metadata}. Previous code silently no-op'd
-    // because Supabase drops unknown columns on insert.
-    // transaction_type must match the CHECK constraint enum:
-    // referral_bonus, welcome_bonus, share_unlock, book_generation, export,
-    // purchase, admin_adjustment, promo_code, publishing, publishing_refund
-    await supabase.from('credit_transactions').insert({
-      user_id: user.id,
-      amount: -creditCost,
-      transaction_type: 'book_generation',
-      reference_id: projectId,
-      notes: `Generated document: ${project.title} (plan: ${plan})`,
-    });
 
     // Trigger Inngest function for durable writing (any document type)
     const outlineBody = outline.body || outline.chapters || [];
@@ -197,7 +238,7 @@ export async function POST(request: NextRequest) {
       eventId: ids[0],
       message: 'Book generation started',
       totalChapters: outline.chapters.length,
-      creditsUsed: creditCost,
+      creditsUsed: deductCredits ? creditCost : 0,
       creditsRemaining: newCreditsBalance + newCreditsPurchased,
     });
 

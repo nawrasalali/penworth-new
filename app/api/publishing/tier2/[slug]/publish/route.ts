@@ -93,6 +93,7 @@ export async function POST(
     userId: user.id,
     amount: PUBLISHING_CREDIT_COSTS.tier2_api,
     reason: `Tier 2 auto-publish: ${platform.name}`,
+    projectId,
   });
   if (!debit.ok) {
     return NextResponse.json(
