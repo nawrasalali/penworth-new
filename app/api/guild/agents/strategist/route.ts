@@ -7,13 +7,9 @@ import {
   loadReferralMetrics,
   getAgentContext,
 } from '@/lib/guild/agents/shared';
-import {
-  buildStrategistPrompt,
-  StrategistPlan,
-  nextMondayUtc,
-  planEndDate,
-} from '@/lib/guild/agents/strategist';
+import { buildStrategistPrompt, StrategistPlan, nextMondayUtc, planEndDate } from '@/lib/guild/agents/strategist';
 import { AnalystReport } from '@/lib/guild/agents/analyst';
+import { requireAgentAccess } from '@/lib/guild/require-agent-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,11 +26,10 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
  */
 
 export async function GET(_req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const gate = await requireAgentAccess();
+  if (!gate.ok) return gate.response;
+  const { user, admin } = gate;
 
-  const admin = createAdminClient();
   const member = await resolveGuildMember(admin, user.id);
   if (!member) return NextResponse.json({ error: 'not a Guild member' }, { status: 403 });
 
@@ -64,11 +59,10 @@ export async function GET(_req: NextRequest) {
 }
 
 export async function POST(_req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const gate = await requireAgentAccess();
+  if (!gate.ok) return gate.response;
+  const { user, admin } = gate;
 
-  const admin = createAdminClient();
   const member = await resolveGuildMember(admin, user.id);
   if (!member) return NextResponse.json({ error: 'not a Guild member' }, { status: 403 });
   if (member.status === 'terminated' || member.status === 'resigned') {

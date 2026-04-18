@@ -13,6 +13,7 @@ import {
   currentWeekOf,
   MentorSession,
 } from '@/lib/guild/agents/mentor';
+import { requireAgentAccess } from '@/lib/guild/require-agent-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,17 +26,19 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
  * (idempotency — you can't start two check-ins in one week).
  */
 export async function POST(_req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  // Auth + probation check in one call. Probationed members are blocked here.
+  // This is a business-rule change: mentor was previously accessible on
+  // probation — Phase 1D moves to "probation locks all agents".
+  const gate = await requireAgentAccess();
+  if (!gate.ok) return gate.response;
+  const { user, admin } = gate;
 
-  const admin = createAdminClient();
   const member = await resolveGuildMember(admin, user.id);
   if (!member)
     return NextResponse.json({ error: 'not a Guild member' }, { status: 403 });
-  if (member.status !== 'active' && member.status !== 'probation') {
+  // Defense-in-depth: the gate already rejects non-'active' members via the
+  // RPC, but keep this check in case the gate is ever loosened.
+  if (member.status !== 'active') {
     return NextResponse.json(
       { error: `membership ${member.status}` },
       { status: 403 },

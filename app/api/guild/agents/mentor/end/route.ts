@@ -10,6 +10,7 @@ import {
   buildMentorSummaryPrompt,
   MentorSession,
 } from '@/lib/guild/agents/mentor';
+import { requireAgentAccess } from '@/lib/guild/require-agent-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,9 +23,9 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
  * clears the active session from agent context.
  */
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const gate = await requireAgentAccess();
+  if (!gate.ok) return gate.response;
+  const { user, admin } = gate;
 
   let body: any;
   try { body = await req.json(); } catch {
@@ -33,7 +34,6 @@ export async function POST(req: NextRequest) {
   const sessionId = String(body?.session_id ?? '');
   if (!sessionId) return NextResponse.json({ error: 'session_id required' }, { status: 400 });
 
-  const admin = createAdminClient();
   const member = await resolveGuildMember(admin, user.id);
   if (!member) return NextResponse.json({ error: 'not a Guild member' }, { status: 403 });
 

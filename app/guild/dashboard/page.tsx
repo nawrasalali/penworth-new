@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { ProbationBanner } from '@/components/guild/ProbationBanner';
+import { isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
 export const dynamic = 'force-dynamic';
 export const metadata = {
@@ -74,8 +76,28 @@ export default async function GuildDashboardPage() {
   const mandatoryTotal = academyStatus?.mandatory_total ?? 0;
   const referralUnlocked = mandatoryTotal > 0 && mandatoryCompleted >= mandatoryTotal;
 
+  // Resolve locale + deferred balance for the probation banner. Only fetch
+  // the balance when the member is actually on probation — it's an extra
+  // RPC call we don't need to make for active members.
+  const rawLang = (member.primary_language || 'en').toLowerCase();
+  const locale: Locale = isSupportedLocale(rawLang) ? rawLang : 'en';
+  let deferredBalance = 0;
+  if (member.status === 'probation') {
+    const { data: balanceRaw } = await admin.rpc('guild_deferred_balance_usd', {
+      p_guildmember_id: member.id,
+    });
+    deferredBalance = Number(balanceRaw ?? 0);
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
+      {member.status === 'probation' && (
+        <ProbationBanner
+          deferredBalance={deferredBalance}
+          variant="inline"
+          locale={locale}
+        />
+      )}
       <DashboardHeader member={member} referralUnlocked={referralUnlocked} />
 
       <div className="mt-12 grid gap-6 lg:grid-cols-[200px_1fr_300px]">
