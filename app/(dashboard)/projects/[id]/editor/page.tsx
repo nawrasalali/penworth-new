@@ -122,6 +122,25 @@ function UnifiedLeftPanel({
   locale?: Locale;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  // Default to collapsed on viewports narrower than lg (1024px). Same pattern
+  // as DocumentPreview — SSR renders expanded, client effect re-renders
+  // collapsed if narrow. On a 390px phone: 256px dashboard drawer (off-
+  // screen mobile) + 40px left rail + 40px right rail = 80px of editor
+  // chrome, leaving ~310px for the writing column, which is above the
+  // 280px minimum.
+  //
+  // The reason we check <1024 (not <768) is that on a 768-1023 tablet
+  // with both editor panels fully expanded (240 + 280 = 520) plus the
+  // dashboard's 256px sidebar (visible at md+) = 776px of chrome, leaving
+  // only ~250px for the writing column. Too narrow. Collapsing both
+  // panels to rails recovers ~440px of that, giving ~500px writing column
+  // on a 768 tablet. Comfortable.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.innerWidth < 1024) {
+      setCollapsed(true);
+    }
+  }, []);
 
   if (collapsed) {
     return (
@@ -980,7 +999,7 @@ function EditorContentNew() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center">
+      <div className="h-[calc(100vh-3rem)] md:h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Loading your writing workspace...</p>
@@ -1129,7 +1148,11 @@ function EditorContentNew() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-background">
+    // On mobile (<md) the dashboard layout adds pt-12 for the hamburger
+    // top bar, so 100vh on the editor would overflow the viewport. Subtract
+    // 3rem (= h-12 = 48px) on mobile; use full h-screen on md+ where no
+    // mobile topbar exists.
+    <div className="h-[calc(100vh-3rem)] md:h-screen flex flex-col bg-background">
       {/* Top Header Bar */}
       <div className="h-12 border-b flex items-center justify-between px-4 bg-card">
         <div className="flex items-center gap-2">
@@ -1210,7 +1233,7 @@ function EditorContentNew() {
 export default function EditorPage() {
   return (
     <Suspense fallback={
-      <div className="h-screen flex items-center justify-center">
+      <div className="h-[calc(100vh-3rem)] md:h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
           <p className="text-muted-foreground">…</p>

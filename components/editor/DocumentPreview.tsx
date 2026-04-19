@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CoverConfig } from '@/types/agent-workflow';
 import { cn } from '@/lib/utils';
@@ -62,6 +62,24 @@ export function DocumentPreview({
   locale = 'en',
 }: DocumentPreviewProps) {
   const [collapsed, setCollapsed] = useState(false);
+  // Default to collapsed on viewports narrower than lg (1024px). This runs
+  // once on mount — SSR always renders expanded, then the client re-renders
+  // collapsed if the viewport is narrow. A ~100ms flash is acceptable; the
+  // alternative (reading window in useState initializer) breaks SSR. Only
+  // re-collapses on the transition from md-or-wider to <lg to avoid fighting
+  // an intentional user expand. Also reacts to viewport widening: if the
+  // user rotates to landscape on a tablet we don't keep them stuck expanded
+  // when there's no room.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.innerWidth < 1024) {
+      setCollapsed(true);
+    }
+    // No resize listener here by design — the user's explicit toggle after
+    // mount should stick. Tablet rotation mid-writing-session is rare and
+    // the content still renders even if the panel is in the 'wrong' state
+    // for the new orientation. User can tap the collapse toggle to fix.
+  }, []);
   const isBook = ['fiction', 'non-fiction', 'memoir', 'self-help', 'children', 'poetry', 'cookbook', 'travel', 'biography'].includes(contentType);
 
   // Collapsed rail — 10px wide, matches the left-panel collapsed width.

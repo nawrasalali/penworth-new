@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/dashboard/Sidebar';
 import { FirstLoginConsentModal } from '@/components/auth/FirstLoginConsentModal';
 import { NoraWidget } from '@/components/nora/NoraWidget';
 import { isSupportedLocale, isRTL, type Locale } from '@/lib/i18n/strings';
+import { cn } from '@/lib/utils';
 
 export default async function DashboardLayout({
   children,
@@ -64,7 +65,21 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-background" dir={dir} lang={locale}>
       <Sidebar user={userData} organization={organization} locale={locale} />
-      <main className={dir === 'rtl' ? 'pr-64' : 'pl-64'}>
+      {/* Main content padding:
+            - On mobile (<md): no left/right padding since the sidebar slides
+              off-screen. Top padding of 12 (= 48px, = h-12) reserves space
+              for the mobile topbar rendered by <Sidebar>. The editor page
+              has its own full-height flex shell so this top padding becomes
+              part of the editor chrome layout — still correct because the
+              editor's own h-12 top header sits below the sidebar's topbar.
+            - On md+: 256px side padding for the fixed sidebar, no top
+              padding since the mobile topbar is hidden. */}
+      <main
+        className={cn(
+          'pt-12 md:pt-0',
+          dir === 'rtl' ? 'pr-0 md:pr-64' : 'pl-0 md:pl-64'
+        )}
+      >
         <div className="min-h-screen">{children}</div>
       </main>
       {needsConsent && <FirstLoginConsentModal locale={locale} />}
