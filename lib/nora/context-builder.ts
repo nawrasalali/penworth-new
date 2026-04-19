@@ -108,10 +108,17 @@ export async function buildNoraContext(
     .maybeSingle<MemberContextRow>();
 
   if (error) {
-    console.error('[buildNoraContext] view fetch error:', error);
+    console.error('[nora:context-builder:error]', { userId: user_id, error });
     return { ok: false, reason: 'member_not_found' };
   }
   if (!data) {
+    // Previously silent. A 2026-04-19 prod incident (8× 404 on /start with
+    // zero log lines on the Vercel side) proved this branch needed its own
+    // signal — when the view query returns successfully but matches zero
+    // rows under the current role/RLS, we need to see it in the logs to
+    // distinguish "service role bypassed but user has no profile row" from
+    // "RLS silently returned empty set under wrong role".
+    console.error('[nora:context-builder:no-data]', { userId: user_id });
     return { ok: false, reason: 'member_not_found' };
   }
 
