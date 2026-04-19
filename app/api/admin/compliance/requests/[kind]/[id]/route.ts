@@ -27,7 +27,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { logAuditFromRequest, type AuditSeverity } from '@/lib/audit';
 import { isDeadlineBreached } from '@/lib/compliance';
 
@@ -118,13 +119,16 @@ async function handlePatch(
   const failureReason = typeof body?.failure_reason === 'string' ? body.failure_reason.trim() : null;
   const manifest = Array.isArray(body?.manifest) ? body.manifest : null;
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const table = kind === 'deletion' ? 'data_deletion_requests' : 'data_exports';
+  const manifestCol = kind === 'deletion' ? 'deletion_manifest' : 'export_manifest';
 
-  // Load the row to check current status + deadline
+  // Load the row to check current status + deadline. Only select the
+  // manifest column that actually exists on this table — requesting the
+  // other one yields a Postgrest "column does not exist" error.
   const { data: current, error: loadErr } = await admin
     .from(table)
-    .select('id, status, user_id, user_email, statutory_deadline, deletion_manifest, export_manifest')
+    .select(`id, status, user_id, user_email, statutory_deadline, ${manifestCol}`)
     .eq('id', id)
     .maybeSingle();
 
@@ -188,8 +192,8 @@ async function handlePatch(
 
   if (manifest) {
     // Merge new manifest entries with existing. Both tables use JSONB
-    // array with the same structure.
-    const manifestCol = kind === 'deletion' ? 'deletion_manifest' : 'export_manifest';
+    // array with the same structure. manifestCol is declared above at
+    // the same scope as `table` — reuse it here.
     const existing = (current as any)[manifestCol] ?? [];
     updates[manifestCol] = [...existing, ...manifest];
   }
