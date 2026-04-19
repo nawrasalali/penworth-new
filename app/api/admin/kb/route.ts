@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin/require-admin';
+import { validateArticlePayload } from '@/lib/admin/validators';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -73,29 +74,3 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ data }, { status: 201 });
 }
 
-export function validateArticlePayload(
-  body: any,
-): { ok: true } | { ok: false; error: string } {
-  if (typeof body.slug !== 'string' || body.slug.trim().length === 0) {
-    return { ok: false, error: 'slug is required' };
-  }
-  if (typeof body.title !== 'string' || body.title.trim().length === 0) {
-    return { ok: false, error: 'title is required' };
-  }
-  if (
-    typeof body.content_markdown !== 'string' ||
-    body.content_markdown.trim().length === 0
-  ) {
-    return { ok: false, error: 'content_markdown is required' };
-  }
-  if (!Array.isArray(body.surface_scope) || body.surface_scope.length === 0) {
-    return { ok: false, error: 'surface_scope must be a non-empty array' };
-  }
-  if (!Array.isArray(body.role_scope) || body.role_scope.length === 0) {
-    return { ok: false, error: 'role_scope must be a non-empty array' };
-  }
-  if (body.tags && !Array.isArray(body.tags)) {
-    return { ok: false, error: 'tags must be an array if provided' };
-  }
-  return { ok: true };
-}

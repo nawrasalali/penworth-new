@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin/require-admin';
-import { validateArticlePayload } from '../route';
+import { validateArticlePayload } from '@/lib/admin/validators';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

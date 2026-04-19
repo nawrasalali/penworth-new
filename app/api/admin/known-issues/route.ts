@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/admin/require-admin';
+import { validateKnownIssuePayload } from '@/lib/admin/validators';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -63,30 +64,4 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ data }, { status: 201 });
-}
-
-export function validateKnownIssuePayload(
-  body: any,
-): { ok: true } | { ok: false; error: string } {
-  if (typeof body.pattern_slug !== 'string' || body.pattern_slug.trim().length === 0) {
-    return { ok: false, error: 'pattern_slug is required' };
-  }
-  if (typeof body.title !== 'string' || body.title.trim().length === 0) {
-    return { ok: false, error: 'title is required' };
-  }
-  if (body.symptom_keywords && !Array.isArray(body.symptom_keywords)) {
-    return { ok: false, error: 'symptom_keywords must be an array' };
-  }
-  if (body.auto_fix_tool && body.auto_fix_tier !== null && body.auto_fix_tier !== undefined) {
-    if (![1, 2, 3].includes(body.auto_fix_tier)) {
-      return { ok: false, error: 'auto_fix_tier must be 1, 2, or 3' };
-    }
-  }
-  if (body.escalate_after_attempts !== undefined) {
-    const n = Number(body.escalate_after_attempts);
-    if (!Number.isInteger(n) || n < 1 || n > 10) {
-      return { ok: false, error: 'escalate_after_attempts must be an integer 1-10' };
-    }
-  }
-  return { ok: true };
 }
