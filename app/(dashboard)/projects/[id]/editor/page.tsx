@@ -297,6 +297,17 @@ function EditorContentNew() {
   const [isWriting, setIsWriting] = useState(false);
   const [isCheckingQA, setIsCheckingQA] = useState(false);
 
+  // Pipeline health — driven by SSE 'session_update' events. 'active'
+  // means normal; anything else triggers a banner above the writing UI.
+  // Keeping these as separate hooks rather than nesting under `session`
+  // so a stale `session` object (cached from initial fetch) never
+  // overrides a fresh stream event.
+  const [pipelineStatus, setPipelineStatus] = useState<
+    'active' | 'stuck' | 'recovering' | 'failed' | 'completed' | 'user_abandoned'
+  >('active');
+  const [pipelineFailureReason, setPipelineFailureReason] = useState<string | null>(null);
+  const [pipelineFailureCount, setPipelineFailureCount] = useState(0);
+
   // Derived state
   const currentAgent = session?.current_agent || 'validate';
   const agentStatus = session?.agent_status || {
@@ -718,6 +729,27 @@ function EditorContentNew() {
               }];
             });
           }
+          // Pipeline health events come from the interview_sessions
+          // Realtime channel. Transitions we care about:
+          //   active      — normal; clear any previous failure state
+          //   stuck       — stuck detector flagged a stale heartbeat
+          //   recovering  — auto-retry cron fired; counter bumped
+          //   failed      — auto-recovery budget exhausted
+          if (msg.type === 'session_update') {
+            const status = msg.pipeline_status;
+            if (
+              status === 'active' ||
+              status === 'stuck' ||
+              status === 'recovering' ||
+              status === 'failed' ||
+              status === 'completed' ||
+              status === 'user_abandoned'
+            ) {
+              setPipelineStatus(status);
+            }
+            setPipelineFailureReason(msg.last_failure_reason ?? null);
+            setPipelineFailureCount(msg.failure_count ?? 0);
+          }
           if (msg.type === 'complete') {
             eventSource.close();
             setIsWriting(false);
@@ -1085,6 +1117,10 @@ function EditorContentNew() {
             onEditChapter={handleEditChapter}
             onRegenerateChapter={handleRegenerateChapter}
             locale={locale}
+            pipelineStatus={pipelineStatus}
+            pipelineFailureReason={pipelineFailureReason}
+            failureCount={pipelineFailureCount}
+            onRetryWriting={startWriting}
           />
         );
 

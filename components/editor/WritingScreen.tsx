@@ -13,8 +13,32 @@ import {
   Loader2,
   Edit3,
   RefreshCw,
-  Coins
+  Coins,
+  AlertTriangle,
+  AlertOctagon,
 } from 'lucide-react';
+
+/**
+ * Pipeline health states surfaced to the user.
+ *
+ * active     — normal operation; no banner
+ * stuck      — stuck-detector flagged a stale heartbeat; auto-recovery
+ *              cron hasn't picked it up yet, or it's in-flight
+ * recovering — retry fired; waiting for the restart consumer to
+ *              make progress
+ * failed     — auto-recovery budget exhausted; session is dead; user
+ *              needs the resume affordance
+ * completed  — writing done; shouldn't render here but typed for
+ *              completeness
+ * user_abandoned — user walked away; not relevant to the writing UI
+ */
+export type PipelineStatus =
+  | 'active'
+  | 'stuck'
+  | 'recovering'
+  | 'failed'
+  | 'completed'
+  | 'user_abandoned';
 
 interface WritingScreenProps {
   bookTitle: string;
@@ -26,6 +50,12 @@ interface WritingScreenProps {
   onEditChapter: (chapterId: string, content: string) => void;
   onRegenerateChapter: (chapterId: string, instructions?: string) => void;
   locale?: Locale;
+  // Pipeline health — all optional; absent means 'active'. Supplied by
+  // the editor page from the SSE session_update payload.
+  pipelineStatus?: PipelineStatus;
+  pipelineFailureReason?: string | null;
+  failureCount?: number;
+  onRetryWriting?: () => void;
 }
 
 export function WritingScreen({
@@ -38,6 +68,10 @@ export function WritingScreen({
   onEditChapter,
   onRegenerateChapter,
   locale = 'en',
+  pipelineStatus = 'active',
+  pipelineFailureReason = null,
+  failureCount = 0,
+  onRetryWriting,
 }: WritingScreenProps) {
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
@@ -103,6 +137,18 @@ export function WritingScreen({
           {t('writing.subtitle', locale)}
         </p>
       </div>
+
+      {/* Pipeline health banner — shown only when the run is in a
+          non-happy state. Drives the founder's P0 fix: before this
+          landed, a silently-dead writing agent produced a spinner
+          forever. Now the banner reflects real session state as the
+          stuck detector and auto-recovery cron update it. */}
+      <PipelineHealthBanner
+        status={pipelineStatus}
+        failureReason={pipelineFailureReason}
+        failureCount={failureCount}
+        onRetry={onRetryWriting}
+      />
       
       {/* Progress Bar — single row: "Chapter X/Y · N words" on left,
           "N% complete" on right, slim 1.5px bar underneath. Was three
@@ -307,6 +353,124 @@ export function WritingScreen({
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * PipelineHealthBanner
+ *
+ * Renders above the writing UI when the session is in a non-happy
+ * pipeline_status. Silent during normal writing.
+ *
+ * Copy is deliberately warm and concrete rather than technical: an
+ * author watching their book get written doesn't care that "agent_heartbeat_at
+ * exceeded the 15-minute threshold." They care that something's off
+ * and that someone's on it.
+ *
+ * For 'failed' we render an actionable retry button. For 'stuck' and
+ * 'recovering' we render reassurance only — the auto-recovery cron is
+ * already acting; there's nothing for the user to do.
+ */
+function PipelineHealthBanner({
+  status,
+  failureReason,
+  failureCount,
+  onRetry,
+}: {
+  status: PipelineStatus;
+  failureReason: string | null;
+  failureCount: number;
+  onRetry?: () => void;
+}) {
+  if (status === 'active' || status === 'completed' || status === 'user_abandoned') {
+    return null;
+  }
+
+  if (status === 'stuck') {
+    return (
+      <div className="mb-4 p-4 rounded-lg bg-amber-500/10 border border-amber-500/40">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-200">
+              Taking longer than usual
+            </p>
+            <p className="text-sm text-amber-100/80 mt-1 leading-relaxed">
+              Our team is already looking into it. Your progress is saved —
+              you don&apos;t need to do anything. We&apos;ll email you the moment
+              it&apos;s ready.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'recovering') {
+    const attemptLabel =
+      failureCount > 0 ? ` (attempt ${failureCount})` : '';
+    return (
+      <div className="mb-4 p-4 rounded-lg bg-sky-500/10 border border-sky-500/40">
+        <div className="flex items-start gap-3">
+          <Loader2 className="h-5 w-5 text-sky-400 shrink-0 mt-0.5 animate-spin" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-sky-200">
+              Retrying your last step{attemptLabel}
+            </p>
+            <p className="text-sm text-sky-100/80 mt-1 leading-relaxed">
+              We hit a bump and we&apos;re picking things back up. Stay on the
+              page — this usually resolves within a minute or two.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // status === 'failed'
+  return (
+    <div className="mb-4 p-4 rounded-lg bg-red-500/10 border border-red-500/40">
+      <div className="flex items-start gap-3">
+        <AlertOctagon className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-red-200">
+            We hit a problem writing your document
+          </p>
+          <p className="text-sm text-red-100/80 mt-1 leading-relaxed">
+            Your progress is saved. You can resume from the last completed
+            step, or reach out to support if this keeps happening.
+          </p>
+          {failureReason && (
+            <details className="mt-2 text-xs text-red-100/60">
+              <summary className="cursor-pointer hover:text-red-100/90">
+                Show technical details
+              </summary>
+              <pre className="mt-2 p-2 rounded bg-red-950/30 font-mono whitespace-pre-wrap break-words">
+                {failureReason}
+              </pre>
+            </details>
+          )}
+          <div className="mt-3 flex items-center gap-2">
+            {onRetry && (
+              <Button
+                size="sm"
+                onClick={onRetry}
+                className="bg-red-500 hover:bg-red-600 text-white"
+              >
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                Resume from last step
+              </Button>
+            )}
+            <a
+              href="mailto:support@penworth.ai?subject=Document%20generation%20problem"
+              className="text-xs text-red-200 hover:text-red-100 underline underline-offset-2"
+            >
+              Contact support
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
