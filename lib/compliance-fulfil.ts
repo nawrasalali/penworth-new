@@ -63,7 +63,12 @@ interface TableSpec {
   userColumn: 'user_id' | 'author_id' | 'owner_id';
 }
 
-const USER_SCOPED_TABLES: ReadonlyArray<TableSpec> = [
+/**
+ * Exported for tests. Source of truth for which tables are walked
+ * during export fulfilment. Order is alphabetical so export JSON
+ * output is deterministic.
+ */
+export const USER_SCOPED_TABLES: ReadonlyArray<TableSpec> = [
   { name: 'ai_sessions', userColumn: 'user_id' },
   { name: 'audiobook_chapters', userColumn: 'user_id' },
   { name: 'collaborators', userColumn: 'owner_id' },
@@ -114,11 +119,41 @@ const USER_SCOPED_TABLES: ReadonlyArray<TableSpec> = [
  * Sensitive columns that are redacted from the export output.
  * Publishing credentials are encrypted at rest but still — sending
  * them back in a JSON dump would create a second attack surface.
+ * Exported for tests.
  */
-const REDACTED_COLUMNS_BY_TABLE: Record<string, ReadonlyArray<string>> = {
+export const REDACTED_COLUMNS_BY_TABLE: Record<string, ReadonlyArray<string>> = {
   publishing_credentials: ['encrypted_password', 'encrypted_api_key', 'encrypted_secret', 'encrypted_token'],
   store_author_credentials: ['encrypted_password', 'encrypted_api_key', 'encrypted_secret', 'encrypted_token'],
 };
+
+/**
+ * Apply the redaction map for a given table to a list of rows.
+ *
+ * Pure function — no side effects, no IO. Exported for tests.
+ *
+ * If the table has no redaction rules, the input array is returned
+ * unchanged (same reference). If there ARE rules, each row is shallow
+ * copied and every configured column that exists on the row is
+ * overwritten with the sentinel string '[REDACTED]'. Columns that are
+ * absent on a given row are left alone.
+ *
+ * Rows are treated as plain objects; columns not mentioned in the
+ * redaction map pass through untouched.
+ */
+export function applyRedaction(
+  rows: Array<Record<string, unknown>>,
+  tableName: string,
+): Array<Record<string, unknown>> {
+  const redactedCols = REDACTED_COLUMNS_BY_TABLE[tableName];
+  if (!redactedCols) return rows;
+  return rows.map((row) => {
+    const copy = { ...row };
+    for (const col of redactedCols) {
+      if (col in copy) copy[col] = '[REDACTED]';
+    }
+    return copy;
+  });
+}
 
 // ----------------------------------------------------------------------------
 // Types
@@ -268,16 +303,7 @@ export async function fulfilExportRequest(
       }
 
       const rows = data ?? [];
-      const redactedCols = REDACTED_COLUMNS_BY_TABLE[spec.name];
-      const cleaned = redactedCols
-        ? rows.map((row: Record<string, unknown>) => {
-            const copy = { ...row };
-            for (const col of redactedCols) {
-              if (col in copy) copy[col] = '[REDACTED]';
-            }
-            return copy;
-          })
-        : rows;
+      const cleaned = applyRedaction(rows, spec.name);
 
       tablesBlock[spec.name] = cleaned;
       manifest.push({
