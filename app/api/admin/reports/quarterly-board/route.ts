@@ -35,6 +35,20 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  try {
+    return await handleGet(request);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error('[reports/quarterly-board] handler error:', message, stack);
+    return NextResponse.json(
+      { error: 'report_generation_failed', message, stack },
+      { status: 500 },
+    );
+  }
+}
+
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   // Admin gate
   const supabase = await createClient();
   const { data: { user }, error: authErr } = await supabase.auth.getUser();
