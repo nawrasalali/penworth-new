@@ -2,17 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { MODEL_IDS } from '@/lib/ai/model-router';
-import { NORA_SYSTEM_PROMPT } from '@/lib/nora/system-prompt';
 import { buildNoraContext } from '@/lib/nora/context-builder';
+import { composeSystemPrompt } from '@/lib/nora/compose-system-prompt';
 import {
   matchKnownIssue,
-  type KnownIssuePattern,
 } from '@/lib/nora/known-issue-matcher';
 import {
   findTool,
   buildAnthropicToolsSpec,
 } from '@/lib/nora/tools';
-import type { NoraContext, NoraSurface, NoraToolContext } from '@/lib/nora/types';
+import type { NoraSurface, NoraToolContext } from '@/lib/nora/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -455,83 +454,6 @@ export async function POST(request: NextRequest) {
 }
 
 // -----------------------------------------------------------------------------
-// Helpers
+// Helpers — composeSystemPrompt lives in lib/nora/compose-system-prompt.ts
+// (extracted for Next.js 15 route-export rules + unit-testability)
 // -----------------------------------------------------------------------------
-
-/**
- * Compose the system prompt for a single Nora turn: the canonical
- * NORA_SYSTEM_PROMPT + a context block + (if any) a matched-pattern
- * block. Kept out of the main handler body to keep the flow readable.
- */
-function composeSystemPrompt(
-  ctx: NoraContext,
-  matched: KnownIssuePattern | null,
-): string {
-  const contextBlock = `
-
-═══ INJECTED SESSION CONTEXT ═══
-
-User identity:
-  user_id: ${ctx.user_id}
-  email: ${ctx.email}
-  primary_language: ${ctx.primary_language}
-  plan: ${ctx.plan ?? 'none'}
-  is_admin: ${ctx.is_admin}
-  account_created_at: ${ctx.account_created_at}
-
-Session:
-  surface: ${ctx.surface}
-  user_role: ${ctx.user_role}
-
-${ctx.guildmember_id ? formatGuildBlock(ctx) : 'Not a Guild member.'}
-`;
-
-  const patternBlock = matched
-    ? `
-
-═══ KNOWN-ISSUE PATTERN MATCHED ═══
-
-Your symptom match returned the pattern below. Use its playbook to
-answer. If the playbook text does not apply to this user's situation,
-say so and either run a different tool or escalate.
-
-pattern_slug: ${matched.pattern_slug}
-title: ${matched.title}
-${matched.auto_fix_tool ? `auto_fix_tool: ${matched.auto_fix_tool} (tier ${matched.auto_fix_tier ?? '?'})` : ''}
-
-resolution_playbook:
-${matched.resolution_playbook ?? '(no playbook text on file)'}
-`
-    : '';
-
-  return NORA_SYSTEM_PROMPT + contextBlock + patternBlock;
-}
-
-function formatGuildBlock(ctx: NoraContext): string {
-  return `Guild state:
-  guildmember_id: ${ctx.guildmember_id}
-  tier: ${ctx.tier ?? '?'}
-  guild_status: ${ctx.guild_status ?? '?'}
-  referral_code: ${ctx.referral_code ?? '?'}
-  guild_joined_at: ${ctx.guild_joined_at ?? '?'}
-  primary_market: ${ctx.primary_market ?? '?'}
-
-  fee_window_active: ${ctx.fee_window_active ?? '?'}
-  current_monthly_fee_usd: ${ctx.current_monthly_fee_usd ?? 0}
-  deferred_balance_usd: ${ctx.deferred_balance_usd ?? 0}
-  ${ctx.probation_started_at ? `probation_started_at: ${ctx.probation_started_at}` : ''}
-  ${ctx.probation_reason ? `probation_reason: ${ctx.probation_reason}` : ''}
-
-  total_referrals: ${ctx.total_referrals ?? 0}
-  retained_referrals: ${ctx.retained_referrals ?? 0}
-  referrals_in_gate_window: ${ctx.referrals_in_gate_window ?? 0}
-
-  pending_commission_usd: ${ctx.pending_commission_usd ?? 0}
-  unused_grants: ${ctx.unused_grants ?? 0}
-
-  completed_mentor_sessions: ${ctx.completed_mentor_sessions ?? 0}
-  mandatory_modules: ${ctx.mandatory_modules_completed ?? 0}/${ctx.mandatory_modules_total ?? 0}
-
-  open_fraud_flags: ${ctx.open_fraud_flags ?? 0}
-  open_support_tickets: ${ctx.open_support_tickets ?? 0}`;
-}

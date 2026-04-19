@@ -195,6 +195,11 @@ export async function buildNoraContext(
 /**
  * Role derivation per A10 + founder prompt's user_role enum.
  *
+ * Exported for unit testing — the role matrix is product policy and
+ * deserves explicit coverage. Not re-exported from any index because
+ * it's an implementation detail of the context builder; tests import
+ * from this file directly.
+ *
  * Precedence order:
  *   1. admin            — is_admin trumps everything. Super admin is
  *                         not signalled by any column so never returned.
@@ -208,7 +213,7 @@ export async function buildNoraContext(
  * "has access to runbooks"), not guildmember_active. That's the whole
  * reason surface is admin-overrideable.
  */
-function deriveUserRole(
+export function deriveUserRole(
   row: MemberContextRow,
   _surface: NoraSurface,
 ): NoraUserRole {
@@ -231,3 +236,10 @@ function deriveUserRole(
   if (plan === 'pro' || plan === 'starter') return 'author_pro';
   return 'author_free';
 }
+
+/**
+ * Row shape exported for tests that want to feed deriveUserRole()
+ * without standing up the whole builder. Not expected to be used by
+ * production code outside this module.
+ */
+export type { MemberContextRow };
