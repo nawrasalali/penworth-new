@@ -88,10 +88,16 @@ export async function POST(_req: NextRequest) {
 
   // Ask Claude for the opening line
   const system = buildMentorSystemPrompt(member, metrics);
+  // Prompt caching: the system prompt is built from member context
+  // + this week's referral metrics and stays identical across every
+  // turn of the check-in. Writing the cache here means continue/end
+  // calls within the 5-minute TTL pay 10× less for the system prompt.
   const response = await anthropic.messages.create({
     model: modelFor('guild_mentor_turn'),
     max_tokens: maxTokensFor('guild_mentor_turn'),
-    system,
+    system: [
+      { type: 'text', text: system, cache_control: { type: 'ephemeral' } },
+    ],
     messages: [
       {
         role: 'user',

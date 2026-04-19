@@ -74,10 +74,15 @@ export async function POST(req: NextRequest) {
 
   // Build the Anthropic conversation
   const system = buildMentorSystemPrompt(member, session.metrics_snapshot);
+  // Cache hit on the system prompt established by mentor/start.
+  // 5-min TTL comfortably covers a typical check-in (5-10 turns
+  // spaced 30s-2min apart).
   const response = await anthropic.messages.create({
     model: modelFor('guild_mentor_turn'),
     max_tokens: maxTokensFor('guild_mentor_turn'),
-    system,
+    system: [
+      { type: 'text', text: system, cache_control: { type: 'ephemeral' } },
+    ],
     messages: session.turns.map((t: MentorTurn) => ({
       role: t.role,
       content: t.content,
