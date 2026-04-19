@@ -95,8 +95,146 @@ interface Session {
 }
 
 // =============================================================================
-// NAVIGATION SIDEBAR (Column 1)
+// UNIFIED LEFT PANEL (Project details + Agent Pipeline)
 // =============================================================================
+// Merges what used to be two separate columns (NavigationSidebar 240px +
+// AgentPipeline 200px = 440px) into a single 240px panel split vertically.
+// Top section: project title, type, description, chapter list.
+// Bottom section: agent pipeline with live status.
+// Collapsible to 12px so the user can reclaim the full horizontal width
+// for the writing area when they don't need the sidebar context.
+
+function UnifiedLeftPanel({
+  project,
+  chapters,
+  currentAgent,
+  agentStatus,
+  activeMessages,
+  onNavigateHome,
+  locale = 'en',
+}: {
+  project: Project | null;
+  chapters: Chapter[];
+  currentAgent: AgentName;
+  agentStatus: AgentStatusMap;
+  activeMessages?: { line1: string; line2: string };
+  onNavigateHome: () => void;
+  locale?: Locale;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  if (collapsed) {
+    return (
+      <div className="w-10 border-r bg-muted/20 flex flex-col items-center py-3 shrink-0">
+        <button
+          onClick={() => setCollapsed(false)}
+          className="p-2 hover:bg-muted rounded-lg"
+          aria-label={t('editor.expandSidebar', locale)}
+          title={t('editor.expandSidebar', locale)}
+        >
+          <Menu className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-[240px] shrink-0 border-r bg-muted/20 flex flex-col overflow-hidden">
+      {/* Header — project title + collapse toggle */}
+      <div className="p-3 border-b flex items-center justify-between gap-2">
+        <button
+          onClick={onNavigateHome}
+          className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors min-w-0 flex-1"
+        >
+          <ArrowLeft className="h-4 w-4 shrink-0" />
+          <span className="truncate min-w-0">{project?.title || t('editor.untitled', locale)}</span>
+        </button>
+        <button
+          onClick={() => setCollapsed(true)}
+          className="p-1 hover:bg-muted rounded shrink-0"
+          aria-label={t('editor.collapseSidebar', locale)}
+          title={t('editor.collapseSidebar', locale)}
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* TOP HALF — Project details */}
+      {/* min-h-0 is critical: without it, a flex child with overflow won't
+          actually scroll; it will just push the lower section off-screen. */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {/* Type + description */}
+        <div className="p-3 border-b">
+          <div className="flex items-center gap-2 mb-1.5">
+            <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+              {project?.content_type || t('editor.document', locale)}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground line-clamp-3">
+            {project?.description || t('editor.noDescription', locale)}
+          </p>
+        </div>
+
+        {/* Chapters list — compact rows */}
+        <div className="p-3 border-b">
+          <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            {t('editor.chapters', locale)} ({chapters.length})
+          </h3>
+          {chapters.length > 0 ? (
+            <div className="space-y-0.5">
+              {chapters.map((chapter, idx) => (
+                <div
+                  key={chapter.id}
+                  className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-muted/50 cursor-pointer text-xs"
+                >
+                  <span className="text-muted-foreground w-4 text-[10px] shrink-0">{idx + 1}</span>
+                  <span className="truncate flex-1" title={chapter.title}>
+                    {chapter.title}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground shrink-0">
+                    {chapter.word_count || 0}w
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground italic">
+              {t('editor.chaptersEmpty', locale)}
+            </p>
+          )}
+        </div>
+
+        {/* BOTTOM HALF — Agent Pipeline embedded (no separate border/chrome;
+            the outer panel provides those). */}
+        <AgentPipeline
+          currentAgent={currentAgent}
+          agentStatus={agentStatus}
+          activeMessages={activeMessages}
+          locale={locale}
+          embedded
+        />
+      </div>
+
+      {/* Footer — back to project */}
+      <div className="p-2 border-t shrink-0">
+        <Link
+          href={`/projects/${project?.id}`}
+          className="flex items-center gap-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1"
+        >
+          <Home className="h-3 w-3" />
+          {t('editor.backToProject', locale)}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// NAVIGATION SIDEBAR — DEPRECATED (replaced by UnifiedLeftPanel)
+// =============================================================================
+// Kept here temporarily in case any other code path imports it; the editor
+// page no longer uses it. Safe to delete once audit confirms zero references.
 
 function NavigationSidebar({
   project,
@@ -1118,30 +1256,27 @@ function EditorContentNew() {
         </div>
       </div>
 
-      {/* Main Content - 4 Column Layout */}
+      {/* Main Content — 3 columns (was 4). Left panel merges project
+          details + agent pipeline; main area is the flex-1 writing surface;
+          right panel is the collapsible document preview. */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Column 1: Navigation Sidebar */}
-        <NavigationSidebar
+        {/* Left: Project + Agents (collapsible) */}
+        <UnifiedLeftPanel
           project={project}
           chapters={chapters}
+          currentAgent={currentAgent}
+          agentStatus={agentStatus}
+          activeMessages={getActiveMessage()}
           onNavigateHome={() => router.push('/projects')}
           locale={locale}
         />
 
-        {/* Column 2: Agent Pipeline */}
-        <AgentPipeline
-          currentAgent={currentAgent}
-          agentStatus={agentStatus}
-          activeMessages={getActiveMessage()}
-          locale={locale}
-        />
-
-        {/* Column 3: Main Interaction Area */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-background">
+        {/* Center: Main Interaction Area */}
+        <div className="flex-1 flex flex-col overflow-hidden bg-background min-w-0">
           {renderMainScreen()}
         </div>
 
-        {/* Column 4: Document Preview */}
+        {/* Right: Document Preview (collapsible) */}
         <DocumentPreview
           bookTitle={session?.book_title || project?.title || t('editor.untitled', locale)}
           authorName={session?.author_name || t('editor.author', locale)}

@@ -187,3 +187,31 @@
     @apply bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent;
   }
 }
+
+/* Ambient animations — slow, low-contrast cycles for "still working"
+   indicators that shouldn't feel urgent. Used on long-running agent
+   cards where a 1s spinner or 2s pulse reads as an alert after ~10s
+   of exposure. The 3s period is long enough that the motion fades
+   into peripheral awareness rather than commanding the eye. */
+@layer utilities {
+  /* Opacity-only breathe for borders and soft backgrounds.
+     0.5 → 1 → 0.5 over 3s, ease-in-out. Ranges chosen so the *low*
+     point is still clearly visible — this is "breathing", not blinking. */
+  .animate-breathe {
+    animation: breathe 3s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
+  /* Pulse dot — slow scale for a status indicator dot. Same 3s tempo
+     as breathe so they phase-lock if both appear on the same card. */
+  .animate-pulse-dot {
+    animation: pulse-dot 3s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { transform: scale(1); opacity: 0.7; }
+    50% { transform: scale(1.15); opacity: 1; }
+  }
+}

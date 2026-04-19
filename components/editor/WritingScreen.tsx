@@ -91,24 +91,28 @@ export function WritingScreen({
         </p>
       </div>
       
-      {/* Progress Bar */}
+      {/* Progress Bar — single row: "Chapter X/Y · N words" on left,
+          "N% complete" on right, slim 1.5px bar underneath. Was three
+          stacked rows (label, bar, %age) = 3× vertical spend. */}
       <div className="mb-4">
-        <div className="flex items-center justify-between text-sm mb-2">
-          <span>
+        <div className="flex items-center justify-between text-xs mb-1.5">
+          <span className="text-muted-foreground">
             {t('writing.currentlyWriting', locale)} {currentChapterIndex + 1} / {chapters.length}
+            {totalWords > 0 && (
+              <span className="ml-2 text-muted-foreground/70">
+                · {totalWords.toLocaleString()} {t('writing.words', locale)}
+              </span>
+            )}
           </span>
           <span className="text-muted-foreground">
-            {totalWords.toLocaleString()} {t('writing.words', locale)}
+            {Math.round(progress)}% {t('writing.complete', locale)}
           </span>
         </div>
-        <div className="h-3 bg-muted rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-gradient-to-r from-primary to-primary/60 transition-all duration-500"
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary/80 transition-all duration-700 ease-out"
             style={{ width: `${progress}%` }}
           />
-        </div>
-        <div className="text-right text-xs text-muted-foreground mt-1">
-          {Math.round(progress)}% {t('writing.complete', locale)}
         </div>
       </div>
       
@@ -227,8 +231,12 @@ export function WritingScreen({
           </div>
         </div>
         
-        {/* Chapter List Sidebar */}
-        <div className="w-64 overflow-y-auto">
+        {/* Chapter List Sidebar — hidden entirely when no chapters yet.
+            During the first write, chapters.length is 0 and this column
+            would render as a 256px dark void. Reclaim the space for the
+            writing surface until chapters actually exist. */}
+        {chapters.length > 0 && (
+        <div className="w-64 overflow-y-auto shrink-0">
           <h3 className="font-semibold mb-3 text-sm">{t('writing.chapterProgress', locale)}</h3>
           <div className="space-y-2">
             {chapters.map((chapter, idx) => (
@@ -264,6 +272,7 @@ export function WritingScreen({
             ))}
           </div>
         </div>
+        )}
       </div>
       
       {/* Credit Warning */}
