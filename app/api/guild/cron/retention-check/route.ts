@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { runRetentionCheck } from '@/lib/guild/commissions';
+import { requireCronAuth } from '@/lib/cron/require-cron-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -16,16 +17,13 @@ export const dynamic = 'force-dynamic';
  * referrals count toward Guild tier advancement, and only their commissions
  * can be locked in the monthly close.
  *
- * Authentication: Vercel Cron includes Authorization: Bearer CRON_SECRET
- * automatically when CRON_SECRET is set in the environment.
+ * Authentication: requireCronAuth validates the Authorization bearer
+ * against CRON_SECRET. Fail-closed: if CRON_SECRET is unset we 500
+ * rather than pass silently. Vercel Cron auto-signs scheduled calls.
  */
 export async function GET(request: NextRequest) {
-  // Gate by the CRON_SECRET when available
-  const auth = request.headers.get('authorization');
-  const expected = process.env.CRON_SECRET;
-  if (expected && auth !== `Bearer ${expected}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const unauthorized = requireCronAuth(request);
+  if (unauthorized) return unauthorized;
 
   try {
     const admin = createAdminClient();

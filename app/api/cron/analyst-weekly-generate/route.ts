@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { generateWeeklyAnalystReport } from '@/lib/guild/agents/analyst-generator';
 import type { GuildMemberCtx } from '@/lib/guild/agents/shared';
+import { requireCronAuth } from '@/lib/cron/require-cron-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -36,11 +37,8 @@ export const dynamic = 'force-dynamic';
 const CONCURRENCY = 10;
 
 export async function GET(request: NextRequest) {
-  const auth = request.headers.get('authorization');
-  const expected = process.env.CRON_SECRET;
-  if (expected && auth !== `Bearer ${expected}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const unauthorized = requireCronAuth(request);
+  if (unauthorized) return unauthorized;
 
   const startedAt = Date.now();
   const admin = createAdminClient();

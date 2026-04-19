@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { runMonthlyClose } from '@/lib/guild/commissions';
+import { requireCronAuth } from '@/lib/cron/require-cron-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // can be long if many Guildmembers
@@ -23,12 +24,8 @@ export const dynamic = 'force-dynamic';
  *                    Default: current month in Adelaide timezone.
  */
 export async function GET(request: NextRequest) {
-  // Gate by CRON_SECRET
-  const auth = request.headers.get('authorization');
-  const expected = process.env.CRON_SECRET;
-  if (expected && auth !== `Bearer ${expected}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const unauthorized = requireCronAuth(request);
+  if (unauthorized) return unauthorized;
 
   try {
     const url = new URL(request.url);
