@@ -17,6 +17,10 @@
       "schedule": "0 2 * * *"
     },
     {
+      "path": "/api/cron/compliance-export-cleanup",
+      "schedule": "0 3 * * *"
+    },
+    {
       "path": "/api/cron/analyst-weekly-generate",
       "schedule": "0 6 * * 1"
     }
