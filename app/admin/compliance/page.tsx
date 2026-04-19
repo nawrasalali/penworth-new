@@ -287,12 +287,20 @@ export default async function AdminCompliancePage() {
 
       {/* Footer help */}
       <div className="mt-6 rounded-xl border bg-muted/30 p-5 text-sm text-muted-foreground">
-        <p className="font-semibold text-foreground mb-1">Fulfilment workflow (interim)</p>
+        <p className="font-semibold text-foreground mb-1">Fulfilment workflow</p>
+        <p className="mb-2">
+          <span className="font-semibold text-foreground">Exports:</span> auto-fulfilment
+          is available. Open any received or failed export request and click
+          &quot;Run fulfilment&quot; to build the JSON dump, upload to private
+          storage, generate a 7-day signed URL, and email the user.
+        </p>
         <p>
-          Click any row above to open its detail page, where you can transition
-          the request through its state machine. For now, the actual data
-          deletion / export file generation is manual (SQL against Supabase).
-          Automated fulfilment is the next build.
+          <span className="font-semibold text-foreground">Deletions:</span> still
+          manual. Open a deletion request, run the required DELETE statements
+          against Supabase yourself (in FK dependency order), record what was
+          cleared in the fulfillment notes + manifest, then transition the
+          request to &quot;completed&quot;. Auto-fulfilment for deletions is a
+          planned follow-up.
         </p>
       </div>
     </div>
