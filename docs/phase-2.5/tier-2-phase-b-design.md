@@ -190,7 +190,15 @@ Considered alternative: dedicated rate-limit RPC analogous to `nora_consume_turn
 
 ### 11. The RPC I need verification chat to add
 
-**`nora_adjust_credits_and_record_undo`** (per section 4 above). Single Postgres function that runs in an implicit transaction:
+**`nora_adjust_credits_and_record_undo`** (per section 4 above). Single Postgres function that runs in an implicit transaction.
+
+**Verification chat accepted Option 1 and added two refinements:**
+
+1. **`SECURITY DEFINER` with narrow EXECUTE grant** — more defensive than `SECURITY INVOKER`. RPC runs as the function owner (postgres, always has permission) regardless of what happens to service_role's grants in future. Only service_role can invoke it. No other role can call it accidentally.
+
+2. **Defence-in-depth input validation** — `p_delta` and `p_expires_at` bounds enforced at the RPC boundary, not just the tool-handler layer. Same pattern as CHECK constraints on the undo token table. Catches bugs if the tool-handler layer ever has a hole.
+
+**Final RPC:**
 
 ```sql
 CREATE OR REPLACE FUNCTION nora_adjust_credits_and_record_undo(
@@ -204,12 +212,31 @@ CREATE OR REPLACE FUNCTION nora_adjust_credits_and_record_undo(
 ) RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_new_balance INTEGER;
   v_undo_token_id UUID;
 BEGIN
+  -- Defence-in-depth: validate delta bounds at the DB layer.
+  -- Tool handler also enforces |delta| <= 1000 and delta != 0, but
+  -- CHECK-constraint-style defence here catches any future bug in the
+  -- handler layer. Same discipline as the nora_tool_undo_tokens CHECK
+  -- constraints — don't trust the caller, even when the caller is us.
+  IF p_delta = 0 OR p_delta < -1000 OR p_delta > 1000 THEN
+    RAISE EXCEPTION 'adjust_credits_small: delta out of bounds (got %, must be -1000..1000, non-zero)', p_delta
+      USING ERRCODE = '22023';  -- invalid_parameter_value
+  END IF;
+
+  -- Defence-in-depth: expires_at must be in the future AND within 24h.
+  -- Prevents a bug (or injection) from creating a 10-year undo window.
+  -- Tool handler sets expires_at = now() + 60 minutes, so anything beyond
+  -- 24h would already be wrong — giving headroom for any future tuning.
+  IF p_expires_at <= now() OR p_expires_at > now() + interval '24 hours' THEN
+    RAISE EXCEPTION 'adjust_credits_small: expires_at out of valid window (got %, must be (now, now+24h])', p_expires_at
+      USING ERRCODE = '22023';
+  END IF;
+
   -- Forward action: adjust balance
   UPDATE profiles
   SET credits_balance = credits_balance + p_delta
@@ -244,10 +271,35 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION nora_adjust_credits_and_record_undo TO service_role;
+-- Lock down EXECUTE: only service_role can invoke this.
+-- PUBLIC revoke first so no default grant leaks through.
+REVOKE EXECUTE ON FUNCTION nora_adjust_credits_and_record_undo(
+  UUID, INTEGER, TEXT, UUID, UUID, JSONB, TIMESTAMPTZ
+) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION nora_adjust_credits_and_record_undo(
+  UUID, INTEGER, TEXT, UUID, UUID, JSONB, TIMESTAMPTZ
+) TO service_role;
 ```
 
-If verification chat would rather downgrade to best-effort atomicity, I'll ship Option 2 and note the tradeoff in the tool's docblock. Flagging this as the one open decision.
+**Notes on the refinements:**
+
+- `SECURITY DEFINER` requires `SET search_path = public, pg_temp` as a defence against search-path-hijack attacks. Added to the final version above — standard hardening for any SECURITY DEFINER function.
+- The REVOKE FROM PUBLIC is paired with the GRANT TO service_role for belt-and-braces: Postgres defaults grant EXECUTE to PUBLIC on new functions unless explicitly revoked. Without the REVOKE, `authenticated` role could technically call it too (though it would still fail the service_role-only grants downstream). Explicit revoke closes that window.
+- The function signature in the REVOKE/GRANT lines is verbose on purpose — Postgres allows function overloading, and the grant needs to target the exact overload we created.
+
+**Expected call pattern from the tool handler:**
+
+```ts
+const { data, error } = await admin.rpc('nora_adjust_credits_and_record_undo', {
+  p_user_id: ctx.member.user_id,
+  p_delta: delta,
+  p_reason: reason,
+  p_conversation_id: ctx.conversation_id,
+  p_forward_turn_id: forwardTurnId,
+  p_reverse_payload: { tool_name: 'adjust_credits_small', tool_input: { delta: -delta, reason: `reverse of: ${reason}` } },
+  p_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+});
+```
 
 ### 12. What's NOT in Phase B
 
@@ -299,8 +351,11 @@ False-positive cases from (10):
 
 The `^...$` anchors handle all of these.
 
-## Open decision for verification chat
+## Decision log — closed
 
-**Only one:** confirm either (a) add the `nora_adjust_credits_and_record_undo` RPC for true atomicity, or (b) OK to ship adjust_credits_small as best-effort three-step sequence with explicit docblock about the tradeoff.
+**Option 1 (RPC for adjust_credits_small atomicity)**: accepted. Verification chat added two refinements that are now part of the final RPC spec in section 11:
 
-Everything else is locked.
+1. `SECURITY DEFINER` + `REVOKE EXECUTE FROM PUBLIC` + explicit `GRANT EXECUTE TO service_role` — more defensive than SECURITY INVOKER, immune to future grant changes.
+2. Defence-in-depth `RAISE EXCEPTION` guards on `p_delta` (bounds + non-zero) and `p_expires_at` (future, within 24h) at the RPC layer, independent of the tool-handler layer validation.
+
+Design is fully locked. Awaiting verification chat's migration ship, then code begins.
