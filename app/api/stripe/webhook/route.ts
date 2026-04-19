@@ -584,6 +584,36 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 
   console.log(`Billing cycle reset: ${userId} credits=${newCredits}`);
 
+  // Audit trail — credit.grant. Monthly renewal is the highest-frequency
+  // financial event on the platform; closing the audit gap here completes
+  // the set alongside the other 5 Stripe events already instrumented
+  // (commit f7e6c6e). Fire-and-forget per the established pattern — a
+  // logAudit failure must never block the credit grant it documents.
+  const previousBalance = profile?.credits_balance ?? 0;
+  const rolloverAmount = plan === 'max' && limits.creditRollover
+    ? Math.min(previousBalance, limits.creditRollover)
+    : 0;
+  void logAudit({
+    actorType: 'stripe_webhook',
+    actorUserId: userId,
+    action: 'credit.grant',
+    entityType: 'profile',
+    entityId: userId,
+    before: { credits_balance: previousBalance },
+    after: { credits_balance: newCredits },
+    metadata: {
+      kind: 'monthly_renewal',
+      plan,
+      monthly_grant: limits.monthlyCredits,
+      rollover_applied: rolloverAmount,
+      rollover_cap: plan === 'max' ? limits.creditRollover ?? 0 : 0,
+      stripe_invoice_id: invoice.id,
+      stripe_customer_id: customerId,
+      invoice_amount_paid_cents: typeof invoice.amount_paid === 'number' ? invoice.amount_paid : null,
+      billing_reason: invoice.billing_reason,
+    },
+  });
+
   // ---------------------------------------------------------------------
   // Guild commission hook — renewal payment from a referred user
   // ---------------------------------------------------------------------
