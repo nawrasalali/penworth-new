@@ -3,6 +3,12 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { buildSystemPrompt, getPromptById } from '@/lib/industry-prompts';
 import { modelFor, maxTokensFor, calculateCost as calcCostByTask } from '@/lib/ai/model-router';
+import {
+  pulseHeartbeat,
+  markAgentCompleted,
+  logIncident,
+  bumpFailureCount,
+} from '@/lib/pipeline/heartbeat';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
@@ -64,6 +70,92 @@ export const writeBook = inngest.createFunction(
     id: 'write-book',
     name: 'Write Complete Document',
     retries: 3,
+    // When every retry of a step is exhausted, Inngest marks the whole
+    // function as failed and calls onFailure. This is the end-of-line
+    // hook — a stuck step is now definitively dead. We:
+    //   1. Mark the session pipeline_status='failed' so the UI stops
+    //      showing "Nora is investigating" and shows the retry/resume
+    //      affordance instead.
+    //   2. Log a p0 incident so the founder gets paged immediately via
+    //      the auto-alert trigger.
+    //   3. Mark the project status='error' so the /generate/stream SSE
+    //      closes cleanly (it watches projects.status transitions).
+    // Everything is wrapped so an onFailure failure never becomes a
+    // secondary incident loop.
+    onFailure: async (ctx: any) => {
+      try {
+        // The onFailure event wraps the original trigger. Inngest v4
+        // shape: ctx.event.data.event.data is the original payload,
+        // ctx.event.data.error is the failure.
+        const originalData =
+          ctx?.event?.data?.event?.data ?? ctx?.event?.data ?? {};
+        const projectId: string | undefined = originalData.projectId;
+        const userId: string | undefined = originalData.userId;
+        const errorMessage: string =
+          ctx?.error?.message ??
+          ctx?.event?.data?.error?.message ??
+          'Inngest function failed after exhausting retries';
+
+        if (!projectId || !userId) {
+          console.error('[write-book.onFailure] missing projectId/userId in payload', ctx?.event);
+          return;
+        }
+
+        // Re-resolve sessionId. We can't rely on the memoized projectCtx
+        // here — onFailure runs in a fresh context.
+        const { findSessionIdForProject } = await import('@/lib/pipeline/heartbeat');
+        const sessionId = await findSessionIdForProject(projectId, userId);
+
+        // Mark session + project as failed. Use the service client
+        // directly rather than pulseHeartbeat, because we need both
+        // the pipeline_status flip AND the last_failure_reason in one
+        // shot for clear dashboard state.
+        const { createServiceClient } = await import('@/lib/supabase/service');
+        const admin = createServiceClient();
+        if (sessionId) {
+          await admin
+            .from('interview_sessions')
+            .update({
+              pipeline_status: 'failed',
+              agent_heartbeat_at: new Date().toISOString(),
+              last_failure_at: new Date().toISOString(),
+              last_failure_reason: `Inngest onFailure: ${errorMessage}`.slice(0, 500),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', sessionId);
+        }
+        await admin
+          .from('projects')
+          .update({
+            status: 'error',
+            metadata: {
+              errorMessage,
+              failedAt: new Date().toISOString(),
+            },
+          })
+          .eq('id', projectId);
+
+        // p0: every retry failed, pipeline is dead, founder needs paging.
+        await logIncident({
+          sessionId,
+          userId,
+          agent: 'writing',
+          incidentType: 'infrastructure_error',
+          severity: 'p0',
+          details: {
+            source: 'inngest_onFailure',
+            projectId,
+            message: errorMessage,
+            runId: ctx?.runId ?? null,
+          },
+        });
+      } catch (hookErr) {
+        // Never let an onFailure hook throw — Inngest would log it as a
+        // separate failure and potentially loop. The stuck detector
+        // will still catch the session when its heartbeat goes stale.
+        console.error('[write-book.onFailure] hook itself threw:', hookErr);
+      }
+    },
     triggers: [{ event: 'book/write' }],
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,7 +193,10 @@ export const writeBook = inngest.createFunction(
       throw new Error('Outline has no body sections — nothing to write');
     }
 
-    // Load the brief's research + author info once, pass to every section
+    // Load the brief's research + author info once, pass to every section.
+    // Also expose sessionId so each step can pulse the heartbeat. Absence
+    // of a session is logged but not fatal — legacy projects may not
+    // have one and we'd rather generate the book than refuse.
     const projectCtx = await step.run('load-context', async () => {
       const { data: session } = await supabase
         .from('interview_sessions')
@@ -109,6 +204,12 @@ export const writeBook = inngest.createFunction(
         .eq('project_id', projectId)
         .eq('user_id', userId)
         .single();
+
+      if (!session?.id) {
+        console.warn(
+          `[write-book] No interview_sessions row for project ${projectId} — pipeline-health monitoring will be skipped for this run.`,
+        );
+      }
 
       const { data: resources } = session?.id
         ? await supabase
@@ -125,6 +226,7 @@ export const writeBook = inngest.createFunction(
         .single();
 
       return {
+        sessionId: session?.id as string | undefined,
         chosenIdea: session?.validation_data?.chosenIdea || title,
         authorName: session?.author_name,
         aboutAuthor: session?.about_author,
@@ -134,10 +236,22 @@ export const writeBook = inngest.createFunction(
       };
     });
 
+    const sessionId = projectCtx.sessionId ?? null;
+
     // Total sections = front + body + back
     const totalSections = frontMatter.length + body.length + backMatter.length;
 
     await step.run('initialize-project', async () => {
+      // Pipeline entry: mark the writing agent as active with a fresh
+      // heartbeat. `markStart` stamps agent_started_at — the stuck
+      // detector falls back to updated_at via COALESCE if heartbeat is
+      // NULL, but having both is cleaner for the dashboards.
+      await pulseHeartbeat(sessionId, {
+        markStart: true,
+        agent: 'writing',
+        pipelineStatus: 'active',
+      });
+
       await supabase
         .from('projects')
         .update({
@@ -159,52 +273,108 @@ export const writeBook = inngest.createFunction(
     // --- FRONT MATTER ---
     for (let i = 0; i < frontMatter.length; i++) {
       const fm = frontMatter[i];
-      const result = await step.run(`front-${i}`, async () => {
-        return writeSection({
-          kind: 'front_matter',
-          title: fm.title,
-          description: fm.description,
-          keyPoints: fm.keyPoints || [],
-          targetWords: fm.estimatedWords || 1500,
-          projectId,
-          userId,
-          docTitle: title,
-          orderIndex: orderIndex,
-          meta,
-          voiceProfile,
-          projectCtx,
-          prior: written.map((w) => w.title).join(', '),
-          industry,
-        });
+      const stepName = `front-${i}`;
+      const result = await step.run(stepName, async () => {
+        // Pulse at every retry of this step, not just the first — that's
+        // why the call lives inside the step body rather than outside.
+        await pulseHeartbeat(sessionId, { agent: 'writing' });
+        try {
+          return await writeSection({
+            kind: 'front_matter',
+            title: fm.title,
+            description: fm.description,
+            keyPoints: fm.keyPoints || [],
+            targetWords: fm.estimatedWords || 1500,
+            projectId,
+            userId,
+            docTitle: title,
+            orderIndex: orderIndex,
+            meta,
+            voiceProfile,
+            projectCtx,
+            prior: written.map((w) => w.title).join(', '),
+            industry,
+          });
+        } catch (err) {
+          // p3 = audit-only. Step will retry (Inngest retries:3 at fn
+          // level). If every retry fails, onFailure fires a p0.
+          await logIncident({
+            sessionId,
+            userId,
+            agent: 'writing',
+            incidentType: classifyError(err),
+            severity: 'p3',
+            details: {
+              step: stepName,
+              sectionTitle: fm.title,
+              message: err instanceof Error ? err.message : String(err),
+              stack: err instanceof Error ? err.stack?.slice(0, 2000) : undefined,
+            },
+          });
+          await bumpFailureCount(
+            sessionId,
+            `${stepName}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          throw err;
+        }
       });
       written.push(result);
       orderIndex += 1;
+      // Pulse once more on successful step completion so the next
+      // step's entry heartbeat is redundant-but-safe.
+      await pulseHeartbeat(sessionId);
     }
 
     // --- BODY (chapters / sections / clauses / recipes) ---
     for (let i = 0; i < body.length; i++) {
       const b = body[i];
-      const result = await step.run(`body-${i + 1}`, async () => {
-        return writeSection({
-          kind: 'body',
-          title: b.title,
-          description: b.description,
-          keyPoints: b.keyPoints || [],
-          targetWords: b.estimatedWords || 3000,
-          bodyNumber: b.number,
-          projectId,
-          userId,
-          docTitle: title,
-          orderIndex: orderIndex,
-          meta,
-          voiceProfile,
-          projectCtx,
-          prior: written.map((w) => w.title).join(', '),
-          industry,
-        });
+      const stepName = `body-${i + 1}`;
+      const result = await step.run(stepName, async () => {
+        await pulseHeartbeat(sessionId, { agent: 'writing' });
+        try {
+          return await writeSection({
+            kind: 'body',
+            title: b.title,
+            description: b.description,
+            keyPoints: b.keyPoints || [],
+            targetWords: b.estimatedWords || 3000,
+            bodyNumber: b.number,
+            projectId,
+            userId,
+            docTitle: title,
+            orderIndex: orderIndex,
+            meta,
+            voiceProfile,
+            projectCtx,
+            prior: written.map((w) => w.title).join(', '),
+            industry,
+          });
+        } catch (err) {
+          await logIncident({
+            sessionId,
+            userId,
+            agent: 'writing',
+            incidentType: classifyError(err),
+            severity: 'p3',
+            details: {
+              step: stepName,
+              sectionTitle: b.title,
+              bodyNumber: b.number,
+              message: err instanceof Error ? err.message : String(err),
+              stack: err instanceof Error ? err.stack?.slice(0, 2000) : undefined,
+            },
+          });
+          await bumpFailureCount(
+            sessionId,
+            `${stepName}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          throw err;
+        }
       });
       written.push(result);
       orderIndex += 1;
+
+      await pulseHeartbeat(sessionId);
 
       await supabase
         .from('projects')
@@ -221,26 +391,50 @@ export const writeBook = inngest.createFunction(
     // --- BACK MATTER ---
     for (let i = 0; i < backMatter.length; i++) {
       const bm = backMatter[i];
-      const result = await step.run(`back-${i}`, async () => {
-        return writeSection({
-          kind: 'back_matter',
-          title: bm.title,
-          description: bm.description,
-          keyPoints: bm.keyPoints || [],
-          targetWords: bm.estimatedWords || 1500,
-          projectId,
-          userId,
-          docTitle: title,
-          orderIndex: orderIndex,
-          meta,
-          voiceProfile,
-          projectCtx,
-          prior: written.map((w) => w.title).join(', '),
-          industry,
-        });
+      const stepName = `back-${i}`;
+      const result = await step.run(stepName, async () => {
+        await pulseHeartbeat(sessionId, { agent: 'writing' });
+        try {
+          return await writeSection({
+            kind: 'back_matter',
+            title: bm.title,
+            description: bm.description,
+            keyPoints: bm.keyPoints || [],
+            targetWords: bm.estimatedWords || 1500,
+            projectId,
+            userId,
+            docTitle: title,
+            orderIndex: orderIndex,
+            meta,
+            voiceProfile,
+            projectCtx,
+            prior: written.map((w) => w.title).join(', '),
+            industry,
+          });
+        } catch (err) {
+          await logIncident({
+            sessionId,
+            userId,
+            agent: 'writing',
+            incidentType: classifyError(err),
+            severity: 'p3',
+            details: {
+              step: stepName,
+              sectionTitle: bm.title,
+              message: err instanceof Error ? err.message : String(err),
+              stack: err instanceof Error ? err.stack?.slice(0, 2000) : undefined,
+            },
+          });
+          await bumpFailureCount(
+            sessionId,
+            `${stepName}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          throw err;
+        }
       });
       written.push(result);
       orderIndex += 1;
+      await pulseHeartbeat(sessionId);
     }
 
     // --- FINALIZE ---
@@ -260,6 +454,13 @@ export const writeBook = inngest.createFunction(
           },
         })
         .eq('id', projectId);
+
+      // Flip the writing agent to 'completed' in agent_status and mark
+      // the pipeline as 'completed'. The next agent (qa) will be
+      // re-activated when the frontend calls /api/interview-session
+      // advance, which pulses pipelineStatus='active' again.
+      await markAgentCompleted(sessionId, 'writing');
+      await pulseHeartbeat(sessionId, { pipelineStatus: 'completed' });
 
       const { count: completedCount } = await supabase
         .from('projects')
@@ -613,6 +814,35 @@ async function triggerReferralCredits(userId: string, projectId: string, bookTit
   } catch (error) {
     console.error('Error triggering referral credits:', error);
   }
+}
+
+/**
+ * Map a thrown error into one of the pipeline_incidents.incident_type
+ * enum values. Best-effort string matching — the Anthropic SDK tags
+ * errors with status codes we can read.
+ */
+function classifyError(err: unknown): 'api_rate_limit' | 'api_error' | 'token_budget_exhausted' | 'infrastructure_error' | 'unknown' {
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    const status = (err as any)?.status ?? (err as any)?.statusCode;
+
+    if (status === 429 || msg.includes('rate limit') || msg.includes('rate_limit')) {
+      return 'api_rate_limit';
+    }
+    if (msg.includes('max_tokens') || msg.includes('context length') || msg.includes('token budget')) {
+      return 'token_budget_exhausted';
+    }
+    if (typeof status === 'number' && status >= 500) {
+      return 'api_error';
+    }
+    if (typeof status === 'number' && status >= 400) {
+      return 'api_error';
+    }
+    if (msg.includes('etimedout') || msg.includes('econnrefused') || msg.includes('socket hang up')) {
+      return 'infrastructure_error';
+    }
+  }
+  return 'unknown';
 }
 
 export default writeBook;
