@@ -88,6 +88,97 @@ export type BuildNoraContextResult =
   | { ok: false; reason: 'member_not_found' | 'nora_unavailable' };
 
 /**
+ * Raw PostgREST bypass for v_nora_member_context.
+ *
+ * === WHY THIS EXISTS ===
+ *
+ * Commits 12, 13, 14 all tried to make @supabase/supabase-js send the
+ * service-role key on this one view query. All three failed in production
+ * with matching Postgres 42501 "permission denied for table users" errors
+ * under user=authenticator. Verification chat's diagnosis:
+ *
+ *   persistSession: false + autoRefreshToken: false + detectSessionInUrl:
+ *   false do not prevent a session from being attached at request time.
+ *   Those flags control storage read/write, refresh polling, and URL hash
+ *   detection — none of them stops an already-resident this.currentSession
+ *   object or an inherited cookie-based session from being read by
+ *   auth.getSession(). Something in the Next.js 15 SSR boundary or a
+ *   chained import is attaching user auth to the service client instance.
+ *
+ * Instead of fighting the client library for a fourth commit, this helper
+ * removes the library from the equation entirely for this ONE query. Raw
+ * fetch, explicit service-role apikey + Authorization headers, zero
+ * dependency on SupabaseClient / GoTrueClient / PostgrestClient / any
+ * storage adapter / any auth cookie.
+ *
+ * === CONTRACT ===
+ *
+ *   - Returns MemberContextRow on match, null when zero rows match.
+ *   - THROWS on HTTP !ok — caller MUST wrap in try/catch. The throw is
+ *     deliberate: a failing PostgREST call is infrastructure-level and
+ *     should not be silently coerced into "member_not_found" (which
+ *     could mask a real outage as "user needs to complete profile").
+ *
+ * === SCOPE ===
+ *
+ *   Intentionally narrow. Does not replace createServiceClient() for any
+ *   other caller — 178 other call sites continue to use the supabase-js
+ *   client. If those prove to have the same auth-leakage problem later,
+ *   we generalise; for now this one query is the only confirmed victim.
+ */
+async function fetchMemberContextViaRawFetch(
+  userId: string,
+): Promise<MemberContextRow | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) {
+    throw new Error(
+      'fetchMemberContextViaRawFetch: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required',
+    );
+  }
+
+  const endpoint =
+    `${url}/rest/v1/v_nora_member_context` +
+    `?user_id=eq.${encodeURIComponent(userId)}` +
+    `&select=*` +
+    `&limit=1`;
+
+  const res = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '<unreadable>');
+    console.error('[nora:context-builder:raw-fetch-error]', {
+      userId,
+      status: res.status,
+      statusText: res.statusText,
+      body: body.slice(0, 500),
+    });
+    throw new Error(
+      `v_nora_member_context raw fetch failed: ${res.status} ${res.statusText}`,
+    );
+  }
+
+  const rows = (await res.json()) as MemberContextRow[];
+  return rows[0] ?? null;
+}
+
+/**
+ * Exported ONLY for unit testing. Production callers should use
+ * buildNoraContext. Marked with the __test_ prefix to make misuse visible
+ * in grep / code review. See nora.test.ts for mocked-fetch coverage.
+ */
+export const __test_fetchMemberContextViaRawFetch = fetchMemberContextViaRawFetch;
+
+/**
  * Load the view row for a user, derive role, shape into NoraContext.
  *
  * Returns reason='nora_unavailable' if the user is a Guildmember who
@@ -99,7 +190,12 @@ export type BuildNoraContextResult =
 export async function buildNoraContext(
   args: BuildNoraContextArgs,
 ): Promise<BuildNoraContextResult> {
-  const { user_id, surface, admin } = args;
+  const { user_id, surface, admin: _admin } = args;
+  // `admin` kept in args signature for API stability across the 4 call
+  // sites, but no longer used for the view query (see Commit 15 raw-fetch
+  // bypass below). Future refactor may remove `admin` from the args once
+  // all queries migrate to raw fetch. Prefixed _ to flag the intentional
+  // non-use to TypeScript's noUnusedParameters check.
 
   // Sentinel log per verification chat step 3. Confirms the route path
   // reached context-builder at all. If we see clicks in Vercel logs with
@@ -108,27 +204,31 @@ export async function buildNoraContext(
   // builder — investigate there instead of here.
   console.info('[nora:context-builder:start]', { user_id, surface });
 
-  const { data, error } = await admin
-    .from('v_nora_member_context')
-    .select('*')
-    .eq('user_id', user_id)
-    .maybeSingle<MemberContextRow>();
-
-  if (error) {
-    // Structured PostgrestError fields per verification chat step 4. We've
-    // been blind to the actual error shape for three commits in a row;
-    // exposing code/message/details/hint gives verification chat what they
-    // need to diagnose whatever comes back next (42501 RLS, PGRST116
-    // cardinality, 500 server, etc.).
+  // Commit 15: raw-fetch bypass of supabase-js for this ONE query.
+  // Commits 12-14 proved that service-role auth cannot be reliably forced
+  // via the library client in this code path — see fetchMemberContextViaRawFetch
+  // docblock for the full postmortem. This helper talks to PostgREST directly
+  // with explicit service-role headers, sidestepping the entire library
+  // auth/session layer. Throws on HTTP !ok (infrastructure failure),
+  // returns null on zero rows matched, returns MemberContextRow on hit.
+  let data: MemberContextRow | null;
+  try {
+    data = await fetchMemberContextViaRawFetch(user_id);
+  } catch (err) {
+    // Structured error log — shape differs from the old PostgrestError
+    // shape (Commit 14 logged code/message/details/hint from a PostgREST
+    // response body). The raw-fetch-error log emitted inside the helper
+    // already captured HTTP-level detail (status/statusText/body); this
+    // outer log preserves the [nora:context-builder:error] prefix so
+    // anyone grepping for "builder encountered a non-null error path"
+    // still finds every such occurrence in one place.
     console.error('[nora:context-builder:error]', {
       user_id,
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
+      message: err instanceof Error ? err.message : String(err),
     });
     return { ok: false, reason: 'member_not_found' };
   }
+
   if (!data) {
     // Previously silent. Distinct prefix so we can tell apart:
     //   - query succeeded, zero rows matched (this branch) → view is

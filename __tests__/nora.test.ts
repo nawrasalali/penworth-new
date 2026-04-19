@@ -22,7 +22,7 @@
  * is where regressions hide.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   tokenizeUserMessage,
   type KnownIssuePattern,
@@ -741,5 +741,167 @@ describe('Commit 12 — nora_turns row shapes', () => {
       numToolCalls: 0,
     });
     expect(indices).toEqual([7]);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Commit 15 — fetchMemberContextViaRawFetch: raw PostgREST bypass
+//
+// Coverage for the helper that replaced supabase-js for the v_nora_member_context
+// query after Commits 12-14 failed to force service-role via the library client.
+// Tests confirm:
+//   - URL is constructed exactly as PostgREST expects
+//   - apikey + Authorization headers carry the service role key
+//   - Zero rows returns null (no throw)
+//   - One row returns the row unchanged
+//   - HTTP !ok throws, with the raw-fetch-error log carrying diagnostic detail
+//   - Missing env vars throws with a clear message
+//
+// We import the __test_ alias to make the intent visible: production code
+// must not reach past buildNoraContext for this function.
+// -----------------------------------------------------------------------------
+
+import { __test_fetchMemberContextViaRawFetch } from '@/lib/nora/context-builder';
+
+describe('fetchMemberContextViaRawFetch', () => {
+  const originalFetch = global.fetch;
+  const originalUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://fake.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'sk_test_service_role_key_abc123';
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = originalUrl;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
+    vi.restoreAllMocks();
+  });
+
+  it('constructs the expected PostgREST URL, headers, and method', async () => {
+    const fetchSpy = vi.fn(async () =>
+      new Response(JSON.stringify([baseRow({ user_id: 'user-xyz' })]), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    global.fetch = fetchSpy as unknown as typeof fetch;
+
+    await __test_fetchMemberContextViaRawFetch('user-xyz');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [calledUrl, calledInit] = fetchSpy.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+
+    // URL: baseUrl + rest path + user_id filter + select=* + limit=1
+    expect(calledUrl).toBe(
+      'https://fake.supabase.co/rest/v1/v_nora_member_context' +
+        '?user_id=eq.user-xyz&select=*&limit=1',
+    );
+
+    // Method + cache-control
+    expect(calledInit.method).toBe('GET');
+    expect(calledInit.cache).toBe('no-store');
+
+    // Both apikey AND Authorization carry the service role key — PostgREST
+    // accepts either, but we send both for belt-and-braces and to match
+    // the headers @supabase/supabase-js would have sent if it were working.
+    const headers = calledInit.headers as Record<string, string>;
+    expect(headers.apikey).toBe('sk_test_service_role_key_abc123');
+    expect(headers.Authorization).toBe(
+      'Bearer sk_test_service_role_key_abc123',
+    );
+    expect(headers.Accept).toBe('application/json');
+  });
+
+  it('url-encodes special characters in user_id (defence against path injection)', async () => {
+    const fetchSpy = vi.fn(async () =>
+      new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } }),
+    );
+    global.fetch = fetchSpy as unknown as typeof fetch;
+
+    await __test_fetchMemberContextViaRawFetch('user+with/weird?chars');
+
+    const [calledUrl] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
+    // encodeURIComponent encodes + / ? so a user_id can never escape the
+    // query param and inject another filter
+    expect(calledUrl).toContain(
+      'user_id=eq.user%2Bwith%2Fweird%3Fchars',
+    );
+  });
+
+  it('returns the first row when PostgREST returns a one-element array', async () => {
+    const row = baseRow({ user_id: 'user-one', email: 'alpha@example.com' });
+    global.fetch = vi.fn(async () =>
+      new Response(JSON.stringify([row]), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    ) as unknown as typeof fetch;
+
+    const result = await __test_fetchMemberContextViaRawFetch('user-one');
+    expect(result).toEqual(row);
+  });
+
+  it('returns null when PostgREST returns an empty array (zero rows matched)', async () => {
+    global.fetch = vi.fn(async () =>
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    ) as unknown as typeof fetch;
+
+    const result = await __test_fetchMemberContextViaRawFetch('nobody');
+    expect(result).toBeNull();
+  });
+
+  it('throws on HTTP !ok (covers the 42501 RLS case and any other PostgREST error)', async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    const errorBody = JSON.stringify({
+      code: '42501',
+      message: 'permission denied for table users',
+      details: null,
+      hint: null,
+    });
+    global.fetch = vi.fn(async () =>
+      new Response(errorBody, {
+        status: 403,
+        statusText: 'Forbidden',
+        headers: { 'content-type': 'application/json' },
+      }),
+    ) as unknown as typeof fetch;
+
+    await expect(
+      __test_fetchMemberContextViaRawFetch('user-denied'),
+    ).rejects.toThrow(/v_nora_member_context raw fetch failed: 403 Forbidden/);
+
+    // Diagnostic log fires with all the right shape — verification chat
+    // will be looking for this prefix if Commit 15 ever starts failing
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[nora:context-builder:raw-fetch-error]',
+      expect.objectContaining({
+        userId: 'user-denied',
+        status: 403,
+        statusText: 'Forbidden',
+        body: expect.stringContaining('42501'),
+      }),
+    );
+  });
+
+  it('throws with a clear message when required env vars are missing', async () => {
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    await expect(
+      __test_fetchMemberContextViaRawFetch('user-any'),
+    ).rejects.toThrow(
+      /NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required/,
+    );
   });
 });
