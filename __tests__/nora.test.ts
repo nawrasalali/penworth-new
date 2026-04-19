@@ -612,3 +612,134 @@ describe('NoraSurface / NoraUserRole enumeration', () => {
     expect(roles).toHaveLength(10);
   });
 });
+
+// -----------------------------------------------------------------------------
+// Commit 12 — turn-row-builders: role-split persistence shapes
+// -----------------------------------------------------------------------------
+//
+// Prod schema's nora_turns.role CHECK enum is ('user', 'assistant',
+// 'tool_call', 'tool_result', 'system_note'). The brief's original
+// design packed tool calls into a tool_calls JSONB on a single
+// assistant row — that column doesn't exist. Each tool invocation
+// produces three DB rows (assistant, tool_call, tool_result). These
+// tests assert the row shapes are correct before the route persists
+// them — if the shape drifts, the INSERT 400s in prod.
+
+import {
+  buildAssistantTurnRow,
+  buildToolCallRow,
+  buildToolResultRow,
+  computeTurnIndicesForIteration,
+} from '@/lib/nora/turn-row-builders';
+
+describe('Commit 12 — nora_turns row shapes', () => {
+  it('assistant row: model_used + token counts + matched_pattern_id on first iteration', () => {
+    const row = buildAssistantTurnRow({
+      conversation_id: 'c1',
+      turn_index: 3,
+      content: 'Resetting password now.',
+      model: 'claude-haiku-4-5-20251001',
+      inputTokens: 120,
+      outputTokens: 40,
+      isFirstIteration: true,
+      matchedPatternId: 'pat-1',
+    });
+    expect(row.role).toBe('assistant');
+    expect(row.content).toBe('Resetting password now.');
+    expect(row.model_used).toBe('claude-haiku-4-5-20251001');
+    expect(row.input_tokens).toBe(120);
+    expect(row.output_tokens).toBe(40);
+    expect(row.matched_pattern_id).toBe('pat-1');
+    // Must NOT carry tool fields — those live on their own rows
+    expect((row as unknown as Record<string, unknown>).tool_name).toBeUndefined();
+    expect((row as unknown as Record<string, unknown>).tool_input).toBeUndefined();
+    expect((row as unknown as Record<string, unknown>).tool_output).toBeUndefined();
+  });
+
+  it('assistant row: matched_pattern_id is NULL on non-first iteration', () => {
+    // Prevents over-counting in resolution_success_rate. Only the first
+    // iteration of a Claude tool-use loop should be treated as the
+    // "pattern match origin" turn.
+    const row = buildAssistantTurnRow({
+      conversation_id: 'c1',
+      turn_index: 5,
+      content: 'Follow-up after tool result.',
+      model: 'claude-haiku-4-5-20251001',
+      inputTokens: 200,
+      outputTokens: 25,
+      isFirstIteration: false,
+      matchedPatternId: 'pat-1', // same pattern, but this is iter 2+
+    });
+    expect(row.matched_pattern_id).toBeNull();
+  });
+
+  it('tool_call row: tool_name + tool_input present, content explicitly null', () => {
+    const row = buildToolCallRow({
+      conversation_id: 'c1',
+      turn_index: 4,
+      toolName: 'trigger_password_reset',
+      toolInput: { user_email: 'x@y.z' },
+    });
+    expect(row.role).toBe('tool_call');
+    expect(row.tool_name).toBe('trigger_password_reset');
+    expect(row.tool_input).toEqual({ user_email: 'x@y.z' });
+    // Explicit null, not undefined — ensures INSERT sends NULL rather
+    // than omitting the field (Supabase maps undefined to omitted).
+    expect(row.content).toBeNull();
+  });
+
+  it('tool_result row: tool_output flattens is_error alongside envelope fields', () => {
+    const row = buildToolResultRow({
+      conversation_id: 'c1',
+      turn_index: 5,
+      toolName: 'trigger_password_reset',
+      toolResult: {
+        ok: true,
+        message_for_user: 'Reset email sent to x@y.z',
+        data: { link_sent_at: '2026-04-19T06:00:00Z' },
+      },
+    });
+    expect(row.role).toBe('tool_result');
+    expect(row.tool_name).toBe('trigger_password_reset');
+    expect(row.content).toBeNull();
+    expect(row.tool_output.is_error).toBe(false);
+    expect(row.tool_output.ok).toBe(true);
+    expect(row.tool_output.message_for_user).toBe('Reset email sent to x@y.z');
+    // Admin UI queries against tool_output should find is_error at top
+    // level without reaching into a nested object
+    expect(Object.keys(row.tool_output)).toContain('is_error');
+  });
+
+  it('tool_result row: is_error=true when ok=false', () => {
+    const row = buildToolResultRow({
+      conversation_id: 'c1',
+      turn_index: 5,
+      toolName: 'check_payout_status',
+      toolResult: {
+        ok: false,
+        failure_reason: 'no_payouts_found',
+      },
+    });
+    expect(row.tool_output.is_error).toBe(true);
+    expect(row.tool_output.ok).toBe(false);
+    expect(row.tool_output.failure_reason).toBe('no_payouts_found');
+  });
+
+  it('computeTurnIndicesForIteration: 1 assistant + 2 tools yields 5 sequential indices (A, C1, R1, C2, R2)', () => {
+    const indices = computeTurnIndicesForIteration({
+      startIndex: 10,
+      numAssistantRows: 1,
+      numToolCalls: 2,
+    });
+    expect(indices).toEqual([10, 11, 12, 13, 14]);
+  });
+
+  it('computeTurnIndicesForIteration: 1 assistant + 0 tools yields single index', () => {
+    const indices = computeTurnIndicesForIteration({
+      startIndex: 7,
+      numAssistantRows: 1,
+      numToolCalls: 0,
+    });
+    expect(indices).toEqual([7]);
+  });
+});

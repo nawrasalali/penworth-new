@@ -118,12 +118,17 @@ export async function POST(request: NextRequest) {
   const ctx = ctxResult.context;
 
   // --- 4. Create conversation ---------------------------------------------
+  // nora_conversations.language is NOT NULL with no DEFAULT — supplying
+  // explicitly per verification chat schema probe. Falls back to 'en' if
+  // the view didn't return a preferred_language (shouldn't happen given
+  // the view's NOT NULL on preferred_language, but defensive).
   const { data: conversation, error: insertErr } = await admin
     .from('nora_conversations')
     .insert({
       user_id: user.id,
       surface,
       user_role: ctx.user_role,
+      language: ctx.primary_language ?? 'en',
     })
     .select('id, started_at')
     .single();
