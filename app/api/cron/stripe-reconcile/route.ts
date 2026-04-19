@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { getStripeOrError } from '@/lib/stripe/client';
+import { requireCronAuth } from '@/lib/cron/require-cron-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -47,13 +48,8 @@ export const dynamic = 'force-dynamic';
  *   ?dry=1      Don't write; just report what would have been inserted.
  */
 export async function GET(request: NextRequest) {
-  // Gate by CRON_SECRET — Vercel sets the Authorization header on scheduled
-  // cron invocations automatically.
-  const auth = request.headers.get('authorization');
-  const expected = process.env.CRON_SECRET;
-  if (expected && auth !== `Bearer ${expected}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const unauthorized = requireCronAuth(request);
+  if (unauthorized) return unauthorized;
 
   const stripeResult = getStripeOrError();
   if (stripeResult.error) return stripeResult.error;
