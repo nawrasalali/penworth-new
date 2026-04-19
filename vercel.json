@@ -23,6 +23,14 @@
     {
       "path": "/api/cron/analyst-weekly-generate",
       "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/cron/pipeline-health",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/alert-dispatch",
+      "schedule": "* * * * *"
     }
   ]
 }

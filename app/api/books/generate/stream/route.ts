@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
               controller.close();
               projectChannel.unsubscribe();
               chapterChannel.unsubscribe();
+              sessionChannel.unsubscribe();
             }
           }
         )
@@ -97,6 +98,42 @@ export async function GET(request: NextRequest) {
         )
         .subscribe();
 
+      // Subscribe to interview_sessions pipeline_status updates so the
+      // editor UI can switch between "writing" / "stuck — investigating"
+      // / "recovering" / "failed" messaging as the stuck detector and
+      // auto-recovery cron flip the session state.
+      //
+      // This channel is separate from the projects channel because the
+      // project.status transitions (draft → writing → complete/error)
+      // are coarser than the pipeline_status transitions (active →
+      // stuck → recovering → failed). The UI needs both: project.status
+      // for the high-level phase and pipeline_status for the per-run
+      // health state.
+      const sessionChannel = supabase
+        .channel(`session-${projectId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'interview_sessions',
+            filter: `project_id=eq.${projectId}`,
+          },
+          (payload) => {
+            const newRecord = payload.new as Record<string, unknown>;
+            const data = {
+              type: 'session_update',
+              pipeline_status: newRecord.pipeline_status,
+              current_agent: newRecord.current_agent,
+              failure_count: newRecord.failure_count,
+              last_failure_reason: newRecord.last_failure_reason,
+              last_failure_at: newRecord.last_failure_at,
+            };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          }
+        )
+        .subscribe();
+
       // Send heartbeat every 30 seconds to keep connection alive
       const heartbeat = setInterval(() => {
         try {
@@ -111,6 +148,7 @@ export async function GET(request: NextRequest) {
         clearInterval(heartbeat);
         projectChannel.unsubscribe();
         chapterChannel.unsubscribe();
+        sessionChannel.unsubscribe();
         try {
           controller.close();
         } catch {
