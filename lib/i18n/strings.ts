@@ -149,7 +149,7 @@ export type StringKey =
   | 'preview.expand' | 'preview.collapse'
   // WritingScreen (user stares at this during 15-min write)
   | 'writing.title' | 'writing.subtitle'
-  | 'writing.currentlyWriting' | 'writing.words'
+  | 'writing.currentlyWriting' | 'writing.preparing' | 'writing.words'
   | 'writing.complete'
   | 'writing.writing' | 'writing.generating'
   | 'writing.cancel' | 'writing.saveFree'
@@ -606,6 +606,7 @@ const en: Bundle = {
   'writing.title': 'Writing your document',
   'writing.subtitle': 'Watch the magic happen chapter by chapter',
   'writing.currentlyWriting': 'Currently writing: Chapter',
+  'writing.preparing': 'Preparing chapters…',
   'writing.words': 'words',
   'writing.complete': 'complete',
   'writing.writing': 'Writing…',
@@ -1176,6 +1177,7 @@ const ar: Bundle = {
   'writing.title': 'جارٍ كتابة مستندك',
   'writing.subtitle': 'شاهد السحر يحدث فصلاً بعد فصل',
   'writing.currentlyWriting': 'يُكتب الآن: الفصل',
+  'writing.preparing': 'جارٍ تحضير الفصول…',
   'writing.words': 'كلمة',
   'writing.complete': 'مكتمل',
   'writing.writing': 'جارٍ الكتابة…',
@@ -1746,6 +1748,7 @@ const es: Bundle = {
   'writing.title': 'Escribiendo tu documento',
   'writing.subtitle': 'Mira cómo sucede la magia capítulo a capítulo',
   'writing.currentlyWriting': 'Escribiendo ahora: Capítulo',
+  'writing.preparing': 'Preparando capítulos…',
   'writing.words': 'palabras',
   'writing.complete': 'completo',
   'writing.writing': 'Escribiendo…',
@@ -2316,6 +2319,7 @@ const fr: Bundle = {
   'writing.title': 'Rédaction de votre document',
   'writing.subtitle': 'Regardez la magie opérer chapitre après chapitre',
   'writing.currentlyWriting': 'En cours d’écriture : Chapitre',
+  'writing.preparing': 'Préparation des chapitres…',
   'writing.words': 'mots',
   'writing.complete': 'terminé',
   'writing.writing': 'Rédaction…',
@@ -2886,6 +2890,7 @@ const pt: Bundle = {
   'writing.title': 'Escrevendo seu documento',
   'writing.subtitle': 'Veja a mágica acontecer capítulo por capítulo',
   'writing.currentlyWriting': 'Escrevendo agora: Capítulo',
+  'writing.preparing': 'Preparando capítulos…',
   'writing.words': 'palavras',
   'writing.complete': 'concluído',
   'writing.writing': 'Escrevendo…',
@@ -3456,6 +3461,7 @@ const ru: Bundle = {
   'writing.title': 'Пишем ваш документ',
   'writing.subtitle': 'Наблюдайте, как рождается текст глава за главой',
   'writing.currentlyWriting': 'Сейчас пишется: Глава',
+  'writing.preparing': 'Подготовка глав…',
   'writing.words': 'слов',
   'writing.complete': 'готово',
   'writing.writing': 'Пишем…',
@@ -4026,6 +4032,7 @@ const zh: Bundle = {
   'writing.title': '正在撰写您的文档',
   'writing.subtitle': '见证文字一章一章地诞生',
   'writing.currentlyWriting': '正在撰写: 第',
+  'writing.preparing': '正在准备章节…',
   'writing.words': '字',
   'writing.complete': '完成',
   'writing.writing': '撰写中…',
@@ -4596,6 +4603,7 @@ const bn: Bundle = {
   'writing.title': 'আপনার নথি লেখা হচ্ছে',
   'writing.subtitle': 'অধ্যায়ের পর অধ্যায় জাদু ঘটতে দেখুন',
   'writing.currentlyWriting': 'এখন লিখছি: অধ্যায়',
+  'writing.preparing': 'অধ্যায় প্রস্তুত করা হচ্ছে…',
   'writing.words': 'শব্দ',
   'writing.complete': 'সম্পন্ন',
   'writing.writing': 'লিখছে…',
@@ -5166,6 +5174,7 @@ const hi: Bundle = {
   'writing.title': 'आपका दस्तावेज़ लिखा जा रहा है',
   'writing.subtitle': 'अध्याय दर अध्याय जादू होते देखें',
   'writing.currentlyWriting': 'अभी लिखा जा रहा है: अध्याय',
+  'writing.preparing': 'अध्याय तैयार किए जा रहे हैं…',
   'writing.words': 'शब्द',
   'writing.complete': 'पूर्ण',
   'writing.writing': 'लिख रहा है…',
@@ -5736,6 +5745,7 @@ const id: Bundle = {
   'writing.title': 'Menulis dokumen Anda',
   'writing.subtitle': 'Saksikan keajaiban terjadi bab demi bab',
   'writing.currentlyWriting': 'Sedang menulis: Bab',
+  'writing.preparing': 'Menyiapkan bab…',
   'writing.words': 'kata',
   'writing.complete': 'selesai',
   'writing.writing': 'Menulis…',
@@ -6306,6 +6316,7 @@ const vi: Bundle = {
   'writing.title': 'Đang viết tài liệu của bạn',
   'writing.subtitle': 'Hãy xem phép màu diễn ra từng chương một',
   'writing.currentlyWriting': 'Đang viết: Chương',
+  'writing.preparing': 'Đang chuẩn bị chương…',
   'writing.words': 'từ',
   'writing.complete': 'hoàn tất',
   'writing.writing': 'Đang viết…',

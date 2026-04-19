@@ -45,8 +45,21 @@ export function WritingScreen({
   const [regenInstructions, setRegenInstructions] = useState('');
 
   const completedChapters = chapters.filter(c => c.status === 'complete').length;
-  const progress = (completedChapters / chapters.length) * 100;
+  // Guard: when chapters haven't been populated yet (outline still generating,
+  // SSE stream hasn't delivered the first chapter row, etc.) we'd otherwise
+  // produce 0/0 = NaN → render as "NaN% complete" and a broken progress bar.
+  // A 0% value is the correct representation of "nothing done yet".
+  const progress = chapters.length > 0
+    ? (completedChapters / chapters.length) * 100
+    : 0;
   const totalWords = chapters.reduce((sum, c) => sum + (c.wordCount || 0), 0);
+  // Guard the chapter counter display the same way. Before the outline
+  // populates, chapters.length is 0 and currentChapterIndex defaults to 0,
+  // which would render "Currently writing: Chapter 1 / 0" — nonsense to the
+  // author. Show "Chapter 0 / 0" until real chapters arrive; the header
+  // message is suppressed further down when the count is 0.
+  const hasChapters = chapters.length > 0;
+  const displayChapterCount = hasChapters ? currentChapterIndex + 1 : 0;
 
   const currentChapter = chapters[currentChapterIndex];
 
@@ -93,15 +106,25 @@ export function WritingScreen({
       
       {/* Progress Bar — single row: "Chapter X/Y · N words" on left,
           "N% complete" on right, slim 1.5px bar underneath. Was three
-          stacked rows (label, bar, %age) = 3× vertical spend. */}
+          stacked rows (label, bar, %age) = 3× vertical spend.
+
+          When chapters.length === 0 (outline still generating, or the
+          writing agent entered before chapter rows streamed in) we render
+          a neutral "preparing" state instead of "Chapter 1 / 0 · NaN%". */}
       <div className="mb-4">
         <div className="flex items-center justify-between text-xs mb-1.5">
           <span className="text-muted-foreground">
-            {t('writing.currentlyWriting', locale)} {currentChapterIndex + 1} / {chapters.length}
-            {totalWords > 0 && (
-              <span className="ml-2 text-muted-foreground/70">
-                · {totalWords.toLocaleString()} {t('writing.words', locale)}
-              </span>
+            {hasChapters ? (
+              <>
+                {t('writing.currentlyWriting', locale)} {displayChapterCount} / {chapters.length}
+                {totalWords > 0 && (
+                  <span className="ml-2 text-muted-foreground/70">
+                    · {totalWords.toLocaleString()} {t('writing.words', locale)}
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="italic">{t('writing.preparing', locale)}</span>
             )}
           </span>
           <span className="text-muted-foreground">
