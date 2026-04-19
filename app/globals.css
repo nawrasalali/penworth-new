@@ -192,14 +192,42 @@
    indicators that shouldn't feel urgent. Used on long-running agent
    cards where a 1s spinner or 2s pulse reads as an alert after ~10s
    of exposure. The 3s period is long enough that the motion fades
-   into peripheral awareness rather than commanding the eye. */
+   into peripheral awareness rather than commanding the eye.
+
+   Accessibility: these animations are gated behind a prefers-reduced-
+   motion: no-preference media query. Users who have opted out of
+   animations at the OS level (macOS: Reduce Motion; iOS: Reduce
+   Motion; Windows: Show animations off; GNOME: Reduce animations)
+   will see the .animate-breathe and .animate-pulse-dot classes as
+   inert — no opacity cycle, no scale transform. The visual colour
+   treatment (amber border, amber dot) still communicates "active"
+   state; only the motion is suppressed. This matches WCAG 2.1
+   Success Criterion 2.3.3 (Animation from Interactions).
+
+   The classes themselves are defined UNCONDITIONALLY so any JS or
+   test that queries document.querySelectorAll('.animate-breathe')
+   still finds matches regardless of motion preference. Only the
+   animation property is set conditionally. */
 @layer utilities {
   /* Opacity-only breathe for borders and soft backgrounds.
      0.5 → 1 → 0.5 over 3s, ease-in-out. Ranges chosen so the *low*
      point is still clearly visible — this is "breathing", not blinking. */
   .animate-breathe {
-    animation: breathe 3s ease-in-out infinite;
+    /* No animation by default — added only if the user hasn't opted out. */
   }
+  .animate-pulse-dot {
+    /* Same contract as .animate-breathe. */
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .animate-breathe {
+      animation: breathe 3s ease-in-out infinite;
+    }
+    .animate-pulse-dot {
+      animation: pulse-dot 3s ease-in-out infinite;
+    }
+  }
+
   @keyframes breathe {
     0%, 100% { opacity: 0.5; }
     50% { opacity: 1; }
@@ -207,9 +235,6 @@
 
   /* Pulse dot — slow scale for a status indicator dot. Same 3s tempo
      as breathe so they phase-lock if both appear on the same card. */
-  .animate-pulse-dot {
-    animation: pulse-dot 3s ease-in-out infinite;
-  }
   @keyframes pulse-dot {
     0%, 100% { transform: scale(1); opacity: 0.7; }
     50% { transform: scale(1.15); opacity: 1; }
