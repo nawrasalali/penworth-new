@@ -5,65 +5,86 @@ import { createClient } from '@supabase/supabase-js';
  *
  * Bypasses RLS; use only server-side for operations where the user-scoped
  * client can't reach (e.g. writing computer_use_sessions for audit/admin
- * purposes, uploading screenshots). Never import this into a client
- * component.
+ * purposes, uploading screenshots, cross-user aggregation, admin actions).
+ * Never import this into a client component.
  *
- * === CRITICAL: global.headers.Authorization is load-bearing ===
+ * ============================================================================
+ * === WHY COMMIT 13 FAILED (2026-04-19, dpl_7xhTXqJXpN8F8dnneHccxP2T8Xwy) ===
+ * ============================================================================
  *
- * Passing serviceKey as the second arg to createClient() is not sufficient
- * to guarantee requests run with service role. @supabase/supabase-js@2.49.1
- * constructs its fetcher via fetchWithAuth (lib/fetch.ts), which calls
- * _getAccessToken() before every REST request. That helper runs:
+ * Commit 13 tried to force service-role auth by pre-seeding
+ * global.headers.Authorization in createClient() options. Empirical result:
+ * 3 user clicks on POST /api/nora/conversation/start at 12:35:57, 12:36:00,
+ * 12:36:03 UTC all returned 404 with matching 42501 "permission denied for
+ * table users" errors from user=authenticator in Postgres logs. Service-role
+ * was NOT reaching Postgres despite the global.headers pre-seed.
  *
- *     const { data } = await this.auth.getSession();
- *     return data.session?.access_token ?? this.supabaseKey;
+ * The library source (@supabase/supabase-js@2.103.2 compiled dist) shows
+ * fetchWithAuth has a conditional guard:
  *
- * If a session exists anywhere reachable by the GoTrue client's storage
- * (even indirectly — cached session state, a shared @supabase/auth-js
- * storage adapter, anything returned by getSession() that isn't null),
- * the USER JWT gets attached as the Authorization header and the
- * service-role key is silently ignored. The query runs as the
- * `authenticator` role, not `service_role`, and any RLS policy that
- * depends on bypass fails — including any SECURITY INVOKER view that
- * joins auth.users (which `authenticated` cannot SELECT).
+ *     if (!headers.has("Authorization")) headers.set("Authorization", ...)
  *
- * Observed in prod (dpl_7xhTXqJXpN8F8dnneHccxP2T8Xwy, 2026-04-19): 8 user
- * clicks on POST /api/nora/conversation/start returned 404. Postgres
- * audit showed 8 matching "permission denied for table users" errors
- * from user=authenticator at matching timestamps, despite the route
- * explicitly constructing the client via createServiceClient().
+ * On paper this should have preserved our pre-seeded Authorization header.
+ * But Postgres proved it didn't — a user JWT reached the wire. Per
+ * verification chat's analysis, under some runtime condition (possibly
+ * related to header normalization, or PostgrestClient's Headers cloning
+ * stripping/replacing entries, or session state bleeding through
+ * initialization), the global.headers approach does not reliably win.
  *
- * === THE FIX ===
+ * ============================================================================
+ * === WHY THIS FIX (OPTION A) SHOULD WORK ============================
+ * ============================================================================
  *
- * Pre-seed the Authorization header via global.headers. SupabaseClient
- * copies these onto `this.headers` and passes them into PostgrestClient
- * construction. When a REST request is made, fetchWithAuth checks:
+ * Instead of trying to WIN the header race after getSession() returns a
+ * session, this fix ensures getSession() CANNOT return a session at all.
  *
- *     if (!headers.has('Authorization')) {
- *       headers.set('Authorization', `Bearer ${accessToken}`);
- *     }
+ * GoTrueClient's __loadSession (auth-js/dist/module/GoTrueClient.js:2304)
+ * reads session data from `this.storage` via getItemAsync. With:
  *
- * Because our header is already present, the conditional fails and the
- * dynamically-resolved access token is never attached. The service-role
- * key wins every time, regardless of any stray session state.
+ *   persistSession: false          — constructor picks memoryStorage (empty)
+ *   autoRefreshToken: false        — no background refresh writing sessions
+ *   detectSessionInUrl: false      — no URL-callback session capture on init
  *
- * We set both Authorization and apikey for belt-and-braces — some server
- * paths (e.g. Storage) rely on apikey not being overridden by client
- * plumbing.
+ * …the storage is guaranteed to be empty throughout the client's lifetime.
+ * getSession() returns { data: { session: null }, error: null }. In
+ * SupabaseClient._getAccessToken (supabase-js/dist/index.mjs:523):
+ *
+ *   const { data } = await this.auth.getSession();
+ *   return data.session?.access_token ?? this.supabaseKey;
+ *
+ * The nullish-coalesce falls through to this.supabaseKey, which is the
+ * service-role key we passed as arg 2 to createClient. fetchWithAuth then
+ * sets Authorization: Bearer <serviceKey>, and PostgREST sees us as
+ * service_role — RLS is bypassed as intended.
+ *
+ * This is the canonical pattern per Supabase's own server-side docs. It
+ * does NOT use the `accessToken` option (which would turn `this.auth` into
+ * a throwing Proxy and break admin.auth.admin.* callers — we have 3 such
+ * callers: lib/nora/tools/trigger-password-reset.ts, resend-email-
+ * confirmation.ts, and lib/compliance-fulfil.ts).
+ *
+ * ============================================================================
+ * === FALLBACK IF THIS STILL DOESN'T WORK ====================================
+ * ============================================================================
+ *
+ * Option C from verification chat: bypass supabase-js entirely for the
+ * buildNoraContext query. Use raw fetch to
+ *   ${url}/rest/v1/v_nora_member_context?user_id=eq.${userId}
+ * with explicit { apikey, Authorization: Bearer ${serviceKey} } headers.
+ * Narrow blast radius — touches only context-builder.ts, leaves the 178
+ * other service-client callers alone.
  */
 export function createServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) {
-    throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required');
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) {
+    throw new Error('createServiceClient: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required');
   }
-  return createClient(url, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: {
-      headers: {
-        Authorization: `Bearer ${serviceKey}`,
-        apikey: serviceKey,
-      },
+  return createClient(url, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
     },
   });
 }

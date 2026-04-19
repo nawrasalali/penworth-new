@@ -101,6 +101,13 @@ export async function buildNoraContext(
 ): Promise<BuildNoraContextResult> {
   const { user_id, surface, admin } = args;
 
+  // Sentinel log per verification chat step 3. Confirms the route path
+  // reached context-builder at all. If we see clicks in Vercel logs with
+  // no [nora:context-builder:start] line, the 404 is coming from upstream
+  // (auth check, route dispatch, edge middleware) and not from this
+  // builder — investigate there instead of here.
+  console.info('[nora:context-builder:start]', { user_id, surface });
+
   const { data, error } = await admin
     .from('v_nora_member_context')
     .select('*')
@@ -108,17 +115,27 @@ export async function buildNoraContext(
     .maybeSingle<MemberContextRow>();
 
   if (error) {
-    console.error('[nora:context-builder:error]', { userId: user_id, error });
+    // Structured PostgrestError fields per verification chat step 4. We've
+    // been blind to the actual error shape for three commits in a row;
+    // exposing code/message/details/hint gives verification chat what they
+    // need to diagnose whatever comes back next (42501 RLS, PGRST116
+    // cardinality, 500 server, etc.).
+    console.error('[nora:context-builder:error]', {
+      user_id,
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
     return { ok: false, reason: 'member_not_found' };
   }
   if (!data) {
-    // Previously silent. A 2026-04-19 prod incident (8× 404 on /start with
-    // zero log lines on the Vercel side) proved this branch needed its own
-    // signal — when the view query returns successfully but matches zero
-    // rows under the current role/RLS, we need to see it in the logs to
-    // distinguish "service role bypassed but user has no profile row" from
-    // "RLS silently returned empty set under wrong role".
-    console.error('[nora:context-builder:no-data]', { userId: user_id });
+    // Previously silent. Distinct prefix so we can tell apart:
+    //   - query succeeded, zero rows matched (this branch) → view is
+    //     reachable under service role but user truly has no profile row
+    //   - query failed with an error (branch above) → PostgREST or RLS
+    //     rejected the query, error payload tells us which
+    console.error('[nora:context-builder:no-data]', { user_id });
     return { ok: false, reason: 'member_not_found' };
   }
 
