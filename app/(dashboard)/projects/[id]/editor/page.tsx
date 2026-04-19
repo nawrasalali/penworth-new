@@ -123,7 +123,7 @@ function UnifiedLeftPanel({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   // Default to collapsed on viewports narrower than lg (1024px). Same pattern
-  // as DocumentPreview — SSR renders expanded, client effect re-renders
+  // as DocumentPreview â SSR renders expanded, client effect re-renders
   // collapsed if narrow. On a 390px phone: 256px dashboard drawer (off-
   // screen mobile) + 40px left rail + 40px right rail = 80px of editor
   // chrome, leaving ~310px for the writing column, which is above the
@@ -159,10 +159,10 @@ function UnifiedLeftPanel({
 
   return (
     <div className="w-[240px] shrink-0 border-r bg-muted/20 flex flex-col overflow-hidden">
-      {/* Header — back-to-projects button + collapse toggle. We don't re-render
+      {/* Header â back-to-projects button + collapse toggle. We don't re-render
           the project title here because the top header bar (line 1133 area)
-          already displays it as part of the breadcrumb "Title › Agent". Having
-          the title in both places was visibly redundant — two truncated copies
+          already displays it as part of the breadcrumb "Title âº Agent". Having
+          the title in both places was visibly redundant â two truncated copies
           of a long title stacked 48px apart in the same column. The left
           back-button's job is navigation, not labelling. Keep it simple. */}
       <div className="p-3 border-b flex items-center justify-between gap-2">
@@ -184,7 +184,7 @@ function UnifiedLeftPanel({
         </button>
       </div>
 
-      {/* TOP HALF — Project details */}
+      {/* TOP HALF â Project details */}
       {/* min-h-0 is critical: without it, a flex child with overflow won't
           actually scroll; it will just push the lower section off-screen. */}
       <div className="flex-1 min-h-0 overflow-y-auto">
@@ -201,7 +201,7 @@ function UnifiedLeftPanel({
           </p>
         </div>
 
-        {/* Chapters list — compact rows */}
+        {/* Chapters list â compact rows */}
         <div className="p-3 border-b">
           <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             {t('editor.chapters', locale)} ({chapters.length})
@@ -230,7 +230,7 @@ function UnifiedLeftPanel({
           )}
         </div>
 
-        {/* BOTTOM HALF — Agent Pipeline embedded (no separate border/chrome;
+        {/* BOTTOM HALF â Agent Pipeline embedded (no separate border/chrome;
             the outer panel provides those). */}
         <AgentPipeline
           currentAgent={currentAgent}
@@ -241,7 +241,7 @@ function UnifiedLeftPanel({
         />
       </div>
 
-      {/* Footer — back to project */}
+      {/* Footer â back to project */}
       <div className="p-2 border-t shrink-0">
         <Link
           href={`/projects/${project?.id}`}
@@ -278,7 +278,7 @@ function EditorContentNew() {
     is_admin?: boolean;
     plan?: string | null;
   }>({});
-  // Locale for chrome translation — resolved from profile.preferred_language.
+  // Locale for chrome translation â resolved from profile.preferred_language.
   // Defaults to 'en' so the first-paint shell renders in a known language
   // before the async profile fetch completes.
   const [locale, setLocale] = useState<Locale>('en');
@@ -297,7 +297,7 @@ function EditorContentNew() {
   const [isWriting, setIsWriting] = useState(false);
   const [isCheckingQA, setIsCheckingQA] = useState(false);
 
-  // Pipeline health — driven by SSE 'session_update' events. 'active'
+  // Pipeline health â driven by SSE 'session_update' events. 'active'
   // means normal; anything else triggers a banner above the writing UI.
   // Keeping these as separate hooks rather than nesting under `session`
   // so a stale `session` object (cached from initial fetch) never
@@ -480,6 +480,17 @@ function EditorContentNew() {
         .eq('id', project.id);
       setProject({ ...project, title: topic });
     }
+    // Mirror the chosen topic to interview_sessions.book_title so that cover
+    // generation (hooks/use-agent-workflow.ts) and publishing store listings
+    // read the real title instead of falling back to 'Untitled'. Historically
+    // only projects.title was updated; the session column stayed NULL forever.
+    if (session && session.book_title !== topic) {
+      await supabase
+        .from('interview_sessions')
+        .update({ book_title: topic })
+        .eq('id', session.id);
+      setSession({ ...session, book_title: topic });
+    }
     await advanceToNextAgent({
       topic,
       score,
@@ -522,11 +533,11 @@ function EditorContentNew() {
     startResearch();
   };
 
-  // Start research process — real AI call
+  // Start research process â real AI call
   const startResearch = async () => {
     setIsResearching(true);
     // Step labels are localised to the user's interface language so the
-    // "live research feed" reads naturally. These are user-visible only —
+    // "live research feed" reads naturally. These are user-visible only â
     // the server-side research call doesn't key off these strings.
     setResearchSteps([
       { text: t('research.step.reading', locale), completed: false },
@@ -608,7 +619,7 @@ function EditorContentNew() {
     startOutlineGeneration();
   };
 
-  // Start outline generation — real AI call
+  // Start outline generation â real AI call
   const startOutlineGeneration = async () => {
     setIsGeneratingOutline(true);
 
@@ -660,7 +671,7 @@ function EditorContentNew() {
     startWriting();
   };
 
-  // Start writing process — triggers real Inngest writeBook (uses Opus)
+  // Start writing process â triggers real Inngest writeBook (uses Opus)
   const startWriting = async () => {
     setIsWriting(true);
     setCurrentChapterContent('');
@@ -731,10 +742,10 @@ function EditorContentNew() {
           }
           // Pipeline health events come from the interview_sessions
           // Realtime channel. Transitions we care about:
-          //   active      — normal; clear any previous failure state
-          //   stuck       — stuck detector flagged a stale heartbeat
-          //   recovering  — auto-retry cron fired; counter bumped
-          //   failed      — auto-recovery budget exhausted
+          //   active      â normal; clear any previous failure state
+          //   stuck       â stuck detector flagged a stale heartbeat
+          //   recovering  â auto-retry cron fired; counter bumped
+          //   failed      â auto-recovery budget exhausted
           if (msg.type === 'session_update') {
             const status = msg.pipeline_status;
             if (
@@ -784,7 +795,7 @@ function EditorContentNew() {
     }
   };
 
-  // Start QA checks — real endpoint
+  // Start QA checks â real endpoint
   const startQAChecks = async () => {
     setIsCheckingQA(true);
     setQaChecks([
@@ -835,7 +846,7 @@ function EditorContentNew() {
     toast.success(t('editor.chapterSaved', locale));
   };
 
-  // Handler: Regenerate chapter — calls real Opus via /api/ai/regenerate-chapter
+  // Handler: Regenerate chapter â calls real Opus via /api/ai/regenerate-chapter
   const handleRegenerateChapter = async (chapterId: string, instructions?: string) => {
     const cost = 100;
     if (userCredits < cost && !userProfile.is_admin) {
@@ -844,7 +855,7 @@ function EditorContentNew() {
     }
 
     const chapter = chapters.find((ch) => ch.id === chapterId);
-    toast.info(`Regenerating "${chapter?.title || 'chapter'}"… (${cost} credits)`);
+    toast.info(`Regenerating "${chapter?.title || 'chapter'}"â¦ (${cost} credits)`);
 
     try {
       const resp = await fetch('/api/ai/regenerate-chapter', {
@@ -870,7 +881,7 @@ function EditorContentNew() {
         ),
       );
       setUserCredits(data.creditsRemaining ?? userCredits);
-      toast.success(`Chapter regenerated — ${data.chapter.word_count} words`);
+      toast.success(`Chapter regenerated â ${data.chapter.word_count} words`);
     } catch (err) {
       console.error('Regeneration failed:', err);
       toast.error(t('editor.regenFailed', locale));
@@ -947,7 +958,7 @@ function EditorContentNew() {
     toast.info(t('editor.downloadStarting', locale));
   };
 
-  // Handler: Publish — one-click publish to Penworth Store (the 17th platform
+  // Handler: Publish â one-click publish to Penworth Store (the 17th platform
   // Penworth owns fully). Creates a live marketplace listing at /marketplace/[id].
   const handlePublish = async () => {
     try {
@@ -962,10 +973,10 @@ function EditorContentNew() {
         toast.error(data.error || 'Publishing failed');
         return;
       }
-      toast.success(`Live on Penworth Store — ${data.stats.chapterCount} chapters, ${data.stats.totalWords.toLocaleString()} words`);
+      toast.success(`Live on Penworth Store â ${data.stats.chapterCount} chapters, ${data.stats.totalWords.toLocaleString()} words`);
 
       // Fire-and-forget audiobook narration. The response can take several
-      // minutes for a full book, so we don't await it — the author is
+      // minutes for a full book, so we don't await it â the author is
       // redirected immediately, and the marketplace AudiobookPlayer will
       // appear on their listing as chapters finish narrating.
       fetch('/api/publishing/penworth-store/narrate', {
@@ -975,15 +986,15 @@ function EditorContentNew() {
       })
         .then(async (r) => {
           if (r.status === 402 || r.status === 403) {
-            // Gated — silent no-op (rollout: admin-only)
+            // Gated â silent no-op (rollout: admin-only)
             return;
           }
           if (r.ok) {
-            toast.success('Audio narration started — it will appear on your listing within minutes.', { duration: 5000 });
+            toast.success('Audio narration started â it will appear on your listing within minutes.', { duration: 5000 });
           }
         })
         .catch(() => {
-          // Network or 503 (ELEVENLABS_API_KEY not set) — silent no-op so the
+          // Network or 503 (ELEVENLABS_API_KEY not set) â silent no-op so the
           // publish success toast isn't drowned out by a narration error.
         });
 
@@ -1216,7 +1227,7 @@ function EditorContentNew() {
         </div>
       </div>
 
-      {/* Main Content — 3 columns (was 4). Left panel merges project
+      {/* Main Content â 3 columns (was 4). Left panel merges project
           details + agent pipeline; main area is the flex-1 writing surface;
           right panel is the collapsible document preview. */}
       <div className="flex-1 flex overflow-hidden">
@@ -1272,7 +1283,7 @@ export default function EditorPage() {
       <div className="h-[calc(100vh-3rem)] md:h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">…</p>
+          <p className="text-muted-foreground">â¦</p>
         </div>
       </div>
     }>

@@ -15,11 +15,11 @@ export const dynamic = 'force-dynamic';
  * flips delivery_status='sent' (or 'failed' with delivery_error) so the
  * same row is never processed twice.
  *
- * Schedule: every minute (Vercel cron minimum granularity is 1 minute —
+ * Schedule: every minute (Vercel cron minimum granularity is 1 minute â
  * the brief asked for 30 seconds but that isn't available on Vercel
  * crons). The alert_dispatch() SQL function fires a row the instant an
  * incident or stripe failure is detected, and the stuck detector is
- * usually the generator — a 60-second delivery delay on a 15-minute
+ * usually the generator â a 60-second delivery delay on a 15-minute
  * detection threshold is fine.
  *
  * Ordering: P0 first, then P1, then P2, oldest-first within severity.
@@ -27,19 +27,19 @@ export const dynamic = 'force-dynamic';
  * a backlog. Anything above 50 rolls forward to the next run.
  *
  * Categories the cron receives:
- *   pipeline, financial, security, api_health, ai_cost    → admin
- *   user_support                                          → author
+ *   pipeline, financial, security, api_health, ai_cost    â admin
+ *   user_support                                          â author
  *
  * Admin messages get a [SEVERITY] prefix and a dashboard link. Author
  * messages get warmer framing with a reply-to-support footer.
  *
  * Resilience: per-recipient error isolation. One recipient's SMTP
- * bounce doesn't abort the whole row — we record the error, mark the
+ * bounce doesn't abort the whole row â we record the error, mark the
  * row failed (so it's not retried blindly), and move on.
  *
  * Query params:
- *   ?dry=1    — decide + format but don't send or mutate state
- *   ?limit=N  — override the 50-row batch cap (max 200)
+ *   ?dry=1    â decide + format but don't send or mutate state
+ *   ?limit=N  â override the 50-row batch cap (max 200)
  */
 
 // ===========================================================================
@@ -59,7 +59,7 @@ const ADMIN_CATEGORIES = new Set([
   'ai_cost',
 ]);
 
-// Single shared Resend client — lazy so the import doesn't fail at
+// Single shared Resend client â lazy so the import doesn't fail at
 // module load when RESEND_API_KEY hasn't been injected into dev.
 let resendSingleton: Resend | null = null;
 function getResend(): Resend {
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Pull pending rows ordered by severity (p0 first) then oldest first.
-    // p3 is excluded — those are audit-only and should never trigger mail.
+    // p3 is excluded â those are audit-only and should never trigger mail.
     // We order on a client-side CASE because Supabase REST doesn't support
     // ORDER BY CASE directly. Instead: fetch by severity in sequence.
     const all: PendingAlert[] = [];
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
         continue;
       }
       for (const row of data ?? []) {
-        // Drop rows with no recipients — they're a no-op. Mark them
+        // Drop rows with no recipients â they're a no-op. Mark them
         // suppressed so they don't re-appear. (The alert_dispatch SQL
         // function should have set suppressed_quiet_hours on these
         // already, but a defensive belt-and-braces check.)
@@ -190,7 +190,7 @@ export async function GET(request: NextRequest) {
         // Send to all recipients in one Resend call for efficiency.
         // `to` accepts an array; downside is one bad address fails the
         // whole batch. We could loop per recipient if bounce isolation
-        // matters more — for now keep it simple; flag failures for the
+        // matters more â for now keep it simple; flag failures for the
         // founder to investigate in the Command Center later.
         const recipientEmails = alert.recipients_json
           .map((r) => r.email)
@@ -199,7 +199,7 @@ export async function GET(request: NextRequest) {
         const result = await getResend().emails.send({
           from,
           to: recipientEmails,
-          reply_to: REPLY_TO,
+          replyTo: REPLY_TO,
           subject,
           html,
           text: plainTextFallback(alert, isUserFacing),
@@ -256,7 +256,7 @@ export async function GET(request: NextRequest) {
 // ===========================================================================
 
 /**
- * Admin alerts want utilitarian framing — severity badge, title, body
+ * Admin alerts want utilitarian framing â severity badge, title, body
  * preformatted to respect newlines, action link. User alerts want
  * warmer framing with a dashboard CTA.
  */
@@ -275,7 +275,7 @@ function renderAlertHtml(input: {
 
   const severityBadge = isUserFacing
     ? ''
-    : `<span style="display: inline-block; padding: 4px 10px; background-color: ${severityColor}; color: #0f172a; font-size: 11px; font-weight: bold; letter-spacing: 1px; border-radius: 4px; margin-bottom: 16px;">${alert.severity.toUpperCase()} · ${alert.category.toUpperCase()}</span>`;
+    : `<span style="display: inline-block; padding: 4px 10px; background-color: ${severityColor}; color: #0f172a; font-size: 11px; font-weight: bold; letter-spacing: 1px; border-radius: 4px; margin-bottom: 16px;">${alert.severity.toUpperCase()} Â· ${alert.category.toUpperCase()}</span>`;
 
   const bodyHtml = escapeHtml(alert.body).replace(/\n/g, '<br>');
 
@@ -298,7 +298,7 @@ function renderAlertHtml(input: {
         <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #1e293b; border-radius: 16px; overflow: hidden;">
           <tr>
             <td style="padding: 32px 40px; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-bottom: 1px solid #334155;">
-              <div style="display: inline-block; width: 36px; height: 36px; background: linear-gradient(135deg, #facc15, #eab308); border-radius: 8px; text-align: center; line-height: 36px; font-size: 18px; margin-right: 10px; vertical-align: middle;">📖</div>
+              <div style="display: inline-block; width: 36px; height: 36px; background: linear-gradient(135deg, #facc15, #eab308); border-radius: 8px; text-align: center; line-height: 36px; font-size: 18px; margin-right: 10px; vertical-align: middle;">ð</div>
               <span style="font-size: 20px; font-weight: bold; color: #ffffff; vertical-align: middle;">Penworth</span>
             </td>
           </tr>
