@@ -10,6 +10,8 @@ import {
   TrendingUp,
   ShieldCheck,
   BookOpen,
+  AlertTriangle,
+  Scale,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -125,6 +127,45 @@ export default async function AdminPage() {
     .order('created_at', { ascending: false })
     .limit(10);
 
+  // ---------- COMPLIANCE SIGNAL ----------
+  // Pull just the statutory deadlines of pending deletion + export
+  // requests. We don't need the full rows — only enough to count
+  // breached + approaching (<=5 day) items for the alert banner.
+  // Scoped to pending statuses because terminal requests can't breach
+  // any further.
+  const { data: pendingDeletionDeadlines } = await supabase
+    .from('data_deletion_requests')
+    .select('statutory_deadline')
+    .in('status', ['received', 'processing']);
+
+  const { data: pendingExportDeadlines } = await supabase
+    .from('data_exports')
+    .select('statutory_deadline')
+    .in('status', ['received', 'processing']);
+
+  const complianceNow = Date.now();
+  const fiveDaysMs = 5 * 24 * 60 * 60 * 1000;
+
+  const breachedDeletions = (pendingDeletionDeadlines ?? []).filter(
+    (r) => new Date(r.statutory_deadline).getTime() < complianceNow,
+  ).length;
+  const breachedExports = (pendingExportDeadlines ?? []).filter(
+    (r) => new Date(r.statutory_deadline).getTime() < complianceNow,
+  ).length;
+  const approachingDeletions = (pendingDeletionDeadlines ?? []).filter((r) => {
+    const delta = new Date(r.statutory_deadline).getTime() - complianceNow;
+    return delta >= 0 && delta <= fiveDaysMs;
+  }).length;
+  const approachingExports = (pendingExportDeadlines ?? []).filter((r) => {
+    const delta = new Date(r.statutory_deadline).getTime() - complianceNow;
+    return delta >= 0 && delta <= fiveDaysMs;
+  }).length;
+
+  const breachedTotal = breachedDeletions + breachedExports;
+  const approachingTotal = approachingDeletions + approachingExports;
+  const pendingTotal =
+    (pendingDeletionDeadlines ?? []).length + (pendingExportDeadlines ?? []).length;
+
   // ---------- RENDER ----------
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
@@ -161,11 +202,90 @@ export default async function AdminPage() {
           >
             <Cpu className="h-3.5 w-3.5" /> Computer sessions
           </Link>
+          <Link
+            href="/admin/compliance"
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted ${
+              breachedTotal > 0
+                ? 'border-red-500/60 bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-300'
+                : approachingTotal > 0
+                ? 'border-amber-500/60 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300'
+                : ''
+            }`}
+          >
+            <Scale className="h-3.5 w-3.5" /> Compliance
+            {breachedTotal > 0 && (
+              <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-red-600 text-white text-[10px] font-bold">
+                {breachedTotal}
+              </span>
+            )}
+            {breachedTotal === 0 && approachingTotal > 0 && (
+              <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-amber-600 text-white text-[10px] font-bold">
+                {approachingTotal}
+              </span>
+            )}
+          </Link>
           <div className="text-xs text-muted-foreground">
             Last refreshed {new Date().toLocaleTimeString()}
           </div>
         </div>
       </div>
+
+      {/* Compliance alert — only renders when breached or approaching deadlines exist */}
+      {(breachedTotal > 0 || approachingTotal > 0) && (
+        <Link
+          href="/admin/compliance"
+          className={`block mb-6 rounded-xl border p-4 transition-colors ${
+            breachedTotal > 0
+              ? 'border-red-500/60 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/50'
+              : 'border-amber-500/60 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle
+              className={`h-5 w-5 shrink-0 mt-0.5 ${
+                breachedTotal > 0 ? 'text-red-600' : 'text-amber-600'
+              }`}
+            />
+            <div className="flex-1 min-w-0">
+              <div
+                className={`font-semibold text-sm ${
+                  breachedTotal > 0
+                    ? 'text-red-900 dark:text-red-200'
+                    : 'text-amber-900 dark:text-amber-200'
+                }`}
+              >
+                {breachedTotal > 0
+                  ? `${breachedTotal} compliance request${breachedTotal === 1 ? '' : 's'} past statutory deadline`
+                  : `${approachingTotal} compliance request${approachingTotal === 1 ? '' : 's'} approaching deadline (≤5 days)`}
+              </div>
+              <div
+                className={`text-xs mt-0.5 ${
+                  breachedTotal > 0
+                    ? 'text-red-700 dark:text-red-300'
+                    : 'text-amber-700 dark:text-amber-300'
+                }`}
+              >
+                {breachedTotal > 0
+                  ? 'Legal breach. Fulfil immediately.'
+                  : 'Prioritise these before they breach.'}
+                {breachedTotal > 0 && approachingTotal > 0 && (
+                  <> &middot; {approachingTotal} more approaching.</>
+                )}
+                {' '}Click to open the compliance dashboard &rarr;
+              </div>
+            </div>
+            <div
+              className={`text-xs tabular-nums shrink-0 ${
+                breachedTotal > 0
+                  ? 'text-red-700 dark:text-red-300'
+                  : 'text-amber-700 dark:text-amber-300'
+              }`}
+            >
+              {pendingTotal} pending
+            </div>
+          </div>
+        </Link>
+      )}
 
       {/* Top metric cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
