@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { Sidebar } from '@/components/dashboard/Sidebar';
+import { NoraWidget } from '@/components/nora/NoraWidget';
 
 /**
  * Admin Command Center layout.
@@ -45,6 +46,7 @@ export default async function AdminLayout({
       <main className="pl-64">
         <div className="min-h-screen">{children}</div>
       </main>
+      <NoraWidget surface="admin" />
     </div>
   );
 }

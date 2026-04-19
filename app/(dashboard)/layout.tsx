@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { Sidebar } from '@/components/dashboard/Sidebar';
 import { FirstLoginConsentModal } from '@/components/auth/FirstLoginConsentModal';
+import { NoraWidget } from '@/components/nora/NoraWidget';
 import { isSupportedLocale, isRTL, type Locale } from '@/lib/i18n/strings';
 
 export default async function DashboardLayout({
@@ -67,6 +68,7 @@ export default async function DashboardLayout({
         <div className="min-h-screen">{children}</div>
       </main>
       {needsConsent && <FirstLoginConsentModal locale={locale} />}
+      <NoraWidget surface="author" />
     </div>
   );
 }
