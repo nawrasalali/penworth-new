@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { generateWeeklyAnalystReport } from '@/lib/guild/agents/analyst-generator';
 import type { GuildMemberCtx } from '@/lib/guild/agents/shared';
 import { requireCronAuth } from '@/lib/cron/require-cron-auth';
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   if (unauthorized) return unauthorized;
 
   const startedAt = Date.now();
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   // Select active members only. Probated / terminated / resigned don't
   // get reports — they either have agent access locked (probation,

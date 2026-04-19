@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import ReviewButton from './ReviewButton';
 import GradingQueue, { type GradingQueueRow } from './GradingQueue';
 
@@ -43,7 +44,7 @@ export default async function GuildAdminPage(
   if (!profile?.is_admin) redirect('/dashboard');
 
   // Use admin client to bypass RLS and read all applications
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const filter = searchParams.status || 'pending_review';
 
   let query = admin

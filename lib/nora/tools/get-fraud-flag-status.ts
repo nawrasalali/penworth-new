@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import type { NoraToolDefinition } from '../types';
 
 /**
@@ -49,7 +49,7 @@ export const getFraudFlagStatusTool: NoraToolDefinition = {
       };
     }
 
-    const admin = createAdminClient();
+    const admin = createServiceClient();
 
     // Deliberately narrow column list: payload withheld. See rationale above.
     const { data, error } = await admin

@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import type { NoraToolDefinition } from '../types';
 
 /**
@@ -131,7 +131,7 @@ export const openSupportTicketTool: NoraToolDefinition = {
       : 'No known-issue pattern matched. Escalating without prior ' +
         'automated diagnosis.';
 
-    const admin = createAdminClient();
+    const admin = createServiceClient();
 
     const { data, error } = await admin
       .from('nora_support_tickets')

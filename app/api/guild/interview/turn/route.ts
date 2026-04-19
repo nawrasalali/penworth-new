@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import {
   generateNextMessage,
   transcribeAudio,
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const admin = createAdminClient();
+    const admin = createServiceClient();
 
     // Load application + interview state
     const { data: app } = await admin

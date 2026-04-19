@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { buildNoraContext } from '@/lib/nora/context-builder';
 import type { NoraSurface } from '@/lib/nora/types';
 
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
   const surface = surfaceRaw as NoraSurface;
 
   // --- 3. Context + mount guard --------------------------------------------
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const ctxResult = await buildNoraContext({
     user_id: user.id,
     surface,

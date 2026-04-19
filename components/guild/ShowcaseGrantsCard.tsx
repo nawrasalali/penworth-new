@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { t, type Locale, type StringKey } from '@/lib/i18n/strings';
 
 /**
@@ -60,7 +60,7 @@ export async function ShowcaseGrantsCard({
   memberId: string;
   locale: Locale;
 }) {
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   // Per Phase 1E pre-flight #1: query the table directly — the view is
   // aggregate-only. Filter by the member, order by category for stable

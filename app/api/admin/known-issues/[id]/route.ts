@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { requireAdmin } from '@/lib/admin/require-admin';
 import { validateKnownIssuePayload } from '@/lib/admin/validators';
 
@@ -35,7 +35,7 @@ export async function PATCH(
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data, error } = await admin
     .from('nora_known_issues')
     .update({

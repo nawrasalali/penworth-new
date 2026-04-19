@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import {
   scoreInterview,
   type InterviewState,
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'application_id is required' }, { status: 400 });
     }
 
-    const admin = createAdminClient();
+    const admin = createServiceClient();
 
     const { data: app } = await admin
       .from('guild_applications')

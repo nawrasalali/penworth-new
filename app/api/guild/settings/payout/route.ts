@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import {
   encryptPayoutDetails,
   maskPayoutDestination,
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Confirm the caller is actually a Guild member
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data: member, error: memberErr } = await admin
     .from('guild_members')
     .select('id, status')
@@ -150,7 +151,7 @@ export async function GET() {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data: member } = await admin
     .from('guild_members')
     .select('id, payout_method, payout_details_encrypted, tax_residency')

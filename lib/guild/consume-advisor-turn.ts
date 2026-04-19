@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 
 /**
  * Phase 2 Task 2.7 / Phase 2.5 Commit 10 — shared advisor rate-limit
@@ -27,7 +27,7 @@ export async function consumeAdvisorTurn(
     }
   | { ok: false; response: NextResponse }
 > {
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data, error } = await admin.rpc('guild_advisor_consume_turn', {
     p_user_id: userId,
   });

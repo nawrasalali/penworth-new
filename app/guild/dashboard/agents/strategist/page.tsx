@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import StrategistGenerate from './StrategistGenerate';
 import { ProbationBanner } from '@/components/guild/ProbationBanner';
 import { isSupportedLocale, type Locale } from '@/lib/i18n/strings';
@@ -52,7 +53,7 @@ export default async function StrategistPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login?redirect=/guild/dashboard/agents/strategist');
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data: member } = await admin
     .from('guild_members')
     .select('id, status, primary_language')

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { requireAdmin } from '@/lib/admin/require-admin';
 
 export const runtime = 'nodejs';
@@ -31,7 +31,7 @@ export async function POST(
 
   const note = typeof body.note === 'string' ? body.note.trim() : '';
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data, error } = await admin.rpc('guild_lift_probation', {
     p_guildmember_id: memberId,
     p_note: note,

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import Anthropic from '@anthropic-ai/sdk';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { modelFor, maxTokensFor } from '@/lib/ai/model-router';
 import {
   resolveGuildMember,

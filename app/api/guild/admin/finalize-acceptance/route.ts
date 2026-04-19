@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { sendGuildPostInterviewCodeEmail } from '@/lib/email/guild';
 import { logAuditFromRequest } from '@/lib/audit';
 
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'application_id is required' }, { status: 400 });
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data: result, error } = await admin.rpc('guild_finalize_acceptance', {
     p_application_id: payload.application_id,
     p_tier: payload.tier ?? 'apprentice',

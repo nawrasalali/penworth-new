@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { requireAdmin } from '@/lib/admin/require-admin';
 
 export const runtime = 'nodejs';
@@ -50,7 +50,7 @@ export async function POST(
     return NextResponse.json({ error: 'reason is required' }, { status: 400 });
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data, error } = await admin.rpc('guild_promote_tier', {
     p_guildmember_id: memberId,
     p_new_tier: body.new_tier,

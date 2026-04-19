@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { runMonthlyClose } from '@/lib/guild/commissions';
 import { requireCronAuth } from '@/lib/cron/require-cron-auth';
 
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const admin = createAdminClient();
+    const admin = createServiceClient();
     const result = await runMonthlyClose(admin, month);
 
     return NextResponse.json({

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { ProbationBanner } from '@/components/guild/ProbationBanner';
 import { ShowcaseGrantsCard } from '@/components/guild/ShowcaseGrantsCard';
 import { isSupportedLocale, type Locale } from '@/lib/i18n/strings';
@@ -20,7 +21,7 @@ export default async function GuildDashboardPage() {
     redirect('/login?redirect=/guild/dashboard');
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   // Look up Guildmember record
   const { data: member } = await admin

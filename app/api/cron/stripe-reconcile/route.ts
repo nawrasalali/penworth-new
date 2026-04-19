@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { getStripeOrError } from '@/lib/stripe/client';
 import { requireCronAuth } from '@/lib/cron/require-cron-auth';
 
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     const hours = Math.min(Math.max(1, Number(url.searchParams.get('hours') || 48)), 168);
     const dryRun = url.searchParams.get('dry') === '1';
 
-    const admin = createAdminClient();
+    const admin = createServiceClient();
 
     const windowStart = Math.floor(Date.now() / 1000) - hours * 3600;
 

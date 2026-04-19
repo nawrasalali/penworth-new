@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import MentorChat from './MentorChat';
 import { ProbationBanner } from '@/components/guild/ProbationBanner';
 import { isSupportedLocale, type Locale } from '@/lib/i18n/strings';
@@ -13,7 +14,7 @@ export default async function MentorPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login?redirect=/guild/dashboard/agents/mentor');
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data: member } = await admin
     .from('guild_members')
     .select('id, display_name, status, primary_language')

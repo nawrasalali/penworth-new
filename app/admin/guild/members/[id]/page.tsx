@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ArrowLeft } from 'lucide-react';
 import { MemberActionsPanel } from './MemberActionsPanel';
@@ -39,7 +40,7 @@ export default async function AdminGuildMemberDetailPage({
 }) {
   const { id: memberId } = await params;
   const supabase = await createClient();
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   const { data: member, error } = await admin
     .from('guild_members')

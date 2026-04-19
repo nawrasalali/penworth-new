@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import ModuleContent from './ModuleContent';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +21,7 @@ function tierLabel(tier: string): string {
 
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data } = await admin
     .from('guild_academy_modules')
     .select('title')
@@ -37,7 +38,7 @@ export default async function AcademyModulePage(props: { params: Promise<{ slug:
   } = await supabase.auth.getUser();
   if (!user) redirect(`/guild/login?redirect=/guild/dashboard/academy/${params.slug}`);
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   const { data: member } = await admin
     .from('guild_members')

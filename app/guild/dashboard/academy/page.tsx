@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 
 export const dynamic = 'force-dynamic';
 export const metadata = {
@@ -27,7 +28,7 @@ export default async function AcademyIndexPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect('/guild/login?redirect=/guild/dashboard/academy');
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   const { data: member } = await admin
     .from('guild_members')

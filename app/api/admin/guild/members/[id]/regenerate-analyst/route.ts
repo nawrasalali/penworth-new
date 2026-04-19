@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { requireAdmin } from '@/lib/admin/require-admin';
 import { generateWeeklyAnalystReport } from '@/lib/guild/agents/analyst-generator';
 import type { GuildMemberCtx } from '@/lib/guild/agents/shared';
@@ -27,7 +27,7 @@ export async function POST(
   if (!gate.ok) return gate.response;
 
   const { id: memberId } = await ctx.params;
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   const { data: member, error } = await admin
     .from('guild_members')

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 
 /**
@@ -43,7 +44,7 @@ export async function requireAgentAccess(): Promise<
     };
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data: allowed, error } = await admin.rpc('guild_agent_access_allowed', {
     p_user_id: user.id,
   });

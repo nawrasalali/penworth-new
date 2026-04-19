@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient, createClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { sendGuildApplicationReceivedEmail } from '@/lib/email/guild';
 
 export const runtime = 'nodejs';
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const supabase = createAdminClient();
+    const supabase = createServiceClient();
 
     // Duplicate email check — one application per email every 90 days
     const { data: existing } = await supabase

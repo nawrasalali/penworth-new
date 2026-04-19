@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import ClearBalanceButton from './ClearBalanceButton';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,7 @@ export default async function FinancialsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect('/guild/login?redirect=/guild/dashboard/financials');
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data: member } = await admin
     .from('guild_members')
     .select('*')

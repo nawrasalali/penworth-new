@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import type { NoraToolDefinition } from '../types';
 
 /**
@@ -40,7 +40,7 @@ export const resendEmailConfirmationTool: NoraToolDefinition = {
     required: [],
   },
   handler: async (_input, ctx) => {
-    const admin = createAdminClient();
+    const admin = createServiceClient();
     const email = ctx.member.email;
     const user_id = ctx.member.user_id;
 

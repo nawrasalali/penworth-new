@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { requireAdmin } from '@/lib/admin/require-admin';
 
 export const runtime = 'nodejs';
@@ -55,7 +55,7 @@ export async function POST(
     );
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   // Fetch both tickets to validate state.
   const { data: both } = await admin

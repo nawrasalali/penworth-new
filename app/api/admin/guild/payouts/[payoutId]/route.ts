@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { logAuditFromRequest, type AuditSeverity } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ payoutId
     );
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   // Load the row to check current status
   const { data: current, error: loadErr } = await admin

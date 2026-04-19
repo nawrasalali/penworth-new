@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import type { NoraToolDefinition } from '../types';
 
 /**
@@ -34,7 +34,7 @@ export const triggerPasswordResetTool: NoraToolDefinition = {
     required: [],
   },
   handler: async (input, ctx) => {
-    const admin = createAdminClient();
+    const admin = createServiceClient();
     const email = ctx.member.email;
 
     // Default redirect: keep on the surface the user is currently using.

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import {
   sendGuildInterviewInvitationEmail,
   sendGuildDeclineEmail,
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   // Load the application — we need it for the decline email and to fail fast
   // on missing rows before making the RPC call.

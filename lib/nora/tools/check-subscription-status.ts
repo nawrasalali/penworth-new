@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { getStripeOrError } from '@/lib/stripe/client';
 import type { NoraToolDefinition } from '../types';
 
@@ -25,7 +25,7 @@ export const checkSubscriptionStatusTool: NoraToolDefinition = {
     required: [],
   },
   handler: async (_input, ctx) => {
-    const admin = createAdminClient();
+    const admin = createServiceClient();
 
     const { data: memberships, error: membershipErr } = await admin
       .from('org_members')

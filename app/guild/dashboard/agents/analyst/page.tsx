@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import AnalystRefresh from './AnalystRefresh';
 import AdminRegenerateButton from './AdminRegenerateButton';
 import { ProbationBanner } from '@/components/guild/ProbationBanner';
@@ -42,7 +43,7 @@ export default async function AnalystPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login?redirect=/guild/dashboard/agents/analyst');
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data: member } = await admin
     .from('guild_members')
     .select('id, status, primary_language')

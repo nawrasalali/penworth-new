@@ -1,4 +1,5 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { isSupportedLang } from '@/lib/lang-routing';
@@ -60,7 +61,7 @@ async function attachGuildReferralIfAny(userId: string) {
     const code = decodeURIComponent(refCookie.value).trim().toUpperCase();
     if (!code.startsWith('GUILD-')) return;
 
-    const admin = createAdminClient();
+    const admin = createServiceClient();
     await createReferralOnSignup({
       admin,
       referralCode: code,

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import PayoutActions from './PayoutActions';
 import MonthFilter from './MonthFilter';
 
@@ -81,7 +81,7 @@ export default async function AdminGuildPayoutsPage(
 ) {
   const searchParams = await props.searchParams;
   // The /admin layout already enforces is_admin — no need to re-check here.
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   const statusFilter = (searchParams.status as Status | 'all') || 'queued';
   const monthFilter = searchParams.month || null; // YYYY-MM

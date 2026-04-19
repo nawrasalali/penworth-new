@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import {
   generateNextMessage,
   synthesizeSpeech,
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'application_id is required' }, { status: 400 });
     }
 
-    const admin = createAdminClient();
+    const admin = createServiceClient();
 
     // Load application
     const { data: app, error: appError } = await admin

@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import type { NoraToolDefinition } from '../types';
 
 /**
@@ -26,7 +26,7 @@ export const checkPayoutStatusTool: NoraToolDefinition = {
     required: [],
   },
   handler: async (_input, ctx) => {
-    const admin = createAdminClient();
+    const admin = createServiceClient();
 
     // Non-Guildmembers have no payouts. Resolve via context rather than
     // another DB hit where possible.

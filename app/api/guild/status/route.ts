@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'A valid email address is required.' }, { status: 400 });
     }
 
-    const supabase = createAdminClient();
+    const supabase = createServiceClient();
     const { data, error } = await supabase
       .from('guild_applications')
       .select('id, application_status, created_at, decided_at')

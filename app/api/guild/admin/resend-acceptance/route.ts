@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import {
   sendGuildInterviewInvitationEmail,
   sendGuildPostInterviewCodeEmail,
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   // ------------------------------------------------------------------
   // Resolve the application — it's the source of truth for state.

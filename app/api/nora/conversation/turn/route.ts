@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { MODEL_IDS } from '@/lib/ai/model-router';
 import { buildNoraContext } from '@/lib/nora/context-builder';
 import { composeSystemPrompt } from '@/lib/nora/compose-system-prompt';
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   // --- 3. Load conversation + ownership check ------------------------------
   const { data: conversation, error: convErr } = await admin

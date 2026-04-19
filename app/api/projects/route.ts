@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 
 // GET /api/projects - List user's projects
 export async function GET(request: NextRequest) {
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
     // this UPDATE fails between the consume and the return, the helper's
     // second branch (EXISTS guild_showcase_grants status='used') still causes
     // downstream deduction to be skipped. See migration 014 for the RPC body.
-    const admin = createAdminClient();
+    const admin = createServiceClient();
     const { data: grantResult, error: grantErr } = await admin.rpc(
       'guild_consume_showcase_grant',
       {

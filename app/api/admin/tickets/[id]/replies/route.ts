@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { requireAdmin } from '@/lib/admin/require-admin';
 
 export const runtime = 'nodejs';
@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic';
  *   is_internal_note boolean DEFAULT false
  *   created_at       timestamptz DEFAULT now()
  *
- * Uses createAdminClient so the INSERT bypasses any RLS on
+ * Uses createServiceClient so the INSERT bypasses any RLS on
  * support_ticket_replies. Authorization is the is_admin gate at the top.
  */
 export async function POST(
@@ -51,7 +51,7 @@ export async function POST(
   const isInternal =
     typeof body.is_internal_note === 'boolean' ? body.is_internal_note : false;
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   // Sanity-check the ticket exists so we fail with a clean 404 rather than
   // a FK violation or silent drop. Cheap point-lookup.

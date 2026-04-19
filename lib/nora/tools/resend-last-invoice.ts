@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { getStripeOrError } from '@/lib/stripe/client';
 import type { NoraToolDefinition } from '../types';
 
@@ -31,7 +31,7 @@ export const resendLastInvoiceTool: NoraToolDefinition = {
     required: [],
   },
   handler: async (_input, ctx) => {
-    const admin = createAdminClient();
+    const admin = createServiceClient();
     const stripeResult = getStripeOrError();
     if ('error' in stripeResult) {
       return {

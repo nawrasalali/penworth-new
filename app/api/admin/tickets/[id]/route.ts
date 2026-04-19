@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { requireAdmin } from '@/lib/admin/require-admin';
 
 export const runtime = 'nodejs';
@@ -17,7 +18,7 @@ export const dynamic = 'force-dynamic';
  *     support_tickets.assigned_to is FK-less by convention; integrity is
  *     enforced here)
  *
- * Uses createAdminClient for the UPDATE so we bypass RLS on the tickets
+ * Uses createServiceClient for the UPDATE so we bypass RLS on the tickets
  * table — the is_admin gate at the top is the authorization boundary.
  */
 
@@ -92,7 +93,7 @@ export async function PATCH(
     );
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data, error } = await admin
     .from('support_tickets')
     .update(patch)

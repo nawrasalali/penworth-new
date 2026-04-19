@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { runRetentionCheck } from '@/lib/guild/commissions';
 import { requireCronAuth } from '@/lib/cron/require-cron-auth';
 
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   if (unauthorized) return unauthorized;
 
   try {
-    const admin = createAdminClient();
+    const admin = createServiceClient();
     const result = await runRetentionCheck(admin);
     return NextResponse.json({
       ok: true,

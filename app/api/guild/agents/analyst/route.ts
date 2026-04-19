@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { modelFor, maxTokensFor } from '@/lib/ai/model-router';
 import {
   resolveGuildMember,
@@ -125,7 +126,7 @@ async function handle(
  * guild_commissions. One DB read each; aggregated in memory.
  */
 async function loadWeeklyTimeseries(
-  admin: ReturnType<typeof createAdminClient>,
+  admin: ReturnType<typeof createServiceClient>,
   member: GuildMemberCtx,
   weeks: number,
 ): Promise<TimeseriesPoint[]> {

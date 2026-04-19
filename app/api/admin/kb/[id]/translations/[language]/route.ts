@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { requireAdmin } from '@/lib/admin/require-admin';
 
 export const runtime = 'nodejs';
@@ -60,7 +60,7 @@ export async function PUT(
     );
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   // 404 guard — avoid FK error noise.
   const { data: article } = await admin

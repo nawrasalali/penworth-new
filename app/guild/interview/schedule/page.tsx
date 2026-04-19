@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 
 export const dynamic = 'force-dynamic';
 export const metadata = {
@@ -26,7 +26,7 @@ export default async function InterviewSchedulePage(
     redirect('/guild');
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data: app } = await admin
     .from('guild_applications')
     .select('id, full_name, primary_language, application_status')

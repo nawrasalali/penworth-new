@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { logAuditFromRequest } from '@/lib/audit';
 
 export const runtime = 'nodejs';
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data: result, error } = await admin.rpc('guild_grade_interview_rubric', {
     p_interview_id: payload.interview_id,
     p_result: payload.result,

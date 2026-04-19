@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { requireAdmin } from '@/lib/admin/require-admin';
 import { validateArticlePayload } from '@/lib/admin/validators';
 
@@ -47,7 +47,7 @@ export async function PATCH(
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
 
   // Read current version to bump monotonically.
   const { data: current, error: readErr } = await admin

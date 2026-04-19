@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { maskPayoutDestinationSafe } from '@/lib/guild/payout-encryption';
 import SettingsForm from './SettingsForm';
 
@@ -14,7 +15,7 @@ export default async function GuildSettingsPage() {
 
   if (!user) redirect('/login?redirect=/guild/dashboard/settings');
 
-  const admin = createAdminClient();
+  const admin = createServiceClient();
   const { data: member } = await admin
     .from('guild_members')
     .select(

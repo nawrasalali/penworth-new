@@ -2,11 +2,11 @@
  * Unit tests for the apply-form hardening (commits b057cca + ca14041).
  *
  * We exercise the API handler at app/api/guild/apply/route.ts through its
- * POST function. Because the production code imports createAdminClient
- * and createClient from lib/supabase/server, we stub those modules before
- * importing the route. The stubs let us inject specific DB responses
- * (23505 with a Guildmember hint, 23505 without, auth-session vs no
- * session) and assert the response shape.
+ * POST function. The production code now imports createClient from
+ * lib/supabase/server and createServiceClient from lib/supabase/service,
+ * so we stub both modules before importing the route. The stubs let us
+ * inject specific DB responses (23505 with a Guildmember hint, 23505
+ * without, auth-session vs no session) and assert the response shape.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -25,15 +25,13 @@ let mockMode: MockMode = 'success';
 let mockSessionEmail: string | null = null;
 
 // ---------------------------------------------------------------------------
-// Stubs — these must be registered BEFORE the route module imports run
+// Shared `from()` builder used by the service-role mock. The production
+// route reaches into this via createServiceClient() to do the duplicate
+// check and the INSERT.
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/email/guild', () => ({
-  sendGuildApplicationReceivedEmail: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock('@/lib/supabase/server', () => {
-  const from = (_table: string) => {
+function buildMockFrom() {
+  return (_table: string) => {
     const selectChain: any = {
       select: () => selectChain,
       eq: () => selectChain,
@@ -87,9 +85,19 @@ vi.mock('@/lib/supabase/server', () => {
     };
     return selectChain;
   };
+}
 
+// ---------------------------------------------------------------------------
+// Stubs — these must be registered BEFORE the route module imports run
+// ---------------------------------------------------------------------------
+
+vi.mock('@/lib/email/guild', () => ({
+  sendGuildApplicationReceivedEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Route imports createClient from here (for the auth session check).
+vi.mock('@/lib/supabase/server', () => {
   return {
-    createAdminClient: () => ({ from }),
     createClient: async () => ({
       auth: {
         getUser: async () => ({
@@ -97,6 +105,16 @@ vi.mock('@/lib/supabase/server', () => {
         }),
       },
     }),
+  };
+});
+
+// Route imports createServiceClient from here (for the duplicate-check
+// SELECT and the INSERT). Post-commit 5e632e0 migration all guild admin
+// code paths that previously used createAdminClient now use this.
+vi.mock('@/lib/supabase/service', () => {
+  const from = buildMockFrom();
+  return {
+    createServiceClient: () => ({ from }),
   };
 });
 
