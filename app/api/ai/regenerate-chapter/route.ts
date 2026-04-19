@@ -180,7 +180,18 @@ Rewrite the chapter now.`;
     response = await anthropic.messages.create({
       model: modelFor('write_chapter'),
       max_tokens: maxTokensFor('write_chapter'),
-      system: systemPrompt,
+      // Prompt caching — same rationale as write-book.ts. When an
+      // author regenerates several chapters in a sitting (a common
+      // review workflow), every regen after the first gets a 10×
+      // cheaper cache-read on the system prompt. 5-minute TTL
+      // comfortably covers a review session.
+      system: [
+        {
+          type: 'text',
+          text: systemPrompt,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
       messages: [{ role: 'user', content: userPrompt }],
     });
   } catch (err) {
@@ -198,6 +209,10 @@ Rewrite the chapter now.`;
     await refundCredits();
     return NextResponse.json({ error: 'Regeneration produced too little content, credits refunded' }, { status: 500 });
   }
+
+  // Cache stats — optional, zero when caching isn't exercised.
+  const cacheRead = (response.usage as any).cache_read_input_tokens ?? 0;
+  const cacheCreation = (response.usage as any).cache_creation_input_tokens ?? 0;
 
   const wordCount = newContent.trim().split(/\s+/).filter(Boolean).length;
   const regenerationCount = (((chapter.metadata as any)?.regenerationCount) ?? 0) + 1;
@@ -267,8 +282,20 @@ Rewrite the chapter now.`;
       tokens_input: response.usage.input_tokens,
       tokens_output: response.usage.output_tokens,
       model: modelFor('write_chapter'),
-      cost_usd: calculateCost('write_chapter', response.usage.input_tokens, response.usage.output_tokens),
-      metadata: { projectId, chapterId, regenerationCount },
+      cost_usd: calculateCost(
+        'write_chapter',
+        response.usage.input_tokens,
+        response.usage.output_tokens,
+        cacheRead,
+        cacheCreation,
+      ),
+      metadata: {
+        projectId,
+        chapterId,
+        regenerationCount,
+        cacheReadTokens: cacheRead,
+        cacheCreationTokens: cacheCreation,
+      },
     });
   } catch {
     // usage table optional
@@ -309,7 +336,15 @@ Rewrite the chapter now.`;
       model: modelFor('write_chapter'),
       input_tokens: response.usage.input_tokens,
       output_tokens: response.usage.output_tokens,
-      cost_usd: calculateCost('write_chapter', response.usage.input_tokens, response.usage.output_tokens),
+      cache_read_tokens: cacheRead,
+      cache_creation_tokens: cacheCreation,
+      cost_usd: calculateCost(
+        'write_chapter',
+        response.usage.input_tokens,
+        response.usage.output_tokens,
+        cacheRead,
+        cacheCreation,
+      ),
     },
   });
 

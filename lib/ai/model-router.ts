@@ -29,12 +29,27 @@ export const MODEL_IDS: Record<ModelTier, string> = {
 
 /**
  * Pricing per million tokens (USD) as of April 2026.
+ *
  * Used for cost logging only — not for routing decisions.
+ *
+ * Opus 4.7 is $5/$25 per million tokens (not $15/$75 — that was the
+ * Opus 3 rate from 2024 and was in this file by mistake, causing the
+ * CFO Agent to overstate Opus spend by 3x).
+ *
+ * Prompt caching:
+ *   cache_read  → $0.50 / MTok (10× cheaper than normal input)
+ *   cache_write → $6.25 / MTok (1.25× normal input, for 5-min TTL)
+ *
+ * These only apply to Opus. Sonnet and Haiku have their own cache
+ * pricing which we don't currently use; when we do, extend this.
  */
-export const MODEL_PRICING: Record<ModelTier, { input: number; output: number }> = {
-  opus:   { input: 15.00, output: 75.00 },
-  sonnet: { input:  3.00, output: 15.00 },
-  haiku:  { input:  1.00, output:  5.00 },
+export const MODEL_PRICING: Record<
+  ModelTier,
+  { input: number; output: number; cacheRead: number; cacheWrite: number }
+> = {
+  opus:   { input: 5.00, output: 25.00, cacheRead: 0.50, cacheWrite: 6.25 },
+  sonnet: { input: 3.00, output: 15.00, cacheRead: 0.30, cacheWrite: 3.75 },
+  haiku:  { input: 1.00, output:  5.00, cacheRead: 0.10, cacheWrite: 1.25 },
 };
 
 /**
@@ -147,18 +162,31 @@ export function maxTokensFor(task: AITask): number {
 
 /**
  * Calculate USD cost for a completion given its usage.
+ *
+ * The Anthropic response's `usage` object splits input tokens three ways:
+ *   input_tokens              → normal (uncached) input — billed at `input` rate
+ *   cache_read_input_tokens   → cache hits — billed at `cacheRead` rate (10× cheaper)
+ *   cache_creation_input_tokens → cache writes — billed at `cacheWrite` rate (1.25× input)
+ *
+ * Callers can pass just `inputTokens + outputTokens` (legacy two-arg
+ * form) and get the old behaviour, or supply cache token counts for
+ * accurate billing when prompt caching is enabled.
  */
 export function calculateCost(
   task: AITask,
   inputTokens: number,
-  outputTokens: number
+  outputTokens: number,
+  cacheReadTokens: number = 0,
+  cacheCreationTokens: number = 0,
 ): number {
   const tier = TASK_MODEL[task];
   const pricing = MODEL_PRICING[tier];
   return Number(
     (
       (inputTokens / 1_000_000) * pricing.input +
-      (outputTokens / 1_000_000) * pricing.output
+      (outputTokens / 1_000_000) * pricing.output +
+      (cacheReadTokens / 1_000_000) * pricing.cacheRead +
+      (cacheCreationTokens / 1_000_000) * pricing.cacheWrite
     ).toFixed(6)
   );
 }

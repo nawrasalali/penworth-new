@@ -546,10 +546,23 @@ async function writeSection(inp: WriteSectionInput) {
   });
 
   const writeModel = modelFor('write_chapter');
+  // Prompt caching: mark the system prompt as cacheable. The system
+  // prompt is identical across every chapter of a single book (same
+  // industry prompt, voice guide, flavor prelude, language directive).
+  // First chapter pays the 1.25× cache-write premium; every chapter
+  // after gets a 10× cheaper cache-read on the same ~2-4k token block.
+  // 5-minute TTL by default, which comfortably covers the 3-8 minute
+  // book-writing window.
   const response = await anthropic.messages.create({
     model: writeModel,
     max_tokens: maxTokensFor('write_chapter'),
-    system: systemPrompt,
+    system: [
+      {
+        type: 'text',
+        text: systemPrompt,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
     messages: [{ role: 'user', content: userPrompt }],
   });
 
@@ -559,6 +572,12 @@ async function writeSection(inp: WriteSectionInput) {
     .join('\n');
 
   const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
+
+  // Cache token fields are optional in the SDK typing — present when
+  // caching was exercised, undefined otherwise. Coalesce to 0 so the
+  // cost calc stays stable for legacy non-cached calls.
+  const cacheRead = (response.usage as any).cache_read_input_tokens ?? 0;
+  const cacheCreation = (response.usage as any).cache_creation_input_tokens ?? 0;
 
   const { data: saved, error } = await supabase
     .from('chapters')
@@ -578,6 +597,8 @@ async function writeSection(inp: WriteSectionInput) {
         tokensUsed: {
           input: response.usage.input_tokens,
           output: response.usage.output_tokens,
+          cacheRead,
+          cacheCreation,
         },
       },
     })
@@ -592,8 +613,23 @@ async function writeSection(inp: WriteSectionInput) {
     tokens_input: response.usage.input_tokens,
     tokens_output: response.usage.output_tokens,
     model: writeModel,
-    cost_usd: calcCostByTask('write_chapter', response.usage.input_tokens, response.usage.output_tokens),
-    metadata: { projectId, chapterId: saved.id, sectionKind: kind, orderIndex },
+    cost_usd: calcCostByTask(
+      'write_chapter',
+      response.usage.input_tokens,
+      response.usage.output_tokens,
+      cacheRead,
+      cacheCreation,
+    ),
+    metadata: {
+      projectId,
+      chapterId: saved.id,
+      sectionKind: kind,
+      orderIndex,
+      // Separate cache stats from the main token counts so the CFO
+      // Agent can show cache hit rate per book in the future.
+      cacheReadTokens: cacheRead,
+      cacheCreationTokens: cacheCreation,
+    },
   });
 
   return { chapterId: saved.id, title, wordCount };
