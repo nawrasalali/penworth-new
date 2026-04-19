@@ -10,20 +10,26 @@ const nextConfig = {
   // Note: this key was `experimental.serverComponentsExternalPackages`
   // in Next 14. Next 15 moved it to top-level `serverExternalPackages`
   // as a stable API.
-  serverExternalPackages: ['playwright-core', 'playwright'],
+  serverExternalPackages: ['playwright-core', 'playwright', 'pdfkit'],
   // pdfkit ships .afm (Adobe Font Metrics) files for its 14 built-in
-  // fonts at node_modules/pdfkit/js/data/. Webpack bundles pdfkit's JS
-  // but does not detect these .afm runtime reads via fs.readFileSync,
-  // so they're omitted from the Vercel serverless bundle and any
-  // doc.font('Helvetica') call crashes with:
+  // fonts at node_modules/pdfkit/js/data/. pdfkit reads them at runtime
+  // via fs.readFileSync(path.resolve(__dirname, 'data', name + '.afm')).
   //
-  //   ENOENT: no such file or directory, open
-  //   '/var/task/.next/server/chunks/data/Helvetica.afm'
+  // Webpack-bundling pdfkit breaks this two ways:
+  //   1. The .afm files aren't traced as deps → not copied to bundle
+  //   2. Even if they were, pdfkit's __dirname resolves to the webpack
+  //      chunk directory (/var/task/.next/server/chunks/), not the real
+  //      node_modules/pdfkit/js/, so it looks in chunks/data/*.afm
   //
-  // outputFileTracingIncludes forces these to ship. Applied to every
-  // route that uses pdfkit: the existing /api/export + the three new
-  // /api/admin/reports/* endpoints. Wildcarding by directory avoids
-  // listing all 14 fonts individually.
+  // Fix: mark pdfkit as a server-external package. Next will leave it
+  // as a `require('pdfkit')` at runtime. __dirname resolves to the real
+  // node_modules/pdfkit/js/ and the .afm files are found. Same pattern
+  // already used for playwright.
+  //
+  // outputFileTracingIncludes below is belt-and-braces: when a package
+  // is external, Next's standalone build should auto-include it, but
+  // explicit include guarantees the data files ship regardless of how
+  // node_modules tracing evolves.
   outputFileTracingIncludes: {
     '/api/export': ['./node_modules/pdfkit/js/data/**/*'],
     '/api/admin/reports/monthly-investor': ['./node_modules/pdfkit/js/data/**/*'],
