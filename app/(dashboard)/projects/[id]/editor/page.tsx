@@ -140,14 +140,20 @@ function UnifiedLeftPanel({
 
   return (
     <div className="w-[240px] shrink-0 border-r bg-muted/20 flex flex-col overflow-hidden">
-      {/* Header — project title + collapse toggle */}
+      {/* Header — back-to-projects button + collapse toggle. We don't re-render
+          the project title here because the top header bar (line 1133 area)
+          already displays it as part of the breadcrumb "Title › Agent". Having
+          the title in both places was visibly redundant — two truncated copies
+          of a long title stacked 48px apart in the same column. The left
+          back-button's job is navigation, not labelling. Keep it simple. */}
       <div className="p-3 border-b flex items-center justify-between gap-2">
         <button
           onClick={onNavigateHome}
-          className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors min-w-0 flex-1"
+          className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors min-w-0 flex-1"
+          title={t('editor.backToProjects', locale)}
         >
           <ArrowLeft className="h-4 w-4 shrink-0" />
-          <span className="truncate min-w-0">{project?.title || t('editor.untitled', locale)}</span>
+          <span className="truncate min-w-0">{t('editor.backToProjects', locale)}</span>
         </button>
         <button
           onClick={() => setCollapsed(true)}
@@ -221,111 +227,6 @@ function UnifiedLeftPanel({
         <Link
           href={`/projects/${project?.id}`}
           className="flex items-center gap-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1"
-        >
-          <Home className="h-3 w-3" />
-          {t('editor.backToProject', locale)}
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-// =============================================================================
-// NAVIGATION SIDEBAR — DEPRECATED (replaced by UnifiedLeftPanel)
-// =============================================================================
-// Kept here temporarily in case any other code path imports it; the editor
-// page no longer uses it. Safe to delete once audit confirms zero references.
-
-function NavigationSidebar({
-  project,
-  chapters,
-  onNavigateHome,
-  locale = 'en',
-}: {
-  project: Project | null;
-  chapters: Chapter[];
-  onNavigateHome: () => void;
-  locale?: Locale;
-}) {
-  const [collapsed, setCollapsed] = useState(false);
-
-  if (collapsed) {
-    return (
-      <div className="w-12 border-r bg-muted/20 flex flex-col items-center py-3">
-        <button
-          onClick={() => setCollapsed(false)}
-          className="p-2 hover:bg-muted rounded-lg"
-        >
-          <Menu className="h-4 w-4" />
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-[240px] shrink-0 border-r bg-muted/20 flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="p-3 border-b flex items-center justify-between gap-2">
-        <button
-          onClick={onNavigateHome}
-          className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors min-w-0 flex-1"
-        >
-          <ArrowLeft className="h-4 w-4 shrink-0" />
-          <span className="truncate min-w-0">{project?.title || t('editor.untitled', locale)}</span>
-        </button>
-        <button
-          onClick={() => setCollapsed(true)}
-          className="p-1 hover:bg-muted rounded shrink-0"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Project Info */}
-      <div className="p-3 border-b">
-        <div className="flex items-center gap-2 mb-2">
-          <BookOpen className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground uppercase tracking-wider">
-            {project?.content_type || 'Document'}
-          </span>
-        </div>
-        <p className="text-xs text-muted-foreground line-clamp-2">
-          {project?.description || t('editor.noDescription', locale)}
-        </p>
-      </div>
-
-      {/* Chapters List */}
-      <div className="flex-1 overflow-y-auto p-3">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-          {t('editor.chapters', locale)} ({chapters.length})
-        </h3>
-        {chapters.length > 0 ? (
-          <div className="space-y-1">
-            {chapters.map((chapter, idx) => (
-              <div
-                key={chapter.id}
-                className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 cursor-pointer text-sm"
-              >
-                <span className="text-muted-foreground w-5">{idx + 1}.</span>
-                <span className="truncate flex-1">{chapter.title}</span>
-                <span className="text-xs text-muted-foreground">
-                  {chapter.word_count || 0}w
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground italic">
-            {t('editor.chaptersEmpty', locale)}
-          </p>
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="p-3 border-t">
-        <Link
-          href={`/projects/${project?.id}`}
-          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           <Home className="h-3 w-3" />
           {t('editor.backToProject', locale)}

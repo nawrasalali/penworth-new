@@ -119,7 +119,7 @@ export type StringKey =
   | 'auth.signUp'
   // Editor — page chrome + agent pipeline
   | 'editor.agentPipeline' | 'editor.waiting' | 'editor.completed'
-  | 'editor.backToProject' | 'editor.noDescription'
+  | 'editor.backToProject' | 'editor.backToProjects' | 'editor.noDescription'
   | 'editor.chapters' | 'editor.chaptersEmpty'
   | 'editor.credits' | 'editor.unknownAgent'
   | 'editor.untitled' | 'editor.author'
@@ -555,6 +555,7 @@ const en: Bundle = {
   'editor.waiting': 'Waiting…',
   'editor.completed': 'Completed',
   'editor.backToProject': 'Back to project',
+  'editor.backToProjects': 'Back to projects',
   'editor.noDescription': 'No description',
   'editor.chapters': 'Chapters',
   'editor.chaptersEmpty': 'Chapters will appear as the outline is generated…',
@@ -1126,6 +1127,7 @@ const ar: Bundle = {
   'editor.waiting': 'في الانتظار…',
   'editor.completed': 'مكتمل',
   'editor.backToProject': 'العودة إلى المشروع',
+  'editor.backToProjects': 'العودة إلى المشاريع',
   'editor.noDescription': 'لا يوجد وصف',
   'editor.chapters': 'الفصول',
   'editor.chaptersEmpty': 'ستظهر الفصول عند إنشاء المخطط…',
@@ -1697,6 +1699,7 @@ const es: Bundle = {
   'editor.waiting': 'Esperando…',
   'editor.completed': 'Completado',
   'editor.backToProject': 'Volver al proyecto',
+  'editor.backToProjects': 'Volver a proyectos',
   'editor.noDescription': 'Sin descripción',
   'editor.chapters': 'Capítulos',
   'editor.chaptersEmpty': 'Los capítulos aparecerán cuando se genere el esquema…',
@@ -2268,6 +2271,7 @@ const fr: Bundle = {
   'editor.waiting': 'En attente…',
   'editor.completed': 'Terminé',
   'editor.backToProject': 'Retour au projet',
+  'editor.backToProjects': 'Retour aux projets',
   'editor.noDescription': 'Aucune description',
   'editor.chapters': 'Chapitres',
   'editor.chaptersEmpty': 'Les chapitres apparaîtront dès la génération du plan…',
@@ -2839,6 +2843,7 @@ const pt: Bundle = {
   'editor.waiting': 'Aguardando…',
   'editor.completed': 'Concluído',
   'editor.backToProject': 'Voltar ao projeto',
+  'editor.backToProjects': 'Voltar aos projetos',
   'editor.noDescription': 'Sem descrição',
   'editor.chapters': 'Capítulos',
   'editor.chaptersEmpty': 'Os capítulos aparecerão à medida que o esboço for gerado…',
@@ -3410,6 +3415,7 @@ const ru: Bundle = {
   'editor.waiting': 'Ожидание…',
   'editor.completed': 'Завершено',
   'editor.backToProject': 'Вернуться к проекту',
+  'editor.backToProjects': 'Вернуться к проектам',
   'editor.noDescription': 'Нет описания',
   'editor.chapters': 'Главы',
   'editor.chaptersEmpty': 'Главы появятся, когда будет сгенерирован план…',
@@ -3981,6 +3987,7 @@ const zh: Bundle = {
   'editor.waiting': '等待中…',
   'editor.completed': '已完成',
   'editor.backToProject': '返回项目',
+  'editor.backToProjects': '返回项目列表',
   'editor.noDescription': '暂无描述',
   'editor.chapters': '章节',
   'editor.chaptersEmpty': '章节将在大纲生成后显示…',
@@ -4552,6 +4559,7 @@ const bn: Bundle = {
   'editor.waiting': 'অপেক্ষা করছে…',
   'editor.completed': 'সম্পন্ন',
   'editor.backToProject': 'প্রকল্পে ফিরে যান',
+  'editor.backToProjects': 'প্রকল্পগুলিতে ফিরে যান',
   'editor.noDescription': 'কোনো বর্ণনা নেই',
   'editor.chapters': 'অধ্যায়',
   'editor.chaptersEmpty': 'রূপরেখা তৈরি হলে অধ্যায়গুলি দেখা যাবে…',
@@ -5123,6 +5131,7 @@ const hi: Bundle = {
   'editor.waiting': 'प्रतीक्षा में…',
   'editor.completed': 'पूर्ण',
   'editor.backToProject': 'प्रोजेक्ट पर वापस',
+  'editor.backToProjects': 'प्रोजेक्ट्स पर वापस',
   'editor.noDescription': 'कोई विवरण नहीं',
   'editor.chapters': 'अध्याय',
   'editor.chaptersEmpty': 'जैसे ही रूपरेखा बनेगी, अध्याय यहाँ दिखेंगे…',
@@ -5694,6 +5703,7 @@ const id: Bundle = {
   'editor.waiting': 'Menunggu…',
   'editor.completed': 'Selesai',
   'editor.backToProject': 'Kembali ke proyek',
+  'editor.backToProjects': 'Kembali ke proyek',
   'editor.noDescription': 'Tanpa deskripsi',
   'editor.chapters': 'Bab',
   'editor.chaptersEmpty': 'Bab akan muncul ketika kerangka dibuat…',
@@ -6265,6 +6275,7 @@ const vi: Bundle = {
   'editor.waiting': 'Đang chờ…',
   'editor.completed': 'Hoàn tất',
   'editor.backToProject': 'Quay lại dự án',
+  'editor.backToProjects': 'Quay lại danh sách dự án',
   'editor.noDescription': 'Không có mô tả',
   'editor.chapters': 'Chương',
   'editor.chaptersEmpty': 'Các chương sẽ xuất hiện khi dàn ý được tạo…',
