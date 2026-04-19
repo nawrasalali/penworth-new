@@ -181,3 +181,67 @@ export async function setAgentContext(
     { onConflict: 'guildmember_id,agent_name' },
   );
 }
+
+// ---------------------------------------------------------------------------
+// Usage logging
+// ---------------------------------------------------------------------------
+// Guild-agent Anthropic calls were previously invisible to the CFO Agent
+// because these routes never wrote to the `usage` table. That meant every
+// cost dashboard under-counted real spend. Every call site now runs this
+// helper once per Anthropic response.
+//
+// Never-throws contract — usage logging is observability, not correctness.
+// If the insert fails we swallow and log to stderr. The agent itself must
+// stay working.
+// ---------------------------------------------------------------------------
+
+import type { AITask } from '@/lib/ai/model-router';
+import { TASK_MODEL, MODEL_IDS, calculateCost } from '@/lib/ai/model-router';
+
+type AnthropicUsage = {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+};
+
+export async function logGuildAgentUsage(
+  admin: SupabaseClient,
+  args: {
+    userId: string;           // auth user id — maps to profiles.id
+    memberId: string;         // guild_members.id — goes in metadata
+    task: AITask;             // 'guild_mentor_turn' | 'guild_mentor_summary' | ...
+    usage: AnthropicUsage;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<void> {
+  try {
+    const cacheRead = args.usage.cache_read_input_tokens ?? 0;
+    const cacheCreation = args.usage.cache_creation_input_tokens ?? 0;
+    const model = MODEL_IDS[TASK_MODEL[args.task]];
+
+    await admin.from('usage').insert({
+      user_id: args.userId,
+      action_type: args.task,
+      tokens_input: args.usage.input_tokens,
+      tokens_output: args.usage.output_tokens,
+      model,
+      cost_usd: calculateCost(
+        args.task,
+        args.usage.input_tokens,
+        args.usage.output_tokens,
+        cacheRead,
+        cacheCreation,
+      ),
+      metadata: {
+        guildmember_id: args.memberId,
+        cacheReadTokens: cacheRead,
+        cacheCreationTokens: cacheCreation,
+        ...args.metadata,
+      },
+    });
+  } catch (err) {
+    // Never block the agent path. Log + move on.
+    console.error('[logGuildAgentUsage] insert failed', err);
+  }
+}

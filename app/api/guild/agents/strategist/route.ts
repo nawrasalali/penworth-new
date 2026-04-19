@@ -7,6 +7,7 @@ import {
   resolveGuildMember,
   loadReferralMetrics,
   getAgentContext,
+  logGuildAgentUsage,
 } from '@/lib/guild/agents/shared';
 import { buildStrategistPrompt, StrategistPlan, nextMondayUtc, planEndDate } from '@/lib/guild/agents/strategist';
 import { AnalystReport } from '@/lib/guild/agents/analyst';
@@ -113,6 +114,23 @@ export async function POST(_req: NextRequest) {
     .map((c) => c.text)
     .join('\n')
     .trim();
+
+  // Best-effort cost log. Logged before parse — tokens are spent
+  // whether or not the JSON parses cleanly. `week_start` captures
+  // which week the plan targets so the CFO Agent can correlate
+  // strategist spend with plan cadence if needed later.
+  void logGuildAgentUsage(admin, {
+    userId: user.id,
+    memberId: member.id,
+    task: 'guild_strategist_plan',
+    usage: response.usage,
+    metadata: {
+      week_start: nextMondayUtc(),
+      had_prior_mentor_action: Boolean(mentorCtx?.last_summary?.next_action),
+      had_prior_analyst_report: Boolean(latestAnalystReport),
+    },
+  });
+
   const cleaned = raw.replace(/```json\s*|\s*```/g, '').trim();
 
   let plan: StrategistPlan;

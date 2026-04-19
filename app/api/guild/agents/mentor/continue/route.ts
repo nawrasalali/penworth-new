@@ -6,6 +6,7 @@ import { modelFor, maxTokensFor } from '@/lib/ai/model-router';
 import {
   resolveGuildMember,
   setAgentContext,
+  logGuildAgentUsage,
 } from '@/lib/guild/agents/shared';
 import {
   buildMentorSystemPrompt,
@@ -94,6 +95,21 @@ export async function POST(req: NextRequest) {
     .map((c) => c.text)
     .join('\n')
     .trim();
+
+  // Best-effort cost log. `turn_index` lets the CFO Agent see the
+  // cache-hit ramp within a single check-in (turn 1 writes cache,
+  // turns 2+ read cache).
+  void logGuildAgentUsage(admin, {
+    userId: user.id,
+    memberId: member.id,
+    task: 'guild_mentor_turn',
+    usage: response.usage,
+    metadata: {
+      phase: 'continue',
+      session_id: session.id,
+      turn_index: userTurns + 1,
+    },
+  });
 
   session.turns.push({
     role: 'assistant',

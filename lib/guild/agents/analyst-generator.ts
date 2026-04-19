@@ -5,6 +5,7 @@ import {
   loadReferralMetrics,
   getAgentContext,
   setAgentContext,
+  logGuildAgentUsage,
   type GuildMemberCtx,
 } from '@/lib/guild/agents/shared';
 import {
@@ -109,6 +110,23 @@ export async function generateWeeklyAnalystReport(
       .map((c) => c.text)
       .join('\n')
       .trim();
+
+    // Best-effort cost log. This runs from the Monday 06:00 UTC cron
+    // across every active Guild member, so the CFO Agent will see a
+    // clear weekly burst in guild_analyst_report spend. `source: 'cron'`
+    // distinguishes it from on-demand reports from the route.
+    void logGuildAgentUsage(admin, {
+      userId: member.user_id,
+      memberId: member.id,
+      task: 'guild_analyst_report',
+      usage: response.usage,
+      metadata: {
+        source: 'cron',
+        cadence: 'weekly',
+        week_starting: weekStart,
+      },
+    });
+
     const cleaned = raw.replace(/```json\s*|\s*```/g, '').trim();
 
     const report: AnalystReport = JSON.parse(cleaned);

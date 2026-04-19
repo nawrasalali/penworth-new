@@ -6,6 +6,7 @@ import { modelFor, maxTokensFor } from '@/lib/ai/model-router';
 import {
   resolveGuildMember,
   setAgentContext,
+  logGuildAgentUsage,
 } from '@/lib/guild/agents/shared';
 import {
   buildMentorSummaryPrompt,
@@ -75,6 +76,23 @@ export async function POST(req: NextRequest) {
     .map((c) => c.text)
     .join('\n')
     .trim();
+
+  // Best-effort cost log. Logged BEFORE JSON parse because the
+  // tokens were spent regardless of whether we can parse the
+  // output — we still want that cost visible to the CFO Agent.
+  void logGuildAgentUsage(admin, {
+    userId: user.id,
+    memberId: member.id,
+    task: 'guild_mentor_summary',
+    usage: response.usage,
+    metadata: {
+      phase: 'end',
+      session_id: session.id,
+      week_of: session.week_of,
+      turn_count: session.turns.length,
+    },
+  });
+
   const cleaned = raw.replace(/```json\s*|\s*```/g, '').trim();
 
   let summary: {

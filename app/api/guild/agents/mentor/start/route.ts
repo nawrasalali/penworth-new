@@ -8,6 +8,7 @@ import {
   resolveGuildMember,
   loadReferralMetrics,
   setAgentContext,
+  logGuildAgentUsage,
 } from '@/lib/guild/agents/shared';
 import {
   buildMentorSystemPrompt,
@@ -111,6 +112,16 @@ export async function POST(_req: NextRequest) {
     .map((c) => c.text)
     .join('\n')
     .trim();
+
+  // Best-effort cost log — first turn of a check-in, writes the system-
+  // prompt cache. Subsequent `continue` turns will show cache_read hits.
+  void logGuildAgentUsage(admin, {
+    userId: user.id,
+    memberId: member.id,
+    task: 'guild_mentor_turn',
+    usage: response.usage,
+    metadata: { phase: 'start', week_of: weekOf },
+  });
 
   const session: MentorSession = {
     id: randomUUID(),

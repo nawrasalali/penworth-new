@@ -8,6 +8,7 @@ import {
   loadReferralMetrics,
   getAgentContext,
   setAgentContext,
+  logGuildAgentUsage,
   GuildMemberCtx,
 } from '@/lib/guild/agents/shared';
 import {
@@ -77,6 +78,21 @@ async function handle(
     .map((c) => c.text)
     .join('\n')
     .trim();
+
+  // Best-effort cost log. Logged before parse — tokens are spent
+  // whether or not the JSON parses cleanly.
+  void logGuildAgentUsage(admin, {
+    userId: user.id,
+    memberId: member.id,
+    task: 'guild_analyst_report',
+    usage: response.usage,
+    metadata: {
+      date: today,
+      forced_fresh: opts.forceFresh,
+      weeks_of_series: series.length,
+    },
+  });
+
   const cleaned = raw.replace(/```json\s*|\s*```/g, '').trim();
 
   let report: AnalystReport;
