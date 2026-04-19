@@ -46,6 +46,12 @@ export async function GET(request: NextRequest) {
           user_id: user.id,
           current_agent: 'validate',
           agent_status: defaultStatus,
+          // Seed the heartbeat on session creation so the stuck detector
+          // doesn't false-positive on a brand-new session during the
+          // 3-minute validate window.
+          pipeline_status: 'active',
+          agent_started_at: new Date().toISOString(),
+          agent_heartbeat_at: new Date().toISOString(),
         })
         .select()
         .single();
@@ -167,6 +173,18 @@ export async function POST(request: NextRequest) {
         current_agent: nextAgent,
         agent_status: newStatus,
         updated_at: new Date().toISOString(),
+        // Transition = fresh heartbeat. Also flips pipeline_status back
+        // to 'active' in case the previous agent had been marked
+        // 'stuck' or 'recovering' before advancing.
+        agent_heartbeat_at: new Date().toISOString(),
+        agent_started_at: new Date().toISOString(),
+        pipeline_status: 'active',
+        // Reset failure counter on a clean transition — we're moving
+        // into a new agent; whatever went wrong in the previous one is
+        // no longer the active concern.
+        failure_count: 0,
+        last_failure_reason: null,
+        last_failure_at: null,
       };
 
       // Store agent-specific data
