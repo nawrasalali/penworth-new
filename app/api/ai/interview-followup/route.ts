@@ -8,7 +8,7 @@ import { getValidationRubric } from '@/lib/ai/interview-questions';
 
 const anthropic = new Anthropic();
 
-export interface DynamicFollowup {
+interface DynamicFollowup {
   question: string;           // The contextual follow-up question to ask next
   rationale: string;          // Why this question matters (shown as subtle hint)
   type: 'clarify' | 'deepen' | 'missing' | 'priority';

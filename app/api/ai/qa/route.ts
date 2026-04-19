@@ -6,7 +6,7 @@ import { getUserLanguage, languageDirective } from '@/lib/ai/user-language';
 
 const anthropic = new Anthropic();
 
-export interface QACheck {
+interface QACheck {
   name: string;
   status: 'pending' | 'checking' | 'passed' | 'warning' | 'failed';
   detail?: string;

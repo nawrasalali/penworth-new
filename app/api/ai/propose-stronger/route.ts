@@ -7,7 +7,7 @@ import { getUserLanguage, languageDirective } from '@/lib/ai/user-language';
 
 const anthropic = new Anthropic();
 
-export interface ProposedIdea {
+interface ProposedIdea {
   title: string;                    // New, stronger title
   positioning: string;              // One-sentence hook
   targetAudience: string;           // Who exactly buys this
