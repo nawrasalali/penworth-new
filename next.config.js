@@ -11,6 +11,25 @@ const nextConfig = {
   // in Next 14. Next 15 moved it to top-level `serverExternalPackages`
   // as a stable API.
   serverExternalPackages: ['playwright-core', 'playwright'],
+  // pdfkit ships .afm (Adobe Font Metrics) files for its 14 built-in
+  // fonts at node_modules/pdfkit/js/data/. Webpack bundles pdfkit's JS
+  // but does not detect these .afm runtime reads via fs.readFileSync,
+  // so they're omitted from the Vercel serverless bundle and any
+  // doc.font('Helvetica') call crashes with:
+  //
+  //   ENOENT: no such file or directory, open
+  //   '/var/task/.next/server/chunks/data/Helvetica.afm'
+  //
+  // outputFileTracingIncludes forces these to ship. Applied to every
+  // route that uses pdfkit: the existing /api/export + the three new
+  // /api/admin/reports/* endpoints. Wildcarding by directory avoids
+  // listing all 14 fonts individually.
+  outputFileTracingIncludes: {
+    '/api/export': ['./node_modules/pdfkit/js/data/**/*'],
+    '/api/admin/reports/monthly-investor': ['./node_modules/pdfkit/js/data/**/*'],
+    '/api/admin/reports/quarterly-board': ['./node_modules/pdfkit/js/data/**/*'],
+    '/api/admin/reports/dd-data-room': ['./node_modules/pdfkit/js/data/**/*'],
+  },
   webpack: (config, { isServer }) => {
     if (isServer) {
       // Additional belt-and-braces: treat these as commonjs externals so
