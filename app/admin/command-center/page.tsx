@@ -9,6 +9,7 @@ import {
   Bell,
   Cpu,
   Users,
+  ListTodo,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -87,18 +88,29 @@ export default async function CommandCenterPage() {
           </p>
         </div>
 
-        <Link
-          href="/admin/command-center/alerts"
-          className="relative inline-flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted"
-        >
-          <Bell className="h-4 w-4" />
-          <span className="text-sm font-semibold">Alerts</span>
-          {typeof unackCount === 'number' && unackCount > 0 && (
-            <span className="absolute -top-1 -right-1 inline-flex items-center justify-center h-5 min-w-[20px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
-              {unackCount > 99 ? '99+' : unackCount}
-            </span>
+        <div className="flex items-center gap-2">
+          {session.adminRole === 'super_admin' && (
+            <Link
+              href="/admin/command-center/orchestration"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted"
+            >
+              <ListTodo className="h-4 w-4" />
+              <span className="text-sm font-semibold">Orchestration</span>
+            </Link>
           )}
-        </Link>
+          <Link
+            href="/admin/command-center/alerts"
+            className="relative inline-flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted"
+          >
+            <Bell className="h-4 w-4" />
+            <span className="text-sm font-semibold">Alerts</span>
+            {typeof unackCount === 'number' && unackCount > 0 && (
+              <span className="absolute -top-1 -right-1 inline-flex items-center justify-center h-5 min-w-[20px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                {unackCount > 99 ? '99+' : unackCount}
+              </span>
+            )}
+          </Link>
+        </div>
       </div>
 
       {/* ---- NOW strip (always-visible live counters) ---- */}
