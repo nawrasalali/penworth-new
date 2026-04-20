@@ -517,6 +517,33 @@ interface WriteSectionInput {
 async function writeSection(inp: WriteSectionInput) {
   const { kind, title, description, keyPoints, targetWords, bodyNumber, projectId, userId, docTitle, orderIndex, meta, voiceProfile, projectCtx, prior, industry } = inp;
 
+  // Retry-safety: if a prior run already wrote this chapter (same
+  // project_id + order_index), short-circuit before touching the
+  // Anthropic API. This matters for restart paths — pipeline-health
+  // auto-retry, admin force-retry, and any future restart-agent
+  // consumer all re-fire `book/write` with a fresh event id, so
+  // Inngest's step memoization doesn't save us; we'd pay tokens for
+  // work already done.
+  //
+  // The DB uniqueness constraint (migration 023) is the hard guarantee
+  // against duplicate rows. This check is the cost optimization on
+  // top of that guarantee — it avoids the $0.03-0.15 Opus call per
+  // already-written chapter on a resume.
+  const { data: existingChapter } = await supabase
+    .from('chapters')
+    .select('id, word_count')
+    .eq('project_id', projectId)
+    .eq('order_index', orderIndex)
+    .maybeSingle();
+
+  if (existingChapter) {
+    return {
+      chapterId: existingChapter.id,
+      title,
+      wordCount: existingChapter.word_count ?? 0,
+    };
+  }
+
   const userPrompt = buildSectionPrompt({
     kind,
     docTitle,
@@ -579,33 +606,54 @@ async function writeSection(inp: WriteSectionInput) {
   const cacheRead = (response.usage as any).cache_read_input_tokens ?? 0;
   const cacheCreation = (response.usage as any).cache_creation_input_tokens ?? 0;
 
-  const { data: saved, error } = await supabase
+  // Race-safety: two parallel runs could both pass the existence check
+  // above before either inserts. Upsert with ignoreDuplicates means the
+  // loser silently no-ops instead of throwing a constraint-violation.
+  // The winner's row is what ends up in the chapter. We then re-read
+  // to get the canonical row (upsert with ignoreDuplicates:true returns
+  // an empty array on conflict, so we can't rely on the return).
+  const { error: upsertErr } = await supabase
     .from('chapters')
-    .insert({
-      project_id: projectId,
-      title: title,
-      content,
-      order_index: orderIndex,
-      status: 'complete',
-      word_count: wordCount,
-      metadata: {
-        kind,
-        flavor: meta.flavor,
-        bodyNumber,
-        generatedAt: new Date().toISOString(),
-        model: writeModel,
-        tokensUsed: {
-          input: response.usage.input_tokens,
-          output: response.usage.output_tokens,
-          cacheRead,
-          cacheCreation,
+    .upsert(
+      {
+        project_id: projectId,
+        title: title,
+        content,
+        order_index: orderIndex,
+        status: 'complete',
+        word_count: wordCount,
+        metadata: {
+          kind,
+          flavor: meta.flavor,
+          bodyNumber,
+          generatedAt: new Date().toISOString(),
+          model: writeModel,
+          tokensUsed: {
+            input: response.usage.input_tokens,
+            output: response.usage.output_tokens,
+            cacheRead,
+            cacheCreation,
+          },
         },
       },
-    })
-    .select()
+      { onConflict: 'project_id,order_index', ignoreDuplicates: true },
+    );
+
+  if (upsertErr) throw new Error(`Failed to save section: ${upsertErr.message}`);
+
+  // Read the canonical row back. In the common (non-race) path this is
+  // the row we just wrote. In the race path it's the row the winner
+  // wrote.
+  const { data: saved, error: readErr } = await supabase
+    .from('chapters')
+    .select('id')
+    .eq('project_id', projectId)
+    .eq('order_index', orderIndex)
     .single();
 
-  if (error) throw new Error(`Failed to save section: ${error.message}`);
+  if (readErr || !saved) {
+    throw new Error(`Failed to read back saved section: ${readErr?.message ?? 'not found'}`);
+  }
 
   await supabase.from('usage').insert({
     user_id: userId,
