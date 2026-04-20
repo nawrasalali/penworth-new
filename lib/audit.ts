@@ -104,7 +104,11 @@ export type AuditAction =
   // Computer
   | 'computer.session_start'
   | 'computer.session_end'
-  | 'computer.platform_publish';
+  | 'computer.platform_publish'
+  // Pipeline / Command Center
+  | 'pipeline.alert.ack'
+  | 'pipeline.incident.resolve'
+  | 'pipeline.incident.force_retry';
 
 export type AuditActorType =
   | 'user'

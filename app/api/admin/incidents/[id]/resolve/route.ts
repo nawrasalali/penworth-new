@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRoleForApi } from '@/lib/admin/require-admin-role';
 import { createServiceClient } from '@/lib/supabase/service';
+import { logAuditFromRequest } from '@/lib/audit';
 
 export const runtime = 'nodejs';
 
@@ -91,6 +92,24 @@ export async function POST(
     console.error('[incidents/resolve] update failed:', updateErr);
     return NextResponse.json({ error: 'update_failed' }, { status: 500 });
   }
+
+  // Audit log — canonical business-event record. Fire-and-forget;
+  // a logAudit failure must not break the resolve UX.
+  void logAuditFromRequest(request, {
+    actorType: 'admin',
+    actorUserId: gate.userId,
+    action: 'pipeline.incident.resolve',
+    entityType: 'pipeline_incident',
+    entityId: id,
+    before: { resolved: false },
+    after: {
+      resolved: true,
+      resolution_note: `[${action}] ${note}`,
+      recovery_action_taken: `admin_resolve:${action}`,
+    },
+    metadata: { action, note, route: '/api/admin/incidents/[id]/resolve' },
+    severity: 'info',
+  });
 
   return NextResponse.json({ ok: true });
 }

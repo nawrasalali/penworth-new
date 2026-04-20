@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRoleForApi } from '@/lib/admin/require-admin-role';
 import { createServiceClient } from '@/lib/supabase/service';
 import { inngest } from '@/inngest/client';
+import { logAuditFromRequest } from '@/lib/audit';
 
 export const runtime = 'nodejs';
 
@@ -78,6 +79,31 @@ export async function POST(
       })
       .eq('id', id);
   }
+
+  // Audit log — the admin's force_retry action itself is the business
+  // event. Fire-and-forget; logAudit failure must not break the flow.
+  // Logged here (after DB side-effects, before Inngest send) because
+  // the admin action is committed at this point regardless of whether
+  // the downstream Inngest event lands.
+  void logAuditFromRequest(request, {
+    actorType: 'admin',
+    actorUserId: gate.userId,
+    action: 'pipeline.incident.force_retry',
+    entityType: 'pipeline_incident',
+    entityId: id,
+    after: {
+      session_id: incident.session_id,
+      pipeline_status: 'recovering',
+      recovery_action_taken: 'force_retry',
+    },
+    metadata: {
+      session_id: incident.session_id,
+      agent: incident.agent,
+      source: 'super_admin',
+      route: '/api/admin/incidents/[id]/force-retry',
+    },
+    severity: 'warning', // force-retry bypasses auto-recovery logic; worth a glance
+  });
 
   // Fire the Inngest restart event. Same shape as the pipeline-health
   // cron fires — so if a consumer is ever built, it handles both

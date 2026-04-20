@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRoleForApi } from '@/lib/admin/require-admin-role';
 import { createServiceClient } from '@/lib/supabase/service';
+import { logAuditFromRequest } from '@/lib/audit';
 
 export const runtime = 'nodejs';
 
@@ -85,6 +86,20 @@ export async function POST(
     console.error('[alerts/ack] update failed:', updateErr);
     return NextResponse.json({ error: 'update_failed' }, { status: 500 });
   }
+
+  // Audit log — append-only business record of who acknowledged what.
+  // Fire-and-forget; a logAudit failure must not break the ack UX.
+  void logAuditFromRequest(request, {
+    actorType: 'admin',
+    actorUserId: gate.userId,
+    action: 'pipeline.alert.ack',
+    entityType: 'pipeline_alert',
+    entityId: id,
+    before: { acknowledged: false },
+    after: { acknowledged: true, acknowledged_at: new Date().toISOString() },
+    metadata: { note, route: '/api/admin/alerts/[id]/ack' },
+    severity: 'info',
+  });
 
   return NextResponse.json({ ok: true });
 }
