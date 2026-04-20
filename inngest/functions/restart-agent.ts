@@ -43,8 +43,8 @@ export const restartAgent = inngest.createFunction(
     // and re-fire. We don't need a long retry loop here; it would
     // just delay failure visibility.
     retries: 2,
+    triggers: [{ event: 'pipeline.restart-agent' }],
   },
-  { event: 'pipeline.restart-agent' },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async ({ event, step }: any) => {
     const {
