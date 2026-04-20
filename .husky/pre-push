@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Pre-push guard: block any push whose HEAD does not typecheck clean.
+#
+# Why this exists:
+#   Two chats have pushed to this repo in parallel. Three separate
+#   sessions have pushed commits that failed typecheck and left prod
+#   stuck on ERROR deploys for 5+ hours at a time. This hook is the
+#   structural fix — no commit without a clean typecheck reaches origin.
+#
+# Scope of check:
+#   npx tsc --noEmit against the full project. Fast (~10-20s) on warm
+#   cache; slow only on a cold start.
+#
+# Opt-out:
+#   HUSKY=0 git push ...            # disable all hooks globally (not recommended)
+#   SKIP_TYPECHECK=1 git push ...   # skip this specific check, still run others
+
+set -e
+
+if [ "${SKIP_TYPECHECK:-0}" = "1" ]; then
+  echo "pre-push: SKIP_TYPECHECK=1 set, skipping tsc --noEmit. Hope you know what you're doing."
+  exit 0
+fi
+
+echo "pre-push: running typecheck (tsc --noEmit)..."
+if ! npx tsc --noEmit 2>&1 | grep -v "ES5 is deprecated\|TS5107" | grep -q "error TS"; then
+  echo "pre-push: typecheck clean ✓"
+  exit 0
+fi
+
+echo ""
+echo "✗ pre-push: typecheck FAILED. Push rejected."
+echo ""
+echo "  Errors above ↑"
+echo ""
+echo "  Fix them, then push again. To bypass (last resort):"
+echo "    SKIP_TYPECHECK=1 git push ..."
+echo ""
+exit 1
