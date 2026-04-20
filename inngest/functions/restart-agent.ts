@@ -89,18 +89,17 @@ export const restartAgent = inngest.createFunction(
     //     Organizations may be nullable (solo accounts), in which case
     //     we fall back to 'general' — same default as the original
     //     /api/books/generate path.
-    //   - `voiceProfile` — NOT persisted anywhere. It lives only in
-    //     the client request body of /api/books/generate and in the
-    //     Inngest event payload. On restart we cannot reconstruct it.
-    //     Chapters written on a restart will be stylistically less
-    //     faithful than chapters written in the original run. This
-    //     is a known degradation; a follow-up migration can persist
-    //     voiceProfile on interview_sessions for full fidelity.
+    //   - `voiceProfile` — loaded from interview_sessions.voice_profile
+    //     (migration 024). Persisted at book/write time by
+    //     /api/books/generate. Legacy sessions created before migration
+    //     024 have voice_profile=NULL and will restart with the default
+    //     voice — writeBook treats voiceProfile as optional, so NULL is
+    //     safe. New sessions preserve voice consistency across retries.
     // ---------------------------------------------------------------
     const loaded = await step.run('load-session-context', async () => {
       const { data: session, error: sessionErr } = await supabase
         .from('interview_sessions')
-        .select('id, project_id, user_id, book_title, outline_data, pipeline_status')
+        .select('id, project_id, user_id, book_title, outline_data, pipeline_status, voice_profile')
         .eq('id', sessionId)
         .maybeSingle();
 
@@ -140,6 +139,7 @@ export const restartAgent = inngest.createFunction(
         title: (session.book_title as string | null) ?? project.title,
         industry,
         outline: session.outline_data,
+        voiceProfile: (session.voice_profile as unknown) ?? null,
       };
     });
 
@@ -192,12 +192,11 @@ export const restartAgent = inngest.createFunction(
     // uniqueness constraint ensure already-written chapters are
     // skipped without spending tokens or writing duplicate rows.
     //
-    // voiceProfile is deliberately omitted — it's not persisted
-    // anywhere and cannot be reconstructed. writeBook treats it
-    // as optional, so chapters written by this restart will use
-    // the default voice. Chapters written in the original run (if
-    // any) keep their original styling. Follow-up: persist
-    // voiceProfile on interview_sessions to close this gap.
+    // voiceProfile is now loaded from interview_sessions.voice_profile
+    // (migration 024). Sessions created before that migration have
+    // NULL and degrade gracefully — writeBook treats voiceProfile as
+    // optional, so default voice is used. New sessions preserve voice
+    // consistency across retries.
     // ---------------------------------------------------------------
     const sent = await step.run('refire-book-write', async () => {
       const result = await inngest.send({
@@ -208,7 +207,7 @@ export const restartAgent = inngest.createFunction(
           title: loaded.title,
           outline: loaded.outline,
           industry: loaded.industry,
-          // voiceProfile: intentionally absent — see comment above.
+          voiceProfile: loaded.voiceProfile ?? undefined,
         },
       });
       // result is { ids: [eventId1, ...] } from the Inngest SDK

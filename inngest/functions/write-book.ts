@@ -200,7 +200,7 @@ export const writeBook = inngest.createFunction(
     const projectCtx = await step.run('load-context', async () => {
       const { data: session } = await supabase
         .from('interview_sessions')
-        .select('id, validation_data, interview_data, research_data, follow_up_data, author_name, about_author')
+        .select('id, validation_data, interview_data, research_data, follow_up_data, author_name, about_author, voice_profile')
         .eq('project_id', projectId)
         .eq('user_id', userId)
         .single();
@@ -233,10 +233,19 @@ export const writeBook = inngest.createFunction(
         citationStyle: session?.follow_up_data?.citationStyle || meta.citationStyle,
         research: resources || [],
         language: profile?.preferred_language || 'en',
+        sessionVoiceProfile: (session?.voice_profile as VoiceProfile | null) ?? null,
       };
     });
 
     const sessionId = projectCtx.sessionId ?? null;
+
+    // Prefer the event-payload voiceProfile (carried from /api/books/generate);
+    // fall back to the persisted copy on interview_sessions (migration 024).
+    // This is the defense-in-depth for the restart-agent consumer: when that
+    // consumer re-fires this function without a fresh voiceProfile in the
+    // event, the persisted copy keeps voice consistent across retries.
+    const effectiveVoiceProfile: VoiceProfile | undefined =
+      voiceProfile ?? projectCtx.sessionVoiceProfile ?? undefined;
 
     // Total sections = front + body + back
     const totalSections = frontMatter.length + body.length + backMatter.length;
@@ -290,7 +299,7 @@ export const writeBook = inngest.createFunction(
             docTitle: title,
             orderIndex: orderIndex,
             meta,
-            voiceProfile,
+            voiceProfile: effectiveVoiceProfile,
             projectCtx,
             prior: written.map((w) => w.title).join(', '),
             industry,
@@ -344,7 +353,7 @@ export const writeBook = inngest.createFunction(
             docTitle: title,
             orderIndex: orderIndex,
             meta,
-            voiceProfile,
+            voiceProfile: effectiveVoiceProfile,
             projectCtx,
             prior: written.map((w) => w.title).join(', '),
             industry,
@@ -406,7 +415,7 @@ export const writeBook = inngest.createFunction(
             docTitle: title,
             orderIndex: orderIndex,
             meta,
-            voiceProfile,
+            voiceProfile: effectiveVoiceProfile,
             projectCtx,
             prior: written.map((w) => w.title).join(', '),
             industry,

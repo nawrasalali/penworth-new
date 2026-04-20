@@ -197,6 +197,22 @@ export async function POST(request: NextRequest) {
     }
 
 
+    // Persist voiceProfile to interview_sessions BEFORE firing book/write.
+    // Best-effort: if the write fails we log and continue — generation is
+    // still correct because the event carries voiceProfile directly. The
+    // persisted copy is a safety net for retry paths (restart-agent consumer)
+    // so style doesn't drift across retries. Closes the gap flagged in
+    // commit 31205a3's restart-agent TODO.
+    if (voiceProfile) {
+      const { error: vpErr } = await supabase
+        .from('interview_sessions')
+        .update({ voice_profile: voiceProfile })
+        .eq('project_id', projectId);
+      if (vpErr) {
+        console.warn('[generate] failed to persist voice_profile (non-fatal):', vpErr.message);
+      }
+    }
+
     // Trigger Inngest function for durable writing (any document type)
     const outlineBody = outline.body || outline.chapters || [];
     const { ids } = await inngest.send({
