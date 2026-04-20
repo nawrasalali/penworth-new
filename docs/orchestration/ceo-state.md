@@ -6,6 +6,16 @@
 
 ---
 
+## ⚠️ ACTIVE INCIDENT (2026-04-21 19:05 UTC)
+
+**CEO-028 (p0):** Vercel team-wide 503 "DNS cache overflow". All brand domains (penworth.ai, guild.penworth.ai, store.penworth.ai, command.penworth.ai, new.penworth.ai canonical) return HTTP 503 at origin. Edge caches mask it on some custom-domain paths but uncached paths and canonical URLs all fail. Fresh redeploy did not fix — platform-side issue requiring Vercel support.
+
+**Blocks:** CEO-021 (domain cutover) — now `status=blocked`. Cannot cutover while NEW origin is 503.
+
+**Founder action required:** open Vercel support ticket. Draft message in CEO-028 last_update_note and in session handover at `docs/orchestration/handovers/2026-04-21-1905-ceo021-vercel-platform-503-blocker.md`.
+
+---
+
 ## Production health — verified 2026-04-20
 
 | Signal | State |
