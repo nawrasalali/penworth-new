@@ -359,3 +359,73 @@ The `^...$` anchors handle all of these.
 2. Defence-in-depth `RAISE EXCEPTION` guards on `p_delta` (bounds + non-zero) and `p_expires_at` (future, within 24h) at the RPC layer, independent of the tool-handler layer validation.
 
 Design is fully locked. Awaiting verification chat's migration ship, then code begins.
+
+---
+
+## RPC shipped — final addendum
+
+**Migrations applied (2026-04-19):**
+- `nora_adjust_credits_and_record_undo_rpc` — function definition
+- `nora_adjust_credits_rpc_revoke_public_execute` — follow-up lockdown
+
+**RPC signature (final, live on production):**
+
+```
+public.nora_adjust_credits_and_record_undo(
+  p_user_id         uuid,
+  p_delta           integer,
+  p_reason          text,
+  p_conversation_id uuid,
+  p_forward_turn_id uuid,
+  p_reverse_payload jsonb,
+  p_expires_at      timestamptz
+) RETURNS jsonb
+
+LANGUAGE plpgsql, SECURITY DEFINER, SET search_path = public, pg_temp
+EXECUTE granted: postgres, service_role
+EXECUTE revoked: PUBLIC, anon, authenticated
+```
+
+**Return shape (success):**
+```json
+{
+  "success": true,
+  "delta_applied": 200,
+  "previous_credits_balance": 1000000,
+  "new_credits_balance": 1000200,
+  "credit_transaction_id": "<uuid>",
+  "undo_token_id": "<uuid>",
+  "undo_expires_at": "<iso8601>"
+}
+```
+
+Tool handler must read `new_credits_balance` + `undo_token_id` from this envelope (not the shorter `{ new_balance, undo_token_id }` shape from section 11 — verification chat's ship uses the longer shape for better audit observability).
+
+**Audit row shape:** `credit_transactions.type = 'support_adjustment'` (new enum value added to the CHECK constraint in the same migration), `reference_id = p_forward_turn_id`. Tool handler does not insert into `credit_transactions` itself — the RPC does.
+
+**Human-readable summary:** RPC sets `nora_tool_undo_tokens.forward_summary = 'Adjusted credits by +{delta} (reason: {reason})'` automatically. Tool handler doesn't pass this in.
+
+### New security lesson captured
+
+Verification chat's section-11 implementation revealed a Supabase-specific gotcha worth codifying alongside the Phase A role-discipline lesson:
+
+> **`REVOKE EXECUTE ON FUNCTION ... FROM PUBLIC` is not sufficient in Supabase.** The Supabase platform's default privileges re-grant EXECUTE to `anon`, `authenticated`, and `service_role` on every function in the `public` schema at creation time. A `REVOKE FROM PUBLIC` does not undo these named-role grants. Without explicit follow-up `REVOKE ... FROM anon` and `REVOKE ... FROM authenticated`, any authenticated user can POST directly to `/rest/v1/rpc/<function_name>` and invoke a SECURITY DEFINER function with spoofed parameters. The function's own internal validation is the ONLY thing protecting state at that point.
+>
+> **Rule:** when locking down a SECURITY DEFINER function in Supabase, always issue THREE revokes: `FROM PUBLIC`, `FROM anon`, `FROM authenticated` — then `GRANT EXECUTE TO service_role` as the final step.
+
+This is the same pattern of lesson as the Phase A mount-guard miss (role-specific verification required explicit impersonation), pointed at grants rather than verifications. Both stem from: **role assumptions that are only true at the moment you write the code will eventually become false, so encode them as close to the point-of-truth as possible.** Captured for the triage protocol doc, which will consolidate both lessons into a single "Supabase role discipline" section once Phase B ships.
+
+### payment_status enum decision for pause_subscription
+
+Verification chat flagged: `profiles.payment_status` CHECK permits only `(active, past_due, canceled)`. No `paused` state. Two options:
+
+- **(a)** Add `paused` via a new migration before shipping pause_subscription
+- **(b)** Leave `payment_status` at `active` during Stripe-side pause; rely solely on Stripe's `pause_collection` to block billing
+
+**Decision: (b).** Rationale:
+- Stripe's `pause_collection` is the authoritative record of billing state. The local `payment_status` is a denormalized cache of Stripe's position.
+- Adding a `paused` enum state invites a drift class of bugs where Stripe says paused but DB says active (or vice versa) during webhook delay windows. Fewer states → fewer drift scenarios.
+- Users checking "is billing paused?" should hit a Stripe-data-backed check anyway, not `profiles.payment_status`. No new UI depends on a `paused` enum value.
+- If a future product decision needs "paused" visible in the author dashboard, that's the right moment to add the enum — not preemptively during a support-tool build.
+
+Tool handler will NOT touch `profiles.payment_status`. Only Stripe `pause_collection` changes.

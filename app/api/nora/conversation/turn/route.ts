@@ -8,6 +8,7 @@ import { composeSystemPrompt } from '@/lib/nora/compose-system-prompt';
 import {
   matchKnownIssue,
 } from '@/lib/nora/known-issue-matcher';
+import { matchUndoIntent } from '@/lib/nora/undo-intent-matcher';
 import {
   findTool,
   buildAnthropicToolsSpec,
@@ -18,7 +19,7 @@ import {
   buildToolResultRow,
   type ToolResultEnvelope,
 } from '@/lib/nora/turn-row-builders';
-import type { NoraSurface, NoraToolContext } from '@/lib/nora/types';
+import type { NoraContext, NoraSurface, NoraToolContext } from '@/lib/nora/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -235,6 +236,27 @@ export async function POST(request: NextRequest) {
   }
   const ctx = ctxResult.context;
 
+  // --- 6.5. Undo intent matcher (Phase B) ---------------------------------
+  // If the user's message is a full-message undo command ("undo" /
+  // "revert that" / "cancel that" / etc.), skip Claude entirely and
+  // dispatch the reverse payload on the most recent active undo token.
+  // matchUndoIntent is conservative — anchored ^...$ patterns — so we
+  // accept zero false positives in exchange for tolerating some false
+  // negatives (a missed undo means Claude sees the message and can
+  // still respond helpfully).
+  if (matchUndoIntent(userMessage)) {
+    const undoResponse = await runUndoFlow({
+      admin,
+      userId: user.id,
+      conversationId,
+      nextIndex,
+      surface,
+      userMessage,
+      ctx,
+    });
+    return NextResponse.json(undoResponse);
+  }
+
   // --- 7. Known-issue match (non-fatal) ------------------------------------
   const { matched: matchedPattern } = await matchKnownIssue({
     admin,
@@ -303,6 +325,13 @@ export async function POST(request: NextRequest) {
   let assistantRowsInserted = 0;
   let toolRowsInserted = 0; // count of (tool_call + tool_result) rows combined
 
+  // forward_turn_id is populated per-tool-call inside the dispatch loop,
+  // immediately after inserting the tool_call row. See the `.select('id')`
+  // on that insert below. Tier 2 tools (change_email, adjust_credits_small,
+  // pause_subscription) read this to populate the FK on nora_tool_undo_tokens.
+  // Tier 1 tools don't touch it. Initialised as empty string so any
+  // misordered call — reading before it's set — produces a loud, localized
+  // FK violation rather than a silent cascading bug.
   const toolCtx: NoraToolContext = {
     member: ctx,
     conversation_id: conversationId,
@@ -313,6 +342,7 @@ export async function POST(request: NextRequest) {
           resolution_playbook: matchedPattern.resolution_playbook,
         }
       : null,
+    forward_turn_id: '',
   };
 
   try {
@@ -394,7 +424,13 @@ export async function POST(request: NextRequest) {
       for (const use of toolUses) {
         const input = use.input as Record<string, unknown>;
 
-        // Persist tool_call row
+        // Persist tool_call row. We now SELECT the returned id so Tier 2
+        // tools can populate nora_tool_undo_tokens.forward_turn_id (FK to
+        // nora_turns.id). Tier 1 tools ignore the field. If this insert
+        // fails, we fall back to a zero UUID that downstream FK check on
+        // the undo token INSERT will reject — the tool's undo emission
+        // will log [undo-token-insert-failed] and continue. The forward
+        // action still completes.
         const callRow = buildToolCallRow({
           conversation_id: conversationId,
           turn_index: nextRowIndex,
@@ -403,12 +439,18 @@ export async function POST(request: NextRequest) {
         });
         nextRowIndex += 1;
         toolRowsInserted += 1;
-        const { error: callErr } = await admin
+        const { data: insertedCall, error: callErr } = await admin
           .from('nora_turns')
-          .insert(callRow);
+          .insert(callRow)
+          .select('id')
+          .maybeSingle<{ id: string }>();
         if (callErr) {
           console.error('[nora/turn] tool_call row insert failed:', callErr);
         }
+        // Populate forward_turn_id for THIS tool invocation. If the insert
+        // failed, leave it as empty string (or previous turn's id) so the
+        // handler won't try to use a stale value. Tier 2 tools null-check.
+        toolCtx.forward_turn_id = insertedCall?.id ?? '';
 
         // Execute the tool and produce a persisted envelope + API content
         const tool = findTool(use.name);
@@ -609,3 +651,283 @@ export async function POST(request: NextRequest) {
 // Helpers — composeSystemPrompt lives in lib/nora/compose-system-prompt.ts
 // (extracted for Next.js 15 route-export rules + unit-testability)
 // -----------------------------------------------------------------------------
+
+/**
+ * runUndoFlow — Phase 2.5 Item 3 Phase B.
+ *
+ * Handles a user turn whose message matches the undo intent matcher.
+ * Bypasses Claude entirely — this is a deterministic path driven by the
+ * most recent active undo token. Steps:
+ *
+ *   1. Look up the most recent active token (consumed_at IS NULL,
+ *      expires_at > now()). Uses idx_nora_undo_active partial index.
+ *   2. If no token found: INSERT a friendly assistant turn, return.
+ *   3. If token found: resolve reverse_payload → findTool(name).
+ *   4. Insert a tool_call row for the reverse invocation so the FK
+ *      target exists for adjust_credits_small's RPC (and to preserve
+ *      the audit pattern of tool_call+tool_result+assistant).
+ *   5. Invoke tool.handler with { ...reverse_tool_input, is_reverse: true }.
+ *   6. If reverse succeeds: insert tool_result row, insert assistant row
+ *      with the reverse's message_for_user, UPDATE token with
+ *      consumed_at + consumed_by_turn_id=<assistant row id>.
+ *   7. If reverse fails: insert tool_result row with error, insert
+ *      assistant row with a user-visible apology, DO NOT consume the
+ *      token (window stays open so user can retry).
+ *
+ * Returns the same envelope shape as the normal POST handler so the
+ * widget renders the response identically.
+ */
+async function runUndoFlow(args: {
+  admin: ReturnType<typeof createServiceClient>;
+  userId: string;
+  conversationId: string;
+  nextIndex: number;
+  surface: NoraSurface;
+  userMessage: string;
+  ctx: NoraContext;
+}): Promise<{
+  assistant_message: string;
+  tool_calls: Array<{ name: string; input: Record<string, unknown>; result: unknown }>;
+  matched_pattern: null;
+  client_action: null;
+  stop_reason: 'undo_flow';
+  usage: { input_tokens: 0; output_tokens: 0 };
+}> {
+  const { admin, userId, conversationId, nextIndex, surface, ctx } = args;
+  let nextRowIndex = nextIndex + 1;
+
+  // 1. Look up active token.
+  const { data: token, error: tokenErr } = await admin
+    .from('nora_tool_undo_tokens')
+    .select('id, tool_name, forward_summary, reverse_payload, expires_at')
+    .eq('user_id', userId)
+    .is('consumed_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (tokenErr) {
+    console.error('[nora/turn:undo-flow] token lookup error:', tokenErr);
+    // Fall through to friendly message — user shouldn't see DB error.
+  }
+
+  // 2. No token → friendly "nothing to undo" response.
+  if (!token) {
+    const friendly =
+      "There's nothing to undo right now — either the 60-minute undo " +
+      'window expired on the last action, or there are no reversible ' +
+      "actions in this conversation yet. If you meant something else, " +
+      'just tell me what you need.';
+
+    const assistRow = buildAssistantTurnRow({
+      conversation_id: conversationId,
+      turn_index: nextRowIndex,
+      content: friendly,
+      model: 'undo-matcher',
+      inputTokens: 0,
+      outputTokens: 0,
+      isFirstIteration: true,
+      matchedPatternId: null,
+    });
+    await admin.from('nora_turns').insert(assistRow);
+
+    return {
+      assistant_message: friendly,
+      tool_calls: [],
+      matched_pattern: null,
+      client_action: null,
+      stop_reason: 'undo_flow',
+      usage: { input_tokens: 0, output_tokens: 0 },
+    };
+  }
+
+  // 3. Resolve reverse tool.
+  const reversePayload = token.reverse_payload as {
+    tool_name?: string;
+    tool_input?: Record<string, unknown>;
+  };
+  const reverseToolName = reversePayload?.tool_name;
+  const reverseToolInput = reversePayload?.tool_input ?? {};
+
+  if (!reverseToolName || typeof reverseToolName !== 'string') {
+    console.error('[nora/turn:undo-flow] token has malformed reverse_payload', {
+      token_id: token.id,
+      reverse_payload: token.reverse_payload,
+    });
+    const msg =
+      "I found the undo record but couldn't read the reversal details — " +
+      "this is a bug on my side. Let me open a ticket.";
+    const assistRow = buildAssistantTurnRow({
+      conversation_id: conversationId,
+      turn_index: nextRowIndex,
+      content: msg,
+      model: 'undo-matcher',
+      inputTokens: 0,
+      outputTokens: 0,
+      isFirstIteration: true,
+      matchedPatternId: null,
+    });
+    await admin.from('nora_turns').insert(assistRow);
+    return {
+      assistant_message: msg,
+      tool_calls: [],
+      matched_pattern: null,
+      client_action: null,
+      stop_reason: 'undo_flow',
+      usage: { input_tokens: 0, output_tokens: 0 },
+    };
+  }
+
+  const reverseTool = findTool(reverseToolName);
+  if (!reverseTool) {
+    console.error('[nora/turn:undo-flow] reverse tool not in registry', {
+      token_id: token.id,
+      tool_name: reverseToolName,
+    });
+    const msg =
+      "I found the undo record but the reversal tool isn't available on " +
+      "this version of the platform. Let me open a ticket.";
+    const assistRow = buildAssistantTurnRow({
+      conversation_id: conversationId,
+      turn_index: nextRowIndex,
+      content: msg,
+      model: 'undo-matcher',
+      inputTokens: 0,
+      outputTokens: 0,
+      isFirstIteration: true,
+      matchedPatternId: null,
+    });
+    await admin.from('nora_turns').insert(assistRow);
+    return {
+      assistant_message: msg,
+      tool_calls: [],
+      matched_pattern: null,
+      client_action: null,
+      stop_reason: 'undo_flow',
+      usage: { input_tokens: 0, output_tokens: 0 },
+    };
+  }
+
+  // 4. Insert tool_call row for the reverse. This row's id becomes
+  //    ctx.forward_turn_id for the reverse invocation. Required because
+  //    adjust_credits_small's RPC has a FK to nora_turns(id) from the new
+  //    undo token it emits on the reverse — which adjust_credits_small then
+  //    self-consumes (see its handler for the logic).
+  const reverseInputWithFlag = { ...reverseToolInput, is_reverse: true };
+  const callRow = buildToolCallRow({
+    conversation_id: conversationId,
+    turn_index: nextRowIndex,
+    toolName: reverseToolName,
+    toolInput: reverseInputWithFlag,
+  });
+  nextRowIndex += 1;
+  const { data: insertedCall } = await admin
+    .from('nora_turns')
+    .insert(callRow)
+    .select('id')
+    .maybeSingle<{ id: string }>();
+  const reverseCallTurnId = insertedCall?.id ?? '';
+
+  // 5. Invoke the reverse handler.
+  const toolCtx: NoraToolContext = {
+    member: ctx,
+    conversation_id: conversationId,
+    matched_pattern: null,
+    forward_turn_id: reverseCallTurnId,
+  };
+
+  let reverseResult;
+  try {
+    reverseResult = await reverseTool.handler(reverseInputWithFlag, toolCtx);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[nora/turn:undo-flow] reverse handler threw', {
+      token_id: token.id,
+      tool_name: reverseToolName,
+      error: msg,
+    });
+    reverseResult = {
+      ok: false,
+      failure_reason: `handler_threw: ${msg}`,
+      message_for_user:
+        "I hit an error trying to undo that action. Nothing else has " +
+        'changed — your previous state is still in place. Let me open a ' +
+        'ticket for this.',
+    };
+  }
+
+  // 6a. Insert tool_result row regardless of success — audit trail.
+  const resultRow = buildToolResultRow({
+    conversation_id: conversationId,
+    turn_index: nextRowIndex,
+    toolName: reverseToolName,
+    toolResult: reverseResult as ToolResultEnvelope,
+  });
+  nextRowIndex += 1;
+  await admin.from('nora_turns').insert(resultRow);
+
+  // 6b. Insert assistant turn with the reverse's user-facing message.
+  const assistantText =
+    reverseResult.message_for_user ??
+    (reverseResult.ok
+      ? "Done — the previous action has been reversed."
+      : "I couldn't undo that. Your previous state is unchanged.");
+
+  const assistRow = buildAssistantTurnRow({
+    conversation_id: conversationId,
+    turn_index: nextRowIndex,
+    content: assistantText,
+    model: 'undo-matcher',
+    inputTokens: 0,
+    outputTokens: 0,
+    isFirstIteration: true,
+    matchedPatternId: null,
+  });
+  const { data: insertedAssist } = await admin
+    .from('nora_turns')
+    .insert(assistRow)
+    .select('id')
+    .maybeSingle<{ id: string }>();
+
+  // 7. Consume token only on success. Failed reverse leaves the window
+  //    open so the user can retry.
+  if (reverseResult.ok && insertedAssist?.id) {
+    const { error: consumeErr } = await admin
+      .from('nora_tool_undo_tokens')
+      .update({
+        consumed_at: new Date().toISOString(),
+        consumed_by_turn_id: insertedAssist.id,
+      })
+      .eq('id', token.id);
+    if (consumeErr) {
+      console.error('[nora/turn:undo-flow] token consume UPDATE failed', {
+        token_id: token.id,
+        code: consumeErr.code,
+        message: consumeErr.message,
+      });
+      // The reverse already happened. Leaving the token marked consumable
+      // means a subsequent "undo" would reverse the reverse. Not catastrophic
+      // but undesirable — logging loud for ops follow-up.
+    }
+  }
+
+  return {
+    assistant_message: assistantText,
+    tool_calls: [
+      {
+        name: reverseToolName,
+        input: reverseInputWithFlag,
+        result: reverseResult,
+      },
+    ],
+    matched_pattern: null,
+    client_action: null,
+    stop_reason: 'undo_flow',
+    usage: { input_tokens: 0, output_tokens: 0 },
+  };
+}
+
+// Unused import suppression — `surface` param is destructured for API
+// symmetry with /start even though runUndoFlow doesn't need it on the
+// current flow. Keeping the shape stable for Phase 2.6 changes.

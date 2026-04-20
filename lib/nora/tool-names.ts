@@ -43,3 +43,26 @@ export const NORA_TIER_1_TOOL_NAMES = [
 ] as const;
 
 export type NoraTierOneToolName = typeof NORA_TIER_1_TOOL_NAMES[number];
+
+/**
+ * Tier 2 tool names — added Phase 2.5 Item 3 Phase B.
+ *
+ * Tier 2 tools are reversible-within-a-60-minute-window actions that
+ * emit rows into nora_tool_undo_tokens. They are author-surface only
+ * on first ship.
+ *
+ * Invariant (same as Tier 1): lib/nora/tools/index.ts NORA_TOOLS is the
+ * definitive registry. If this array and NORA_TOOLS drift, the admin
+ * editor will refuse to save known_issues rows referencing a tool not
+ * present in both.
+ */
+export const NORA_TIER_2_TOOL_NAMES = [
+  'change_email',
+  'adjust_credits_small',
+  'pause_subscription',
+] as const;
+
+export type NoraTierTwoToolName = typeof NORA_TIER_2_TOOL_NAMES[number];
+
+/** Union of all Nora tool names across tiers. */
+export type NoraToolName = NoraTierOneToolName | NoraTierTwoToolName;

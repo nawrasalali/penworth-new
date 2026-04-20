@@ -161,6 +161,24 @@ export interface NoraToolContext {
     pattern_slug: string;
     resolution_playbook: string | null;
   } | null;
+  /**
+   * UUID of the nora_turns row with role='tool_call' that persisted THIS
+   * tool invocation. Populated by the turn route after inserting the
+   * tool_call row and before calling the handler.
+   *
+   * Used by Tier 2 tools when emitting an undo token — nora_tool_undo_tokens
+   * has a FK forward_turn_id → nora_turns(id), so the token row needs a
+   * real turn id to reference. Without this field, Tier 2 tools couldn't
+   * satisfy the FK and would need a separate post-hoc query to find their
+   * own row.
+   *
+   * Tier 1 tools can ignore this field — it's only relevant to tools that
+   * emit undo tokens (Tier 2+). The shape is required (not optional) so
+   * new tool writers can't forget to pass it when writing undo-emitting
+   * tools; a `undefined` default would silently break undo-token INSERTs
+   * under a FK violation that's hard to attribute.
+   */
+  forward_turn_id: string;
 }
 
 export interface NoraToolDefinition {

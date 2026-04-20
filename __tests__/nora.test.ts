@@ -439,8 +439,8 @@ describe('NORA_SYSTEM_PROMPT integrity', () => {
 // -----------------------------------------------------------------------------
 
 describe('NORA_TOOLS registry', () => {
-  it('contains exactly 8 tools (regenerate_api_key deliberately dropped)', () => {
-    expect(NORA_TOOLS).toHaveLength(8);
+  it('contains exactly 11 tools (8 Tier 1 + 3 Tier 2; regenerate_api_key deliberately dropped)', () => {
+    expect(NORA_TOOLS).toHaveLength(11);
   });
 
   it('every tool has a unique name', () => {
@@ -448,10 +448,17 @@ describe('NORA_TOOLS registry', () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
-  it('every tool is Tier 1', () => {
+  it('every tool has a valid tier (1 or 2)', () => {
     for (const tool of NORA_TOOLS) {
-      expect(tool.tier).toBe(1);
+      expect([1, 2]).toContain(tool.tier);
     }
+  });
+
+  it('has 8 Tier 1 tools + 3 Tier 2 tools', () => {
+    const tier1 = NORA_TOOLS.filter((t) => t.tier === 1);
+    const tier2 = NORA_TOOLS.filter((t) => t.tier === 2);
+    expect(tier1).toHaveLength(8);
+    expect(tier2).toHaveLength(3);
   });
 
   it('every tool has a non-empty description', () => {
@@ -473,10 +480,11 @@ describe('NORA_TOOLS registry', () => {
     }
   });
 
-  it('ships the 8 canonical names from the founder prompt (minus regenerate_api_key)', () => {
+  it('ships the 8 Tier 1 canonical names + 3 Tier 2 names', () => {
     const names = NORA_TOOLS.map((t) => t.name).sort();
     expect(names).toEqual(
       [
+        // Tier 1 — 8
         'check_payout_status',
         'check_subscription_status',
         'get_fraud_flag_status',
@@ -485,6 +493,10 @@ describe('NORA_TOOLS registry', () => {
         'resend_email_confirmation',
         'resend_last_invoice',
         'trigger_password_reset',
+        // Tier 2 — 3 (Phase B)
+        'adjust_credits_small',
+        'change_email',
+        'pause_subscription',
       ].sort(),
     );
   });
@@ -499,10 +511,10 @@ describe('NORA_TOOLS registry', () => {
 // -----------------------------------------------------------------------------
 
 describe('NORA_TIER_1_TOOL_NAMES alignment', () => {
-  it('matches the registry exactly (admin editor relies on this)', () => {
-    const registryNames = [...NORA_TOOLS.map((t) => t.name)].sort();
+  it('matches the Tier 1 subset of the registry exactly (admin editor relies on this)', () => {
+    const tier1Registry = NORA_TOOLS.filter((t) => t.tier === 1).map((t) => t.name).sort();
     const listedNames = [...NORA_TIER_1_TOOL_NAMES].sort();
-    expect(listedNames).toEqual(registryNames);
+    expect(listedNames).toEqual(tier1Registry);
   });
 
   it('contains the 5 canonicalized names from the Phase 2.5 rename', () => {
