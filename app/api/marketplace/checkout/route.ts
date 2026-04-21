@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Paid listing - create Stripe checkout session
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://penworth.ai';
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',

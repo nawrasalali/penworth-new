@@ -28,7 +28,7 @@ export async function POST() {
       return NextResponse.json({ error: 'No billing account found' }, { status: 404 });
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://penworth.ai';
 
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,

@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://penworth.ai';
 
     // Diagnostic: log exactly what we're sending to Stripe so 'No such price'
     // errors point at the offending env var. We log the priceId as-is (not a
@@ -260,7 +260,7 @@ async function handleCreditPackPurchase(
     );
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://penworth.ai';
 
   // Get or create customer ID
   const { data: orgMember } = await supabase

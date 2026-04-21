@@ -44,7 +44,7 @@ export const triggerPasswordResetTool: NoraToolDefinition = {
         ? 'https://guild.penworth.ai'
         : ctx.member.surface === 'store'
         ? 'https://store.penworth.ai'
-        : 'https://new.penworth.ai';
+        : 'https://penworth.ai';
 
     const redirectTo =
       (typeof input.redirect_to === 'string' && input.redirect_to) ||

@@ -55,7 +55,7 @@ export async function GET() {
       .order('created_at', { ascending: false })
       .limit(20);
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://penworth.ai';
 
     return NextResponse.json({
       referralCode: profile.referral_code,

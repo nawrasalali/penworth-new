@@ -45,7 +45,7 @@ export const emailTemplates = {
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center" style="padding: 20px 0;">
-                    <a href="https://new.penworth.ai/projects/new" style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                    <a href="https://penworth.ai/projects/new" style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
                       Start Your First Book
                     </a>
                   </td>
@@ -69,7 +69,7 @@ export const emailTemplates = {
           <tr>
             <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0 0 10px; font-size: 14px; color: #6b7280;">
-                Questions? Reply to this email or visit our <a href="https://new.penworth.ai/help" style="color: #6366f1;">Help Center</a>
+                Questions? Reply to this email or visit our <a href="https://penworth.ai/help" style="color: #6366f1;">Help Center</a>
               </p>
               <p style="margin: 0; font-size: 12px; color: #9ca3af;">
                 © 2026 Penworth.ai | A.C.N. 675 668 710 PTY LTD
@@ -112,7 +112,7 @@ export const emailTemplates = {
                   You'll earn <strong>500 credits</strong> when they complete their first book.
                 </p>
               </div>
-              <a href="https://new.penworth.ai/referrals" style="display: inline-block; background-color: #6366f1; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600;">
+              <a href="https://penworth.ai/referrals" style="display: inline-block; background-color: #6366f1; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600;">
                 View Your Referrals
               </a>
             </td>
@@ -273,7 +273,7 @@ export const emailTemplates = {
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center">
-                    <a href="https://new.penworth.ai/projects" style="display: inline-block; background-color: #6366f1; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600;">
+                    <a href="https://penworth.ai/projects" style="display: inline-block; background-color: #6366f1; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600;">
                       View Your Book
                     </a>
                   </td>

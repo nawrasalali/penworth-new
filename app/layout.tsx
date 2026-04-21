@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://new.penworth.ai',
+    url: 'https://penworth.ai',
     siteName: 'Penworth',
     title: 'Penworth - AI Document Writing Platform',
     description: 'From idea to final document in hours. Write with AI.',

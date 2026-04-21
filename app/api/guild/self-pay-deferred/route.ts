@@ -81,7 +81,7 @@ export async function POST(_request: NextRequest) {
   // Round to cents. Stripe requires integer unit_amount.
   const unitAmountCents = Math.round(balanceUsd * 100);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://penworth.ai';
 
   try {
     const session = await stripe.checkout.sessions.create({

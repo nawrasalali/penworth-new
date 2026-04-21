@@ -89,7 +89,7 @@ export async function sendGuildInterviewInvitationEmail(params: {
   applicationId: string;
   language: string;
 }) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://penworth.ai';
   const bookingUrl = `${appUrl}/guild/interview/schedule?application=${encodeURIComponent(params.applicationId)}`;
   return sendGuildEmail({
     to: params.email,

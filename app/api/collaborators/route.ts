@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     const ownerName = ownerProfile?.full_name || 'Someone';
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://penworth.ai';
     const inviteUrl = `${appUrl}/invite/${inviteToken}`;
 
     // Send invite email

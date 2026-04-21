@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (existingShare) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://penworth.ai';
       return NextResponse.json({
         shareToken: existingShare.share_token,
         shareUrl: `${appUrl}/shared/${existingShare.share_token}`,
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       throw insertError;
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://penworth.ai';
 
     return NextResponse.json({
       shareToken: newShare.share_token,

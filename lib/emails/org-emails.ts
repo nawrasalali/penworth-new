@@ -271,7 +271,7 @@ export async function sendRemovedFromOrgEmail(to: string, data: RemovedFromOrgEm
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
       <tr>
         <td align="center">
-          <a href="https://new.penworth.ai/dashboard" style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #facc15, #eab308); color: #0f172a; font-size: 16px; font-weight: bold; text-decoration: none; border-radius: 12px;">
+          <a href="https://penworth.ai/dashboard" style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #facc15, #eab308); color: #0f172a; font-size: 16px; font-weight: bold; text-decoration: none; border-radius: 12px;">
             Go to My Dashboard
           </a>
         </td>

@@ -17,7 +17,7 @@ function GuildLoginInner() {
       process.env.NEXT_PUBLIC_APP_URL ||
       (typeof window !== 'undefined' && window.location.hostname.includes('localhost')
         ? `${window.location.protocol}//${window.location.host}`
-        : 'https://new.penworth.ai');
+        : 'https://penworth.ai');
     const returnUrl = `https://guild.penworth.ai${redirectPath}`;
     setLoginUrl(`${base}/login?redirect=${encodeURIComponent(returnUrl)}`);
   }, [redirectPath]);

@@ -101,7 +101,7 @@ export async function sendCollaborationInvite(
   role: string,
   inviteToken: string
 ) {
-  const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai'}/invite/${inviteToken}`;
+  const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://penworth.ai'}/invite/${inviteToken}`;
   const template = emailTemplates.collaborationInvite(inviterName, bookTitle, role, inviteUrl);
   return sendEmail({
     to: email,
@@ -126,7 +126,7 @@ export async function sendOrganizationInvite(
   role: string,
   inviteToken: string
 ) {
-  const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai'}/org-invite/${inviteToken}`;
+  const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://penworth.ai'}/org-invite/${inviteToken}`;
   const template = emailTemplates.organizationInvite(inviterName, orgName, role, inviteUrl);
   return sendEmail({
     to: email,

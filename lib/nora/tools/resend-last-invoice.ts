@@ -120,7 +120,7 @@ export const resendLastInvoiceTool: NoraToolDefinition = {
     const surfaceHost =
       ctx.member.surface === 'guild'
         ? 'https://guild.penworth.ai'
-        : 'https://new.penworth.ai';
+        : 'https://penworth.ai';
     try {
       const portal = await stripe.billingPortal.sessions.create({
         customer: customerId,

@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     // Send invitation email using Resend (or configured email service)
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://new.penworth.ai';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://penworth.ai';
     const inviteToken = Buffer.from(JSON.stringify({
       orgId,
       email,
