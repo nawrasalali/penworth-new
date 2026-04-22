@@ -49,8 +49,8 @@ const LANGUAGES = [
 // Document types for the new section
 const DOCUMENT_TYPES = {
   en: {
-    title: 'Whatever you&rsquo;re here to write',
-    subtitle: 'A novel, a memoir, a thesis, a business plan — Penworth writes them all with you',
+    title: 'Whatever book you came here to write',
+    subtitle: 'A novel. A memoir. A book of essays. A dissertation. A business book that does not read like every other business book.',
     categories: [
       {
         name: 'Books',
@@ -67,20 +67,20 @@ const DOCUMENT_TYPES = {
     ],
   },
   ar: {
-    title: 'أي كتاب أنت حابب تكتبه',
-    subtitle: 'من الروايات لخطط العمل — Penworth بيكتبهم كلهم معك',
+    title: 'أيُّ كتابٍ جئتَ إلى هنا لتكتُبَه',
+    subtitle: 'روايةٌ. سيرةٌ ذاتيّة. كتابُ مقالات. أطروحةٌ جامعيَّة. كتابٌ في الأعمال لا يُقرَأُ كبقيَّةِ كتب الأعمال.',
     categories: [
       {
-        name: 'كتب',
+        name: 'الكتب',
         types: ['روايات', 'غير خيالي', 'مذكرات', 'تطوير ذاتي', 'سيرة ذاتية', 'كتب أطفال', 'شعر', 'كتب طبخ', 'دليل سفر'],
       },
       {
         name: 'أكاديمي وعلمي',
-        types: ['أوراق بحثية', 'ماجستير', 'دكتوراه', 'توثيق تقني', 'أوراق بيضاء'],
+        types: ['أوراق بحثيّة', 'ماجستير', 'دكتوراه', 'توثيق تقنيّ', 'أوراق بيضاء'],
       },
       {
         name: 'أعمال ومالية',
-        types: ['خطط عمل', 'تقارير مالية', 'مقترحات', 'دراسات حالة', 'تحليل سوق'],
+        types: ['خطط عمل', 'تقارير ماليّة', 'مقترحات', 'دراسات حالة', 'تحليل سوق'],
       },
     ],
   },
@@ -89,29 +89,29 @@ const DOCUMENT_TYPES = {
 // Editorial studio data (the seven craftspeople backstage)
 const AI_AGENTS = {
   en: {
-    title: 'The seven craftspeople backstage',
-    subtitle: 'Each is an expert in their craft. You are the writer. They bring your book to life.',
+    title: 'The seven hands behind every Penworth book',
+    subtitle: 'A composed editorial studio — one listener, one researcher, one architect, one writer, one editor, one designer, one publisher — working in sequence so the book you finish is a book the world can read.',
     agents: [
-      { name: 'The Validator', description: 'Reads your idea the way a seasoned publisher would — audience, market, clarity — before a single chapter is drafted', icon: ShieldCheck },
-      { name: 'The Interviewer', description: 'Asks, listens, and draws out the things only you could have told — the specifics that become the soul of the book', icon: MessageSquare },
-      { name: 'The Researcher', description: 'Finds the sources, statistics, and context that give your argument weight and your story authority', icon: Search },
-      { name: 'The Architect', description: 'Shapes your ideas into chapters and sections that flow — structure you can feel, not just see', icon: FileText },
-      { name: 'The Writer', description: 'Drafts every chapter in your voice — the rhythm you speak in, not a generic house style', icon: PenTool },
-      { name: 'The Editor', description: 'Reads every line for grammar, readability, consistency, and originality, so the book holds up to a real reader', icon: Shield },
-      { name: 'The Publisher', description: 'Formats, covers, and readies the book for the Penworth Store and 17 other platforms — you just say the word', icon: Rocket },
+      { name: 'The Listener', description: 'Draws the story out of you the way a good interviewer does — patiently, without agenda, holding the thread.', icon: MessageSquare },
+      { name: 'The Researcher', description: 'Brings the context, the sources, and the facts your argument or your setting needs to hold.', icon: Search },
+      { name: 'The Architect', description: 'Shapes the book — chapters, movements, weight in the right places.', icon: FileText },
+      { name: 'The Writer', description: 'Drafts in your voice. Not a house voice. Yours, recognised by the people who know you.', icon: PenTool },
+      { name: 'The Editor', description: 'Reads the way a good editor reads: for clarity, for consistency, for the line that does not earn its place.', icon: Shield },
+      { name: 'The Designer', description: 'Builds the cover that belongs to this book, not a template.', icon: ShieldCheck },
+      { name: 'The Publisher', description: 'Formats, registers, and delivers the book to the Penworth Store and to seventeen other platforms if you ask.', icon: Rocket },
     ],
   },
   ar: {
-    title: 'السبعة اللي بيشتغلوا وراء الكواليس',
-    subtitle: 'كل واحد منهم محترف بشغله. انت الكاتب. هنّي بيوصلوا كتابك للحياة.',
+    title: 'الأيدي السَّبع وراءَ كلِّ كتابٍ من Penworth',
+    subtitle: 'استوديو تحريرٍ مُركَّب — مُنصِتٌ، باحث، مهندس، كاتب، محرِّر، مُصمِّم، ناشر — يعملون بالتتابُع، حتى يكون الكتابُ الذي تُنهيه كتاباً يقدر العالمُ أن يقرأه.',
     agents: [
-      { name: 'المُدقّق', description: 'بيقرأ فكرتك متل ناشر خبرة — الجمهور، السوق، الوضوح — قبل ما تبدأ تكتب أول فصل', icon: ShieldCheck },
-      { name: 'المُحاور', description: 'بيسأل، بيصغي، وبيطلّع الأشياء اللي بس انت فيك تقولها — التفاصيل اللي بتصير روح الكتاب', icon: MessageSquare },
-      { name: 'الباحث', description: 'بيجيب المصادر والإحصاءات والسياق اللي بيعطي كلامك وزن وقصتك مصداقية', icon: Search },
-      { name: 'المهندس', description: 'بيرتّب أفكارك بفصول وأقسام فيها انسياب — بتحسّه، مش بس بتشوفه', icon: FileText },
-      { name: 'الكاتب', description: 'بيكتب كل فصل بصوتك انت — بإيقاع حكيك، مش بأسلوب محفوظ', icon: PenTool },
-      { name: 'المحرّر', description: 'بيقرأ كل سطر للقواعد والسلاسة والاتساق والأصالة، عشان الكتاب يقدر يقف قدام قارئ حقيقي', icon: Shield },
-      { name: 'الناشر', description: 'بينسّق، بيصمّم الغلاف، وبيجهّز الكتاب لمتجر Penworth و17 منصة غيره — بس انت احكي الكلمة', icon: Rocket },
+      { name: 'المُنصِت', description: 'يستخرج القصَّةَ منك كما يفعل المُحاورُ البارع — بصبرٍ، دون نيَّةٍ مسبقة، ماسكاً بالخيط.', icon: MessageSquare },
+      { name: 'الباحث', description: 'يَجلِبُ السياقَ والمصادرَ والحقائقَ التي تحتاجُها حجَّتُك أو مشهدُك كي يَصمُد.', icon: Search },
+      { name: 'المهندس', description: 'يُشكِّل الكتاب — فصولاً، حركاتٍ، ثِقَلاً في المواضع الصَّحيحة.', icon: FileText },
+      { name: 'الكاتب', description: 'يكتبُ بصوتك. لا بصوتِ الدار. صوتُكَ أنت، الذي يعرفُه من يعرفك.', icon: PenTool },
+      { name: 'المحرِّر', description: 'يقرأُ كما يقرأُ المحرِّر الجيِّد: بحثاً عن الوضوح، عن الاتِّساق، عن السَّطرِ الذي لا يَستحقُّ مكانَه.', icon: Shield },
+      { name: 'المُصمِّم', description: 'يَبني الغلافَ الذي يخصُّ هذا الكتاب، لا قالباً من القوالب.', icon: ShieldCheck },
+      { name: 'الناشر', description: 'يُنسِّق، ويُسجِّل، ويُوصِّل الكتابَ إلى متجرِ Penworth وإلى سبعَ عشرةَ منصَّةً أخرى إن شئت.', icon: Rocket },
     ],
   },
 };
@@ -119,25 +119,25 @@ const AI_AGENTS = {
 // Benefits data
 const BENEFITS = {
   en: {
-    title: 'Why writers stay',
+    title: 'What Penworth gives a writer that nowhere else does',
     items: [
-      { title: 'Your library, forever', description: 'Every draft, every chapter, every version — kept. You come back whenever the next book is ready.', icon: Library },
-      { title: 'Your own readers', description: 'Publish to the Penworth Store and the readers who buy your book become yours — not a retailer&rsquo;s. That&rsquo;s our First Covenant.', icon: Users },
-      { title: 'Published, not just printed', description: 'We handle the formatting, the cover, the distribution. You just say the word.', icon: Zap },
-      { title: 'No paywall to top up', description: 'Every plan — even the free one — can buy credits anytime. No gates, no upsell traps.', icon: CreditCard },
-      { title: 'Audiobook included', description: 'Every book becomes an audiobook in your chosen voice. No extra studio, no extra week.', icon: Headphones },
-      { title: 'Days, not months', description: 'From the first conversation to a finished, publishable book — inside a week.', icon: Clock },
+      { title: 'Your own readers', description: "When you publish through the Penworth Store, the readers who buy your book become yours — not a retailer's. Their names, their countries. That is our First Covenant, and it is architectural, not promotional.", icon: Users },
+      { title: 'Your voice, preserved', description: 'Draft, chapter, and version history, kept for the life of your account. Return to the work when you are ready.', icon: Library },
+      { title: 'Days, not years', description: 'From the first conversation to a finished, publishable book — measured in days. From finish to shelf — the same day, if you are ready.', icon: Clock },
+      { title: 'The audiobook is included', description: 'Every book becomes an audiobook in the voice you choose. No extra studio. No extra week.', icon: Headphones },
+      { title: 'Ten languages, no translation step', description: 'Write in your language. The book is publishable in it from day one.', icon: Zap },
+      { title: 'Credits when you need them', description: 'Every plan — even the free one — can add credits at any time. No gates. No upsell traps.', icon: CreditCard },
     ],
   },
   ar: {
-    title: 'ليش الكتّاب بيضلّوا معنا',
+    title: 'ما الذي يمنحه Penworth لكاتبٍ ولا يمنحُه غيرُه',
     items: [
-      { title: 'مكتبتك، للأبد', description: 'كل مسوّدة، كل فصل، كل نسخة — محفوظة. بترجع وقت ما الكتاب الجاي يكون جاهز.', icon: Library },
-      { title: 'قرّاؤك إنت', description: 'انشر في متجر Penworth والقرّاء اللي بيشتروا كتابك بيصيروا إلك — مش لمتجر ثاني. هاد أول عهد إلنا.', icon: Users },
-      { title: 'منشور، مش بس مطبوع', description: 'نحنا بنتولى التنسيق، الغلاف، والتوزيع. انت بس احكي الكلمة.', icon: Zap },
-      { title: 'شحن متى ما بدك', description: 'كل خطة — حتى المجانية — فيها تشتري رصيد متى ما بدك. بدون بوابات، بدون فخاخ.', icon: CreditCard },
-      { title: 'الكتاب الصوتي معمول', description: 'كل كتاب بيصير كتاب صوتي بالصوت اللي بتختاره. بلا استوديو زيادة، بلا أسبوع زيادة.', icon: Headphones },
-      { title: 'أيام، مش شهور', description: 'من أول مكالمة لكتاب جاهز للنشر — داخل أسبوع.', icon: Clock },
+      { title: 'قُرَّاؤُكَ أنت', description: 'حين تَنشرُ عبر متجرِ Penworth، يُصبحُ القرَّاءُ الذين يشترون كتابَكَ لكَ أنت — لا لتاجرِ تجزئة. أسماؤهم، بلدانهم. هذا هو عَهدُنا الأوَّل، وهو بنائيٌّ لا ترويجيّ.', icon: Users },
+      { title: 'صوتُكَ، محفوظاً', description: 'المسوَّداتُ والفصولُ ونُسَخُ العمل، محفوظةٌ طوالَ عمرِ حسابك. تعودُ إلى العمل حين تكون مستعدّاً.', icon: Library },
+      { title: 'أيَّامٌ، لا سنوات', description: 'من المحادثة الأولى إلى كتابٍ تامٍّ صالحٍ للنَّشر — يُقاسُ بالأيَّام. ومن اكتمالِ الكتاب إلى رفِّ المتجر — اليومَ نفسَه، إن كنتَ مستعدّاً.', icon: Clock },
+      { title: 'الكتابُ الصوتيُّ مُضمَّن', description: 'كلُّ كتابٍ يُصبحُ كتاباً صوتيّاً بالصوتِ الذي تختاره. لا استوديو إضافيّ. لا أسبوعَ إضافيّ.', icon: Headphones },
+      { title: 'عَشرُ لغاتٍ، بلا خطوةِ ترجمة', description: 'اكتُب بلُغتك. الكتابُ قابلٌ للنَّشر بها من اليومِ الأوَّل.', icon: Zap },
+      { title: 'أرصدةٌ حين تحتاج', description: 'كلُّ خطَّة — حتى المجَّانيَّة — يمكنُها إضافةُ أرصدةٍ متى شاءت. لا بوَّابات. لا مصائدَ للترقية.', icon: CreditCard },
     ],
   },
 };
@@ -147,22 +147,22 @@ const translations = {
     nav: { features: 'Features', pricing: 'Pricing', login: 'Log in', getStarted: 'Get Started' },
     hero: {
       badge: 'The literary ecosystem',
-      title: 'The book inside you,',
-      titleHighlight: 'finished this week.',
-      subtitle: "You've carried this story long enough. Tell it out loud, once, and Penworth writes it with you — one chapter at a time, in your voice, in your language. We publish it, produce the audiobook and Cinematic Livebook, design the cover, and put it in front of readers who will want to read it, hear it, and see it come to life.",
-      cta: 'Start your book',
+      title: 'Every person has one book.',
+      titleHighlight: 'Penworth is how yours gets written.',
+      subtitle: 'You speak it once. We shape it with you — chapter by chapter, in your voice, in your language. Then we publish it, produce the audiobook, render the Cinematic Livebook, and place it in the hands of readers who were waiting for exactly this story.',
+      cta: 'Begin your book',
       ctaSecondary: 'See how it works',
       noCard: 'No credit card required',
       freeCredits: 'First book free',
     },
     features: {
-      title: 'From your story to the world',
-      subtitle: 'Every step handled end-to-end — by Penworth',
+      title: 'How a Penworth book gets made',
+      subtitle: 'A composed process. One conversation, then an editorial studio — and at the end, a book the world can read.',
       items: [
-        { title: 'A conversation, not a form', description: "You speak your story. Penworth listens — and captures the part only you could tell." },
-        { title: 'The shape of your book', description: 'Chapters, flow, and structure proposed in minutes. You adjust. You own the outline.' },
-        { title: 'Written in your voice', description: 'Each chapter drafted in the voice you speak — not a generic house style.' },
-        { title: 'Published the same week', description: "Ebook, audiobook, cover, and distribution — ready before the week is out." },
+        { title: 'One conversation', description: 'You tell the story once, out loud. Penworth holds the thread and finds the shape only you could have given it.' },
+        { title: 'Your voice, made visible', description: 'Each chapter drafted in the voice you speak — recognised by the people who know you.' },
+        { title: 'An editor, a designer, a publisher', description: 'Structure, cover, and distribution handled with the care of a house editor, not a template.' },
+        { title: 'Ebook. Audiobook. Cinematic Livebook.', description: 'Three forms of one book, produced from the same manuscript — delivered in the format each reader chooses.' },
       ],
     },
     pricing: {
@@ -234,54 +234,55 @@ const translations = {
       },
     },
     cta: {
-      title: "Your story won't tell itself.",
-      subtitle: 'Start today. See the first chapter tonight.',
-      button: 'Start your book'
+      title: 'The book is ready. It has been waiting for you.',
+      subtitle: 'Begin today. Read the first chapter tonight.',
+      button: 'Begin your book'
     },
     cinematic: {
-      badge: 'Patent-pending · Australia',
-      titleBefore: 'Introducing the',
-      titleHighlight: 'Cinematic Livebook',
-      titleAfter: '.',
-      subtitle: "Each page becomes a live performance — particle simulation, live graphs, or scene imagery that tells the page's story as you read it.",
-      tagline: 'Audible narrates. Kindle presents text. Netflix watches for you. Penworth directs. Your book, performed on the page.',
+      badge: '',
+      titleBefore: '',
+      titleHighlight: 'A page that performs itself.',
+      titleAfter: '',
+      subtitle: 'Audible narrates. Kindle presents the text. Netflix watches for you. Penworth introduces a fourth thing — a book that performs as you read.',
+      tagline: "In a Cinematic Livebook, every page is composed with the book. As the narrator speaks, a particle simulation forms on the page — grains of sand that become a figure, a river, a fleet. A live graph that moves as the argument moves. Scene imagery cut to the word, not to the scene. It is not a film. It is not an illustration. It is the page itself, learning to move.",
     },
     ecosystem: {
-      eyebrow: 'One ecosystem. Three doors.',
-      readLabel: 'Want to read instead?',
-      readTitle: 'Meet the authors →',
+      eyebrow: 'Three doors. One house.',
+      readLabel: 'Where readers arrive',
+      readTitle: 'Visit the Store →',
       readDomain: 'store.penworth.ai',
-      guildLabel: 'Love connecting people with books?',
-      guildTitle: 'Earn in the Guild →',
+      guildLabel: 'Where Guildmembers connect them',
+      guildTitle: 'Join the Guild →',
       guildDomain: 'guild.penworth.ai',
     },
-    footer: { 
-      copyright: '© 2026 A.C.N. 675 668 710 PTY LTD. All rights reserved.', 
-      privacy: 'Privacy', 
+    footer: {
+      copyright: '© 2026 A.C.N. 675 668 710 PTY LTD. All rights reserved.',
+      privacy: 'Privacy',
       terms: 'Terms',
-      guild: 'Guild'
+      guild: 'Guild',
+      ip: 'Penworth, Cinematic Livebook, and Particle Simulation — IP patents filed in Australia.'
     },
   },
   ar: {
     nav: { features: 'المميزات', pricing: 'الأسعار', login: 'تسجيل الدخول', getStarted: 'ابدأ الآن' },
     hero: {
-      badge: 'النظام الأدبي المتكامل',
-      title: 'الكتاب اللي جواك،',
-      titleHighlight: 'خلّصه هالأسبوع.',
-      subtitle: 'حكايتك حملتها كفاية. احكيها مرّة بصوتك، وPenworth بيكتبها معك — فصل فصل، بلغتك، بصوتك انت. نحنا بنطبعها، بنعمل الكتاب الصوتي، بنصمم الغلاف، وبنوصلها للقرّاء اللي بدهم يقرؤوها، يسمعوها، ويشوفوها تحيا قدامهم.',
+      badge: 'المنظومةُ الأدبية',
+      title: 'لكلِّ إنسانٍ كتابٌ واحد.',
+      titleHighlight: 'وفي Penworth يُكتَبُ كتابُك.',
+      subtitle: 'تَروي قصَّتك مرَّةً واحدة. ثم نَصوغُها معك — فصلاً فصلاً، بصوتك أنت، وبلغتك أنت. نَنشُرها، ونُنتِج الكتابَ الصوتيّ، ونُخرِج صيغةَ Cinematic Livebook، ونضَعُها في أيدي القرَّاءِ الذين كانوا ينتظرون هذه القصَّةَ بعينها.',
       cta: 'ابدأ كتابك',
-      ctaSecondary: 'شوف كيف بيصير',
-      noCard: 'بدون بطاقة ائتمان',
-      freeCredits: 'أول كتاب ببلاش',
+      ctaSecondary: 'اكتشف كيف يجري العمل',
+      noCard: 'دون الحاجة إلى بطاقة ائتمان',
+      freeCredits: 'الكتاب الأول مجّاناً',
     },
     features: {
-      title: 'من قصتك للعالم',
-      subtitle: 'كل خطوة من الأول للآخر — Penworth بيعملها',
+      title: 'كيف يُصنَعُ كتابٌ من Penworth',
+      subtitle: 'عمليّةٌ مُتقَنة. محادثةٌ واحدة، ثم استوديو تحرير — وفي النهاية، كتابٌ يقدر العالمُ أن يقرأه.',
       items: [
-        { title: 'مكالمة، مش استمارة', description: 'انت بتحكي قصتك، وPenworth عم يصغي — وبيلتقط الشي اللي بس انت قادر تقوله.' },
-        { title: 'شكل كتابك', description: 'الفصول والترتيب بيجهزوا بدقائق. بتعدّل، والمخطط بيبقى ملكك.' },
-        { title: 'مكتوب بصوتك', description: 'كل فصل بيتكتب بصوتك انت — مش بأسلوب عام محفوظ.' },
-        { title: 'مطبوع بنفس الأسبوع', description: 'كتاب إلكتروني، صوتي، غلاف، وتوزيع — جاهزين قبل ما يخلص الأسبوع.' },
+        { title: 'محادثةٌ واحدة', description: 'تَروي القصَّةَ مرَّةً واحدةً بصوتك. يَحفَظُ Penworth الخيط، ويجد لها الشكلَ الذي لم يكن إلاَّ أنتَ قادراً على مَنحِه إيَّاه.' },
+        { title: 'صوتك، ظاهراً للعيان', description: 'كلُّ فصلٍ يُكتَب بالصوتِ الذي تتكلَّمُ به — يعرفه مَن يعرفك.' },
+        { title: 'محرِّرٌ ومُصمِّمٌ وناشر', description: 'البنية، الغلاف، والتوزيع — بعنايةِ محرِّرِ دارِ نشر، لا بقالبٍ جاهز.' },
+        { title: 'كتابٌ إلكتروني. كتابٌ صوتيّ. Cinematic Livebook.', description: 'ثلاثُ صِيَغٍ لكتابٍ واحد، تُنتَج من المخطوطةِ نفسها — وتُقدَّم بالصيغةِ التي يختارها كلُّ قارئ.' },
       ],
     },
     pricing: {
@@ -353,32 +354,33 @@ const translations = {
       },
     },
     cta: {
-      title: 'قصتك مش رح تحكي حالها.',
-      subtitle: 'ابدأ اليوم. بتشوف أول فصل الليلة.',
+      title: 'الكتابُ جاهز. وقد كان ينتظرُك.',
+      subtitle: 'ابدأ اليوم. واقرأ الفصلَ الأوَّل الليلة.',
       button: 'ابدأ كتابك'
     },
     cinematic: {
-      badge: 'براءة اختراع مسجّلة · أستراليا',
-      titleBefore: 'بنقدملكم',
-      titleHighlight: 'الكتاب السينمائي الحي',
-      titleAfter: '.',
-      subtitle: 'كل صفحة بتصير عرض حيّ — محاكاة جزيئات، رسومات متحركة، أو صور مشاهد بتحكي قصة الصفحة وأنت عم تقرأها.',
-      tagline: 'Audible بيقرا. Kindle بيعرض النص. Netflix بيتفرّج محلّك. Penworth بيخرج. كتابك، معروض على الصفحة.',
+      badge: '',
+      titleBefore: '',
+      titleHighlight: 'صفحةٌ تؤدِّي نفسَها بنفسها.',
+      titleAfter: '',
+      subtitle: 'Audible يروي. Kindle يعرضُ النص. Netflix يُشاهدُ نيابةً عنك. يأتي Penworth بشيءٍ رابع — كتابٌ يُؤَدَّى فيما تقرأ.',
+      tagline: 'في Cinematic Livebook، كلُّ صفحةٍ مُؤلَّفةٌ مع الكتاب. فيما يتحدَّثُ الراوي، تتشكَّلُ محاكاةٌ جُزيئيَّةٌ على الصفحة — حبَّاتُ رمالٍ تصيرُ شخصيَّة، نهراً، أسطولاً. رسمٌ بيانيٌّ حيٌّ يتحرَّكُ مع تحرُّكِ الحُجَّة. مشاهدُ مقطوعةٌ على الكلمة، لا على المَشهد. ليست فيلماً. ليست رسماً توضيحيّاً. إنَّها الصفحةُ ذاتُها، تتعلَّمُ الحركة.',
     },
     ecosystem: {
-      eyebrow: 'نظام واحد. ثلاث أبواب.',
-      readLabel: 'حابب تقرأ بدل ما تكتب؟',
-      readTitle: '← تعرّف على الكتّاب',
+      eyebrow: 'ثلاثةُ أبواب. بيتٌ واحد.',
+      readLabel: 'حيثُ يَصِلُ القرَّاء',
+      readTitle: '→ زُرِ المتجر',
       readDomain: 'store.penworth.ai',
-      guildLabel: 'من اللي بيوصلوا الكتب لقرّاءها؟',
-      guildTitle: '← اربح مع الـGuild',
+      guildLabel: 'حيثُ يُوَصِّلهم أعضاءُ النقابة',
+      guildTitle: '→ انضمَّ إلى النقابة',
       guildDomain: 'guild.penworth.ai',
     },
     footer: { 
       copyright: '© 2026 A.C.N. 675 668 710 PTY LTD', 
       privacy: 'الخصوصية', 
       terms: 'الشروط',
-      guild: 'النقابة'
+      guild: 'النقابة',
+      ip: 'Penworth وCinematic Livebook وParticle Simulation — براءاتُ اختراعٍ مُقدَّمةٌ في أستراليا.'
     },
   },
 };
@@ -699,16 +701,13 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Cinematic Livebook — patent-pending category */}
+        {/* Cinematic Livebook — the breakthrough */}
         <section className="py-24 border-t border-neutral-200 dark:border-neutral-800 bg-gradient-to-b from-neutral-50 to-white dark:from-neutral-950 dark:to-neutral-900">
           <div className="mx-auto max-w-4xl px-6 text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 px-3 py-1 mb-6">
-              <span className="text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-400">{t.cinematic.badge}</span>
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-6">
-              {t.cinematic.titleBefore} <span className="italic">{t.cinematic.titleHighlight}</span>{t.cinematic.titleAfter}
+            <h2 className="text-3xl sm:text-5xl font-bold tracking-tight mb-8 italic">
+              {t.cinematic.titleHighlight}
             </h2>
-            <p className="text-lg text-neutral-700 dark:text-neutral-300 mb-4 leading-relaxed">
+            <p className="text-lg text-neutral-700 dark:text-neutral-300 mb-6 leading-relaxed">
               {t.cinematic.subtitle}
             </p>
             <p className="text-base text-neutral-500 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
@@ -753,6 +752,9 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t border-neutral-200 dark:border-neutral-800 py-8">
         <div className="mx-auto max-w-7xl px-6">
+          <p className="text-center text-xs text-neutral-500 dark:text-neutral-500 mb-6">
+            {t.footer.ip}
+          </p>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600">

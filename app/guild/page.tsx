@@ -78,15 +78,16 @@ function HeroSection() {
         </div>
 
         <h1 className="font-serif text-5xl leading-[1.05] tracking-tight md:text-7xl">
-          A craft. A career. A cut of every book you help{' '}
-          <span className="italic text-[#d4af37]">find its reader</span>.
+          A craft. A career.{' '}
+          <span className="italic text-[#d4af37]">A share of every book you help find its reader.</span>
         </h1>
 
         <p className="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-[#c9c2b0] md:text-xl">
-          Some people were born to connect a story to the person who needed it. If that&apos;s you,
-          the Penworth Guild was built for you. Find a writer who&apos;s been waiting. Match a reader
-          to the book that will move them. Get paid — honestly, transparently, for twelve months —
-          every time you do.
+          Some people were born to place a book in the right hand at the right moment. If that has
+          always been you — at dinner tables, in messages to friends, in the comments of a book you
+          loved — the Penworth Guild is where that instinct becomes a career. Bring a writer whose
+          book has been waiting. Lead a reader to the book that will move them. Earn — honestly,
+          transparently, for twelve months — every time you do.
         </p>
 
         <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -94,7 +95,7 @@ function HeroSection() {
             href="/guild/apply"
             className="group inline-flex items-center gap-3 rounded-md bg-[#d4af37] px-8 py-4 text-base font-medium text-[#0a0e1a] transition hover:bg-[#e6c14a]"
           >
-            Apply to Join the Guild
+            Apply to the Guild
             <span className="transition group-hover:translate-x-1">→</span>
           </Link>
           <Link
@@ -106,8 +107,7 @@ function HeroSection() {
         </div>
 
         <p className="mt-8 text-sm text-[#6b6452]">
-          Free to apply · Accepting applicants in every country · 10-minute AI voice interview in
-          your native language
+          Free to apply · Open to applicants in every country · Ten-minute voice interview, by appointment
         </p>
       </div>
     </section>
@@ -142,20 +142,20 @@ function WhatSection() {
         What the Guild is
       </div>
       <h2 className="font-serif text-4xl leading-tight tracking-tight md:text-5xl">
-        A self-governing association of people who believe{' '}
-        <span className="italic text-[#d4af37]">every story deserves its reader</span> — and know
-        how to bring them together.
+        Not an affiliate scheme.{' '}
+        <span className="italic text-[#d4af37]">A craftsperson&apos;s guild for the literary age.</span>
       </h2>
       <div className="mt-12 grid gap-10 md:grid-cols-2">
         <div>
           <p className="text-lg leading-relaxed text-[#c9c2b0]">
-            In the old world, a guild was a community of craftspeople who advanced together through
-            apprenticeship. Standards mattered. Reputation mattered. The work was the point.
+            An affiliate posts a link and waits. A Guildmember has training, a ladder, a code of
+            conduct, and a reputation. The voice interview. The Academy. Five tiers from
+            Apprentice to Fellow. A retreat for the Masters.
           </p>
           <p className="mt-6 text-lg leading-relaxed text-[#c9c2b0]">
-            The Penworth Guild reopens that idea for the modern literary age. You find the writer
-            who&apos;s been holding a book inside them — and you find the reader who&apos;s been waiting
-            for exactly that book. Two hats, one craft, one career.
+            A certified badge that means something, and that we will defend. You find the writer
+            who has been holding a book inside them — and you find the reader who has been waiting
+            for exactly that book. Two hats. One craft. One career.
           </p>
         </div>
         <div className="rounded-xl border border-[#1e2436] bg-[#0f1424] p-8">
@@ -440,8 +440,13 @@ function EcosystemCrossLinkSection() {
   return (
     <section className="border-t border-[#1e2436] bg-[#070a12]">
       <div className="mx-auto max-w-5xl px-6 py-20">
-        <p className="text-center text-xs uppercase tracking-widest text-[#8a8370] mb-10">
-          One ecosystem. Three doors.
+        <p className="text-center text-xs uppercase tracking-widest text-[#8a8370] mb-6">
+          Three doors. One house.
+        </p>
+        <p className="mx-auto mb-10 max-w-3xl text-center text-base leading-relaxed text-[#c9c2b0]">
+          Penworth is a literary ecosystem. Writers bring the ideas. Readers live the experience.
+          Guildmembers connect them, and earn a craftsperson&apos;s living doing it. Every book begins
+          at one door and ends at the other two.
         </p>
         <div className="grid gap-6 md:grid-cols-2">
           <a
@@ -449,7 +454,7 @@ function EcosystemCrossLinkSection() {
             className="group rounded-xl border border-[#1e2436] bg-[#0f1424] p-8 transition hover:border-[#d4af37]/40"
           >
             <div className="text-xs font-semibold uppercase tracking-widest text-[#d4af37] mb-3">
-              See what our writers make
+              Where writers begin
             </div>
             <div className="font-serif text-2xl tracking-tight text-[#e7e2d4]">
               penworth.ai &rarr;
@@ -463,13 +468,13 @@ function EcosystemCrossLinkSection() {
             className="group rounded-xl border border-[#1e2436] bg-[#0f1424] p-8 transition hover:border-[#d4af37]/40"
           >
             <div className="text-xs font-semibold uppercase tracking-widest text-[#d4af37] mb-3">
-              See what our readers read
+              Where readers arrive
             </div>
             <div className="font-serif text-2xl tracking-tight text-[#e7e2d4]">
               store.penworth.ai &rarr;
             </div>
             <p className="mt-3 text-sm text-[#c9c2b0]">
-              Books the rest of the world doesn&apos;t sell. Ebook, audiobook, Cinematic Livebook.
+              Books you will not find anywhere else. Ebook, audiobook, Cinematic Livebook.
             </p>
           </a>
         </div>
@@ -498,7 +503,10 @@ function FinalCTASection() {
         </Link>
       </div>
       <p className="mt-6 text-sm text-[#6b6452]">
-        Takes 5 minutes · You&apos;ll hear back within 30 minutes
+        Takes 5 minutes · You will hear back within 30 minutes
+      </p>
+      <p className="mt-16 text-xs text-[#6b6452]">
+        Penworth, Cinematic Livebook, and Particle Simulation — IP patents filed in Australia.
       </p>
     </section>
   );
