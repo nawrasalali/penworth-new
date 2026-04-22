@@ -1,38 +1,53 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-20 by CEO Claude session (initial)
+**Last updated:** 2026-04-22 by CEO Claude session (privacy rework complete)
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## ⚠️ ACTIVE INCIDENT (2026-04-21 19:05 UTC)
+## Recently shipped — 2026-04-22
 
-**CEO-028 (p0):** Vercel team-wide 503 "DNS cache overflow". All brand domains (penworth.ai, guild.penworth.ai, store.penworth.ai, command.penworth.ai, new.penworth.ai canonical) return HTTP 503 at origin. Edge caches mask it on some custom-domain paths but uncached paths and canonical URLs all fail. Fresh redeploy did not fix — platform-side issue requiring Vercel support.
+**CEO-030 (p0): Privacy correction — remove reader-ownership promise + covenant framing.**
+Status: **done**. Handover at `docs/orchestration/handovers/2026-04-22-privacy-rework-complete.md`.
 
-**Blocks:** CEO-021 (domain cutover) — now `status=blocked`. Cannot cutover while NEW origin is 503.
+Scope: reverse the prior design that promised authors ownership of reader data (name, email,
+country, reading progress) delivered via CSV export. Privacy liability under GDPR / Australian
+Privacy Act. Shipped end-to-end in three commits + one DB migration:
 
-**Founder action required:** open Vercel support ticket. Draft message in CEO-028 last_update_note and in session handover at `docs/orchestration/handovers/2026-04-21-1905-ceo021-vercel-platform-503-blocker.md`.
+- `penworth-store` `c1a3572` — deleted CSV endpoint, author-readers dashboard, covenants
+  page, FiveCovenants component, SharingToggle. Rewrote ~20 pages removing covenant language.
+- `penworth-store` `fefbe2d` — column-drop hygiene, deleted reader-settings endpoint,
+  stripped `share_email_with_authors` from remaining consumers.
+- `penworth-new` `51c70f0` — writer landing benefit "Your own readers" → "Distribution
+  included" (en + ar MSA). Arabic grammar `الأيدي السَّبع` → `الأيادي السبعة`.
+- DB migration `drop_reader_privacy_vestiges` — dropped `store_readers.share_email_with_authors`
+  and `store_purchases.reader_pseudonym`. Privacy posture documented in table comments.
+
+Verified: both Vercel deploys READY; RLS on `store_readers` blocks author access (the
+previous leak was application-layer only via service-role bypass); advisors show no new
+warnings.
+
+Note on task codes: commit messages reference CEO-014 — I conflated with the existing
+catalogue-seeding task. Permanent record is CEO-030.
+
+**CEO-012 (p2): Marketing copy** — literary rewrite shipped earlier on 2026-04-22 across
+all 13 domains. Status: `awaiting_founder` (pending native-speaker review for 10 non-English
+landings, tracked as CEO-013).
 
 ---
 
-## Production health — verified 2026-04-20
+## Production health — verified 2026-04-22
 
 | Signal | State |
 |---|---|
-| Supabase migrations applied | 125 (latest: `ceo_orchestration_tasks_foundation` this session) |
-| Latest main commit | `cf8ecbc` — voice_profile persist (shipped this session) |
-| Prior main commit | `8a5f696` — fix(inngest): restart-agent trigger config |
-| Vercel latest deploy | READY (pre-cf8ecbc); new deploy building for cf8ecbc as of this writing |
-| Stuck sessions right now | 0 |
-| Failed sessions 24h | 10 (historical orphans; all from founder's pre-monitoring testing; not actionable) |
-| Open incidents | 0 |
-| Webhooks failed 24h | 0 |
-| Alerts 24h | 21 (email spam storm, contained by dedup trigger; handled) |
-| Guild applications pending | 0 |
-| Guild active members | 1 (Founder, Fellow tier, referral code `NAWRAS`) |
-| Nora conversations total | 2 |
-| Store live listings | 1 ("The New Rich") |
+| penworth.ai (writer) | READY at `51c70f0` |
+| store.penworth.ai | READY at `fefbe2d` |
+| guild.penworth.ai | READY (shares penworth-new repo, at `51c70f0`) |
+| 10 language landings | READY, each on its latest SHA |
+| Supabase migrations applied | latest: `drop_reader_privacy_vestiges` (this session) |
+| Active incidents | 0 |
+| Privacy-critical issues | 0 |
 
 ## Founder context
 
