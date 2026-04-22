@@ -49,8 +49,8 @@ const LANGUAGES = [
 // Document types for the new section
 const DOCUMENT_TYPES = {
   en: {
-    title: 'Create Any Document Type',
-    subtitle: 'From books to business plans, Penworth handles them all',
+    title: 'Whatever you&rsquo;re here to write',
+    subtitle: 'A novel, a memoir, a thesis, a business plan — Penworth writes them all with you',
     categories: [
       {
         name: 'Books',
@@ -67,16 +67,16 @@ const DOCUMENT_TYPES = {
     ],
   },
   ar: {
-    title: 'أنشئ أي نوع من المستندات',
-    subtitle: 'من الكتب إلى خطط العمل، Penworth يتعامل معها جميعاً',
+    title: 'أي كتاب أنت حابب تكتبه',
+    subtitle: 'من الروايات لخطط العمل — Penworth بيكتبهم كلهم معك',
     categories: [
       {
-        name: 'الكتب',
+        name: 'كتب',
         types: ['روايات', 'غير خيالي', 'مذكرات', 'تطوير ذاتي', 'سيرة ذاتية', 'كتب أطفال', 'شعر', 'كتب طبخ', 'دليل سفر'],
       },
       {
         name: 'أكاديمي وعلمي',
-        types: ['أوراق بحثية', 'رسائل ماجستير', 'رسائل دكتوراه', 'توثيق تقني', 'أوراق بيضاء'],
+        types: ['أوراق بحثية', 'ماجستير', 'دكتوراه', 'توثيق تقني', 'أوراق بيضاء'],
       },
       {
         name: 'أعمال ومالية',
@@ -86,32 +86,32 @@ const DOCUMENT_TYPES = {
   },
 };
 
-// AI Agents data
+// Editorial studio data (the seven craftspeople backstage)
 const AI_AGENTS = {
   en: {
-    title: 'Powered by 7 Specialized AI Agents',
-    subtitle: 'Each agent is an expert in their domain, powered by Claude — the world\'s most capable AI',
+    title: 'The seven craftspeople backstage',
+    subtitle: 'Each is an expert in their craft. You are the writer. They bring your book to life.',
     agents: [
-      { name: 'Validator Agent', description: 'Scores your idea against market demand, audience clarity, and commercial viability before you start', icon: ShieldCheck },
-      { name: 'Interview Agent', description: 'Conducts an intelligent conversation to extract your expertise, vision, and unique perspective', icon: MessageSquare },
-      { name: 'Research Agent', description: 'Gathers credible sources, statistics, and relevant data to strengthen your document', icon: Search },
-      { name: 'Outline Agent', description: 'Creates a professional structure with chapters, sections, and logical flow', icon: FileText },
-      { name: 'Writing Agent', description: 'Transforms your outline into polished, engaging content in your voice', icon: PenTool },
-      { name: 'QA Agent', description: 'Checks grammar, readability, consistency, and plagiarism automatically', icon: Shield },
-      { name: 'Publishing Agent', description: 'Formats for KDP, generates covers, and prepares for 17+ publishing platforms', icon: Rocket },
+      { name: 'The Validator', description: 'Reads your idea the way a seasoned publisher would — audience, market, clarity — before a single chapter is drafted', icon: ShieldCheck },
+      { name: 'The Interviewer', description: 'Asks, listens, and draws out the things only you could have told — the specifics that become the soul of the book', icon: MessageSquare },
+      { name: 'The Researcher', description: 'Finds the sources, statistics, and context that give your argument weight and your story authority', icon: Search },
+      { name: 'The Architect', description: 'Shapes your ideas into chapters and sections that flow — structure you can feel, not just see', icon: FileText },
+      { name: 'The Writer', description: 'Drafts every chapter in your voice — the rhythm you speak in, not a generic house style', icon: PenTool },
+      { name: 'The Editor', description: 'Reads every line for grammar, readability, consistency, and originality, so the book holds up to a real reader', icon: Shield },
+      { name: 'The Publisher', description: 'Formats, covers, and readies the book for the Penworth Store and 17 other platforms — you just say the word', icon: Rocket },
     ],
   },
   ar: {
-    title: 'مدعوم بـ 7 وكلاء ذكاء اصطناعي متخصصين',
-    subtitle: 'كل وكيل خبير في مجاله، مدعوم بـ Claude - أقوى ذكاء اصطناعي في العالم',
+    title: 'السبعة اللي بيشتغلوا وراء الكواليس',
+    subtitle: 'كل واحد منهم محترف بشغله. انت الكاتب. هنّي بيوصلوا كتابك للحياة.',
     agents: [
-      { name: 'وكيل التحقق', description: 'يقيّم فكرتك بناءً على طلب السوق ووضوح الجمهور والجدوى التجارية', icon: ShieldCheck },
-      { name: 'وكيل المقابلة', description: 'يجري محادثة ذكية لاستخراج خبرتك ورؤيتك', icon: MessageSquare },
-      { name: 'وكيل البحث', description: 'يجمع مصادر موثوقة وإحصاءات لتقوية مستندك', icon: Search },
-      { name: 'وكيل المخطط', description: 'ينشئ هيكلاً احترافياً بالفصول والأقسام', icon: FileText },
-      { name: 'وكيل الكتابة', description: 'يحول مخططك إلى محتوى متقن وجذاب', icon: PenTool },
-      { name: 'وكيل الجودة', description: 'يتحقق من القواعد والقراءة والاتساق تلقائياً', icon: Shield },
-      { name: 'وكيل النشر', description: 'يُهيئ لـ KDP وينشئ الأغلفة ويُعد لـ 17+ منصة', icon: Rocket },
+      { name: 'المُدقّق', description: 'بيقرأ فكرتك متل ناشر خبرة — الجمهور، السوق، الوضوح — قبل ما تبدأ تكتب أول فصل', icon: ShieldCheck },
+      { name: 'المُحاور', description: 'بيسأل، بيصغي، وبيطلّع الأشياء اللي بس انت فيك تقولها — التفاصيل اللي بتصير روح الكتاب', icon: MessageSquare },
+      { name: 'الباحث', description: 'بيجيب المصادر والإحصاءات والسياق اللي بيعطي كلامك وزن وقصتك مصداقية', icon: Search },
+      { name: 'المهندس', description: 'بيرتّب أفكارك بفصول وأقسام فيها انسياب — بتحسّه، مش بس بتشوفه', icon: FileText },
+      { name: 'الكاتب', description: 'بيكتب كل فصل بصوتك انت — بإيقاع حكيك، مش بأسلوب محفوظ', icon: PenTool },
+      { name: 'المحرّر', description: 'بيقرأ كل سطر للقواعد والسلاسة والاتساق والأصالة، عشان الكتاب يقدر يقف قدام قارئ حقيقي', icon: Shield },
+      { name: 'الناشر', description: 'بينسّق، بيصمّم الغلاف، وبيجهّز الكتاب لمتجر Penworth و17 منصة غيره — بس انت احكي الكلمة', icon: Rocket },
     ],
   },
 };
@@ -119,25 +119,25 @@ const AI_AGENTS = {
 // Benefits data
 const BENEFITS = {
   en: {
-    title: 'Why Authors Choose Penworth',
+    title: 'Why writers stay',
     items: [
-      { title: 'Lifetime Account', description: 'Your library is saved forever. Access your documents anytime, from any device.', icon: Library },
-      { title: 'Publishing Marketplace', description: 'Publish to our marketplace where readers can discover and buy your work.', icon: Users },
-      { title: 'One-Click Publishing', description: 'We handle formatting, covers, and distribution. Just click publish.', icon: Zap },
-      { title: 'Top Up Anytime', description: 'All tiers can purchase credit packs whenever needed. No restrictions.', icon: CreditCard },
-      { title: 'Audiobooks Coming Soon', description: 'AI-powered audiobook generation is in our pipeline. Stay tuned!', icon: Headphones },
-      { title: 'Fast Creation', description: 'Go from idea to publication-ready document in hours, not months.', icon: Clock },
+      { title: 'Your library, forever', description: 'Every draft, every chapter, every version — kept. You come back whenever the next book is ready.', icon: Library },
+      { title: 'Your own readers', description: 'Publish to the Penworth Store and the readers who buy your book become yours — not a retailer&rsquo;s. That&rsquo;s our First Covenant.', icon: Users },
+      { title: 'Published, not just printed', description: 'We handle the formatting, the cover, the distribution. You just say the word.', icon: Zap },
+      { title: 'No paywall to top up', description: 'Every plan — even the free one — can buy credits anytime. No gates, no upsell traps.', icon: CreditCard },
+      { title: 'Audiobook included', description: 'Every book becomes an audiobook in your chosen voice. No extra studio, no extra week.', icon: Headphones },
+      { title: 'Days, not months', description: 'From the first conversation to a finished, publishable book — inside a week.', icon: Clock },
     ],
   },
   ar: {
-    title: 'لماذا يختار المؤلفون Penworth',
+    title: 'ليش الكتّاب بيضلّوا معنا',
     items: [
-      { title: 'حساب مدى الحياة', description: 'مكتبتك محفوظة للأبد. الوصول لمستنداتك في أي وقت.', icon: Library },
-      { title: 'سوق النشر', description: 'انشر في سوقنا حيث يمكن للقراء اكتشاف وشراء عملك.', icon: Users },
-      { title: 'نشر بنقرة واحدة', description: 'نتولى التنسيق والأغلفة والتوزيع. فقط انقر نشر.', icon: Zap },
-      { title: 'شحن رصيد في أي وقت', description: 'جميع المستويات يمكنها شراء حزم رصيد عند الحاجة.', icon: CreditCard },
-      { title: 'الكتب الصوتية قريباً', description: 'إنشاء كتب صوتية بالذكاء الاصطناعي في خططنا المستقبلية.', icon: Headphones },
-      { title: 'إنشاء سريع', description: 'من الفكرة إلى مستند جاهز للنشر في ساعات، ليس أشهر.', icon: Clock },
+      { title: 'مكتبتك، للأبد', description: 'كل مسوّدة، كل فصل، كل نسخة — محفوظة. بترجع وقت ما الكتاب الجاي يكون جاهز.', icon: Library },
+      { title: 'قرّاؤك إنت', description: 'انشر في متجر Penworth والقرّاء اللي بيشتروا كتابك بيصيروا إلك — مش لمتجر ثاني. هاد أول عهد إلنا.', icon: Users },
+      { title: 'منشور، مش بس مطبوع', description: 'نحنا بنتولى التنسيق، الغلاف، والتوزيع. انت بس احكي الكلمة.', icon: Zap },
+      { title: 'شحن متى ما بدك', description: 'كل خطة — حتى المجانية — فيها تشتري رصيد متى ما بدك. بدون بوابات، بدون فخاخ.', icon: CreditCard },
+      { title: 'الكتاب الصوتي معمول', description: 'كل كتاب بيصير كتاب صوتي بالصوت اللي بتختاره. بلا استوديو زيادة، بلا أسبوع زيادة.', icon: Headphones },
+      { title: 'أيام، مش شهور', description: 'من أول مكالمة لكتاب جاهز للنشر — داخل أسبوع.', icon: Clock },
     ],
   },
 };
@@ -237,6 +237,23 @@ const translations = {
       title: "Your story won't tell itself.",
       subtitle: 'Start today. See the first chapter tonight.',
       button: 'Start your book'
+    },
+    cinematic: {
+      badge: 'Patent-pending · Australia',
+      titleBefore: 'Introducing the',
+      titleHighlight: 'Cinematic Livebook',
+      titleAfter: '.',
+      subtitle: "Each page becomes a live performance — particle simulation, live graphs, or scene imagery that tells the page's story as you read it.",
+      tagline: 'Audible narrates. Kindle presents text. Netflix watches for you. Penworth directs. Your book, performed on the page.',
+    },
+    ecosystem: {
+      eyebrow: 'One ecosystem. Three doors.',
+      readLabel: 'Want to read instead?',
+      readTitle: 'Meet the authors →',
+      readDomain: 'store.penworth.ai',
+      guildLabel: 'Love connecting people with books?',
+      guildTitle: 'Earn in the Guild →',
+      guildDomain: 'guild.penworth.ai',
     },
     footer: { 
       copyright: '© 2026 A.C.N. 675 668 710 PTY LTD. All rights reserved.', 
@@ -339,6 +356,23 @@ const translations = {
       title: 'قصتك مش رح تحكي حالها.',
       subtitle: 'ابدأ اليوم. بتشوف أول فصل الليلة.',
       button: 'ابدأ كتابك'
+    },
+    cinematic: {
+      badge: 'براءة اختراع مسجّلة · أستراليا',
+      titleBefore: 'بنقدملكم',
+      titleHighlight: 'الكتاب السينمائي الحي',
+      titleAfter: '.',
+      subtitle: 'كل صفحة بتصير عرض حيّ — محاكاة جزيئات، رسومات متحركة، أو صور مشاهد بتحكي قصة الصفحة وأنت عم تقرأها.',
+      tagline: 'Audible بيقرا. Kindle بيعرض النص. Netflix بيتفرّج محلّك. Penworth بيخرج. كتابك، معروض على الصفحة.',
+    },
+    ecosystem: {
+      eyebrow: 'نظام واحد. ثلاث أبواب.',
+      readLabel: 'حابب تقرأ بدل ما تكتب؟',
+      readTitle: '← تعرّف على الكتّاب',
+      readDomain: 'store.penworth.ai',
+      guildLabel: 'من اللي بيوصلوا الكتب لقرّاءها؟',
+      guildTitle: '← اربح مع الـGuild',
+      guildDomain: 'guild.penworth.ai',
     },
     footer: { 
       copyright: '© 2026 A.C.N. 675 668 710 PTY LTD', 
@@ -669,16 +703,16 @@ export default function HomePage() {
         <section className="py-24 border-t border-neutral-200 dark:border-neutral-800 bg-gradient-to-b from-neutral-50 to-white dark:from-neutral-950 dark:to-neutral-900">
           <div className="mx-auto max-w-4xl px-6 text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 px-3 py-1 mb-6">
-              <span className="text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-400">Patent-pending · Australia</span>
+              <span className="text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-400">{t.cinematic.badge}</span>
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-6">
-              Introducing the <span className="italic">Cinematic Livebook</span>.
+              {t.cinematic.titleBefore} <span className="italic">{t.cinematic.titleHighlight}</span>{t.cinematic.titleAfter}
             </h2>
             <p className="text-lg text-neutral-700 dark:text-neutral-300 mb-4 leading-relaxed">
-              Each page becomes a live performance — particle simulation, live graphs, or scene imagery that tells the page&apos;s story as you read it.
+              {t.cinematic.subtitle}
             </p>
             <p className="text-base text-neutral-500 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-              Audible narrates. Kindle presents text. Netflix watches for you. Penworth directs. Your book, performed on the page.
+              {t.cinematic.tagline}
             </p>
           </div>
         </section>
@@ -687,18 +721,18 @@ export default function HomePage() {
         <section className="py-20 border-t border-neutral-200 dark:border-neutral-800">
           <div className="mx-auto max-w-5xl px-6">
             <p className="text-center text-sm uppercase tracking-widest text-neutral-500 dark:text-neutral-500 mb-10">
-              One ecosystem. Three doors.
+              {t.ecosystem.eyebrow}
             </p>
             <div className="grid md:grid-cols-2 gap-6">
               <a href="https://store.penworth.ai" className="group rounded-2xl border border-neutral-200 dark:border-neutral-800 p-6 hover:border-amber-300 dark:hover:border-amber-700 transition-colors">
-                <p className="text-xs font-medium uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-2">Want to read instead?</p>
-                <p className="text-lg font-semibold text-neutral-900 dark:text-white mb-1">Meet the authors &rarr;</p>
-                <p className="text-sm text-neutral-500">store.penworth.ai</p>
+                <p className="text-xs font-medium uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-2">{t.ecosystem.readLabel}</p>
+                <p className="text-lg font-semibold text-neutral-900 dark:text-white mb-1">{t.ecosystem.readTitle}</p>
+                <p className="text-sm text-neutral-500">{t.ecosystem.readDomain}</p>
               </a>
               <a href="https://guild.penworth.ai" className="group rounded-2xl border border-neutral-200 dark:border-neutral-800 p-6 hover:border-amber-300 dark:hover:border-amber-700 transition-colors">
-                <p className="text-xs font-medium uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-2">Love connecting people with books?</p>
-                <p className="text-lg font-semibold text-neutral-900 dark:text-white mb-1">Earn in the Guild &rarr;</p>
-                <p className="text-sm text-neutral-500">guild.penworth.ai</p>
+                <p className="text-xs font-medium uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-2">{t.ecosystem.guildLabel}</p>
+                <p className="text-lg font-semibold text-neutral-900 dark:text-white mb-1">{t.ecosystem.guildTitle}</p>
+                <p className="text-sm text-neutral-500">{t.ecosystem.guildDomain}</p>
               </a>
             </div>
           </div>
