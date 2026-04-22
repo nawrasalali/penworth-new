@@ -48,6 +48,7 @@ import {
 
 // Import interview system for questions
 import { getRichInterviewQuestions } from '@/lib/ai/agents/interview-system';
+import { fetchLegacyUiQuestions } from '@/lib/ai/interview-prompts-db';
 import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 
 // =============================================================================
@@ -371,9 +372,19 @@ function EditorContentNew() {
         
         if (sessionData.session) {
           setSession(sessionData.session);
-          
-          // Load interview questions based on content type with real options
-          const richQuestions = getRichInterviewQuestions(projectData.content_type);
+
+          // Load interview questions from the DB-backed interview_prompts
+          // table. Per Founder directive 2026-04-23 (CEO-033), every interview
+          // must be specific to the document type — the legacy hardcoded
+          // "audience / tone / chapter_count" questions in interview-system.ts
+          // are not acceptable. If the DB returns zero rows (should never
+          // happen given resolve_interview_prompt's 'non-fiction' ultimate
+          // fallback), we fall through to the legacy path as a hard safety
+          // net rather than showing no questions at all.
+          const dbQuestions = await fetchLegacyUiQuestions(projectData.content_type);
+          const richQuestions = dbQuestions.length > 0
+            ? dbQuestions
+            : getRichInterviewQuestions(projectData.content_type);
           setInterviewQuestions(richQuestions);
         }
 
