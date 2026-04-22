@@ -102,7 +102,7 @@ const AI_AGENTS = {
     ],
   },
   ar: {
-    title: 'الأيدي السَّبع وراءَ كلِّ كتابٍ من Penworth',
+    title: 'الأيادي السبعة وراءَ كلِّ كتابٍ من Penworth',
     subtitle: 'استوديو تحريرٍ مُركَّب — مُنصِتٌ، باحث، مهندس، كاتب، محرِّر، مُصمِّم، ناشر — يعملون بالتتابُع، حتى يكون الكتابُ الذي تُنهيه كتاباً يقدر العالمُ أن يقرأه.',
     agents: [
       { name: 'المُنصِت', description: 'يستخرج القصَّةَ منك كما يفعل المُحاورُ البارع — بصبرٍ، دون نيَّةٍ مسبقة، ماسكاً بالخيط.', icon: MessageSquare },
@@ -121,7 +121,7 @@ const BENEFITS = {
   en: {
     title: 'What Penworth gives a writer that nowhere else does',
     items: [
-      { title: 'Your own readers', description: "When you publish through the Penworth Store, the readers who buy your book become yours — not a retailer's. Their names, their countries. That is our First Covenant, and it is architectural, not promotional.", icon: Users },
+      { title: 'Distribution included', description: 'Published to the Penworth Store and to seventeen other platforms the same day, if you ask. No extra services, no separate contract.', icon: Users },
       { title: 'Your voice, preserved', description: 'Draft, chapter, and version history, kept for the life of your account. Return to the work when you are ready.', icon: Library },
       { title: 'Days, not years', description: 'From the first conversation to a finished, publishable book — measured in days. From finish to shelf — the same day, if you are ready.', icon: Clock },
       { title: 'The audiobook is included', description: 'Every book becomes an audiobook in the voice you choose. No extra studio. No extra week.', icon: Headphones },
@@ -132,7 +132,7 @@ const BENEFITS = {
   ar: {
     title: 'ما الذي يمنحه Penworth لكاتبٍ ولا يمنحُه غيرُه',
     items: [
-      { title: 'قُرَّاؤُكَ أنت', description: 'حين تَنشرُ عبر متجرِ Penworth، يُصبحُ القرَّاءُ الذين يشترون كتابَكَ لكَ أنت — لا لتاجرِ تجزئة. أسماؤهم، بلدانهم. هذا هو عَهدُنا الأوَّل، وهو بنائيٌّ لا ترويجيّ.', icon: Users },
+      { title: 'التوزيعُ مُضمَّن', description: 'نَشرٌ في متجرِ Penworth وفي سبعَ عشرةَ منصَّةً أخرى في اليوم نفسه، إن شئت. لا خدماتٍ إضافيّة، ولا عقدٍ منفصل.', icon: Users },
       { title: 'صوتُكَ، محفوظاً', description: 'المسوَّداتُ والفصولُ ونُسَخُ العمل، محفوظةٌ طوالَ عمرِ حسابك. تعودُ إلى العمل حين تكون مستعدّاً.', icon: Library },
       { title: 'أيَّامٌ، لا سنوات', description: 'من المحادثة الأولى إلى كتابٍ تامٍّ صالحٍ للنَّشر — يُقاسُ بالأيَّام. ومن اكتمالِ الكتاب إلى رفِّ المتجر — اليومَ نفسَه، إن كنتَ مستعدّاً.', icon: Clock },
       { title: 'الكتابُ الصوتيُّ مُضمَّن', description: 'كلُّ كتابٍ يُصبحُ كتاباً صوتيّاً بالصوتِ الذي تختاره. لا استوديو إضافيّ. لا أسبوعَ إضافيّ.', icon: Headphones },
