@@ -11,10 +11,10 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Penworth — The literary ecosystem',
+    default: 'Penworth — Every person has one book.',
     template: '%s | Penworth',
   },
-  description: "The book inside you, finished this week. Tell your story once — Penworth writes it, publishes it, produces the audiobook and Cinematic Livebook, and puts it in front of readers who will want to read it, hear it, and see it come to life.",
+  description: 'The literary ecosystem. You speak your book once. Penworth shapes it with you — chapter by chapter, in your voice — then publishes it, produces the audiobook, renders the Cinematic Livebook, and places it in the hands of readers who were waiting for exactly this story.',
   keywords: ['write a book', 'publish a book', 'audiobook', 'Cinematic Livebook', 'literary ecosystem', 'Penworth Guild', 'self-publishing'],
   authors: [{ name: 'Penworth' }],
   openGraph: {
@@ -22,13 +22,13 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://penworth.ai',
     siteName: 'Penworth',
-    title: 'Penworth — The book inside you, finished this week.',
+    title: 'Penworth — Every person has one book. Penworth is how yours gets written.',
     description: 'The literary ecosystem. Writers bring the ideas. Readers live the experience. Guildmembers connect them — and earn a craftsperson\'s living doing it.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Penworth — The book inside you, finished this week.',
-    description: 'The literary ecosystem. Writers bring the ideas. Readers live the experience.',
+    title: 'Penworth — Every person has one book.',
+    description: 'The literary ecosystem. Three doors. One house.',
   },
   robots: {
     index: true,
