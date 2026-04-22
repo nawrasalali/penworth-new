@@ -146,23 +146,23 @@ const translations = {
   en: {
     nav: { features: 'Features', pricing: 'Pricing', login: 'Log in', getStarted: 'Get Started' },
     hero: {
-      badge: 'AI-Powered Document Creation',
-      title: 'Write your document.',
-      titleHighlight: 'AI does the rest.',
-      subtitle: 'From idea to final documents in hours. Penworth transforms your expertise into professionally written, publication-ready documents with AI.',
-      cta: 'Start Writing Free',
-      ctaSecondary: 'See How It Works',
+      badge: 'The literary ecosystem',
+      title: 'The book inside you,',
+      titleHighlight: 'finished this week.',
+      subtitle: "You've carried this story long enough. Tell it out loud, once, and Penworth writes it with you — one chapter at a time, in your voice, in your language. We publish it, produce the audiobook and Cinematic Livebook, design the cover, and put it in front of readers who will want to read it, hear it, and see it come to life.",
+      cta: 'Start your book',
+      ctaSecondary: 'See how it works',
       noCard: 'No credit card required',
-      freeCredits: '1 free document per month',
+      freeCredits: 'First book free',
     },
     features: {
-      title: 'Everything you need to publish',
-      subtitle: 'Professional document creation, powered by AI',
+      title: 'From your story to the world',
+      subtitle: 'Every step handled end-to-end — by Penworth',
       items: [
-        { title: 'AI Interview', description: 'Our AI interviews you about your topic, extracting your unique expertise and perspective.' },
-        { title: 'Smart Outline', description: 'Generate a structured document outline that captures your vision and organizes your ideas.' },
-        { title: 'Chapter Writing', description: 'AI writes each section in your voice, maintaining consistency throughout your document.' },
-        { title: 'One-Click Publishing', description: 'Export to PDF, DOCX, or publish directly to Amazon KDP and 16 other platforms.' },
+        { title: 'A conversation, not a form', description: "You speak your story. Penworth listens — and captures the part only you could tell." },
+        { title: 'The shape of your book', description: 'Chapters, flow, and structure proposed in minutes. You adjust. You own the outline.' },
+        { title: 'Written in your voice', description: 'Each chapter drafted in the voice you speak — not a generic house style.' },
+        { title: 'Published the same week', description: "Ebook, audiobook, cover, and distribution — ready before the week is out." },
       ],
     },
     pricing: {
@@ -233,10 +233,10 @@ const translations = {
         ] 
       },
     },
-    cta: { 
-      title: 'Ready to write your document?', 
-      subtitle: 'Join thousands of authors who have published with Penworth.', 
-      button: 'Start Writing Free' 
+    cta: {
+      title: "Your story won't tell itself.",
+      subtitle: 'Start today. See the first chapter tonight.',
+      button: 'Start your book'
     },
     footer: { 
       copyright: '© 2026 A.C.N. 675 668 710 PTY LTD. All rights reserved.', 
@@ -248,23 +248,23 @@ const translations = {
   ar: {
     nav: { features: 'المميزات', pricing: 'الأسعار', login: 'تسجيل الدخول', getStarted: 'ابدأ الآن' },
     hero: {
-      badge: 'إنشاء المستندات بالذكاء الاصطناعي',
-      title: 'اكتب مستندك.',
-      titleHighlight: 'الذكاء الاصطناعي يفعل الباقي.',
-      subtitle: 'من الفكرة إلى المستندات النهائية في ساعات. يحول Penworth خبرتك إلى مستندات مكتوبة باحتراف وجاهزة للنشر.',
-      cta: 'ابدأ الكتابة مجاناً',
-      ctaSecondary: 'شاهد كيف يعمل',
-      noCard: 'لا حاجة لبطاقة ائتمان',
-      freeCredits: 'مستند واحد مجاني شهرياً',
+      badge: 'النظام الأدبي المتكامل',
+      title: 'الكتاب اللي جواك،',
+      titleHighlight: 'خلّصه هالأسبوع.',
+      subtitle: 'حكايتك حملتها كفاية. احكيها مرّة بصوتك، وPenworth بيكتبها معك — فصل فصل، بلغتك، بصوتك انت. نحنا بنطبعها، بنعمل الكتاب الصوتي، بنصمم الغلاف، وبنوصلها للقرّاء اللي بدهم يقرؤوها، يسمعوها، ويشوفوها تحيا قدامهم.',
+      cta: 'ابدأ كتابك',
+      ctaSecondary: 'شوف كيف بيصير',
+      noCard: 'بدون بطاقة ائتمان',
+      freeCredits: 'أول كتاب ببلاش',
     },
     features: {
-      title: 'كل ما تحتاجه للنشر',
-      subtitle: 'إنشاء مستندات احترافية بقوة الذكاء الاصطناعي',
+      title: 'من قصتك للعالم',
+      subtitle: 'كل خطوة من الأول للآخر — Penworth بيعملها',
       items: [
-        { title: 'مقابلة الذكاء الاصطناعي', description: 'يجري الذكاء الاصطناعي مقابلة معك حول موضوعك.' },
-        { title: 'مخطط ذكي', description: 'إنشاء مخطط مستند منظم يلتقط رؤيتك.' },
-        { title: 'كتابة الأقسام', description: 'يكتب الذكاء الاصطناعي كل قسم بصوتك.' },
-        { title: 'نشر بنقرة واحدة', description: 'تصدير إلى PDF أو النشر على Amazon KDP و16 منصة أخرى.' },
+        { title: 'مكالمة، مش استمارة', description: 'انت بتحكي قصتك، وPenworth عم يصغي — وبيلتقط الشي اللي بس انت قادر تقوله.' },
+        { title: 'شكل كتابك', description: 'الفصول والترتيب بيجهزوا بدقائق. بتعدّل، والمخطط بيبقى ملكك.' },
+        { title: 'مكتوب بصوتك', description: 'كل فصل بيتكتب بصوتك انت — مش بأسلوب عام محفوظ.' },
+        { title: 'مطبوع بنفس الأسبوع', description: 'كتاب إلكتروني، صوتي، غلاف، وتوزيع — جاهزين قبل ما يخلص الأسبوع.' },
       ],
     },
     pricing: {
@@ -335,10 +335,10 @@ const translations = {
         ] 
       },
     },
-    cta: { 
-      title: 'مستعد لكتابة مستندك؟', 
-      subtitle: 'انضم لآلاف المؤلفين.', 
-      button: 'ابدأ الكتابة مجاناً' 
+    cta: {
+      title: 'قصتك مش رح تحكي حالها.',
+      subtitle: 'ابدأ اليوم. بتشوف أول فصل الليلة.',
+      button: 'ابدأ كتابك'
     },
     footer: { 
       copyright: '© 2026 A.C.N. 675 668 710 PTY LTD', 
@@ -661,6 +661,45 @@ export default function HomePage() {
                   </Link>
                 ))}
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Cinematic Livebook — patent-pending category */}
+        <section className="py-24 border-t border-neutral-200 dark:border-neutral-800 bg-gradient-to-b from-neutral-50 to-white dark:from-neutral-950 dark:to-neutral-900">
+          <div className="mx-auto max-w-4xl px-6 text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 px-3 py-1 mb-6">
+              <span className="text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-400">Patent-pending · Australia</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-6">
+              Introducing the <span className="italic">Cinematic Livebook</span>.
+            </h2>
+            <p className="text-lg text-neutral-700 dark:text-neutral-300 mb-4 leading-relaxed">
+              Each page becomes a live performance — particle simulation, live graphs, or scene imagery that tells the page&apos;s story as you read it.
+            </p>
+            <p className="text-base text-neutral-500 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
+              Audible narrates. Kindle presents text. Netflix watches for you. Penworth directs. Your book, performed on the page.
+            </p>
+          </div>
+        </section>
+
+        {/* Ecosystem cross-link — soft footer, three doors one house */}
+        <section className="py-20 border-t border-neutral-200 dark:border-neutral-800">
+          <div className="mx-auto max-w-5xl px-6">
+            <p className="text-center text-sm uppercase tracking-widest text-neutral-500 dark:text-neutral-500 mb-10">
+              One ecosystem. Three doors.
+            </p>
+            <div className="grid md:grid-cols-2 gap-6">
+              <a href="https://store.penworth.ai" className="group rounded-2xl border border-neutral-200 dark:border-neutral-800 p-6 hover:border-amber-300 dark:hover:border-amber-700 transition-colors">
+                <p className="text-xs font-medium uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-2">Want to read instead?</p>
+                <p className="text-lg font-semibold text-neutral-900 dark:text-white mb-1">Meet the authors &rarr;</p>
+                <p className="text-sm text-neutral-500">store.penworth.ai</p>
+              </a>
+              <a href="https://guild.penworth.ai" className="group rounded-2xl border border-neutral-200 dark:border-neutral-800 p-6 hover:border-amber-300 dark:hover:border-amber-700 transition-colors">
+                <p className="text-xs font-medium uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-2">Love connecting people with books?</p>
+                <p className="text-lg font-semibold text-neutral-900 dark:text-white mb-1">Earn in the Guild &rarr;</p>
+                <p className="text-sm text-neutral-500">guild.penworth.ai</p>
+              </a>
             </div>
           </div>
         </section>

@@ -49,6 +49,7 @@ export default async function GuildLandingPage() {
       <AgentsPreviewSection />
       <EconomicsSection />
       <ProcessSection />
+      <EcosystemCrossLinkSection />
       <FinalCTASection />
     </>
   );
@@ -77,13 +78,15 @@ function HeroSection() {
         </div>
 
         <h1 className="font-serif text-5xl leading-[1.05] tracking-tight md:text-7xl">
-          Turn your voice into <span className="italic text-[#d4af37]">income</span>.
+          A craft. A career. A cut of every book you help{' '}
+          <span className="italic text-[#d4af37]">find its reader</span>.
         </h1>
 
         <p className="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-[#c9c2b0] md:text-xl">
-          The Penworth Guild is a craft association, not an affiliate program. Introduce the authors in
-          your world to Penworth — and earn commission, month after month, for a full year per
-          referral.
+          Some people were born to connect a story to the person who needed it. If that&apos;s you,
+          the Penworth Guild was built for you. Find a writer who&apos;s been waiting. Match a reader
+          to the book that will move them. Get paid — honestly, transparently, for twelve months —
+          every time you do.
         </p>
 
         <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -140,8 +143,8 @@ function WhatSection() {
       </div>
       <h2 className="font-serif text-4xl leading-tight tracking-tight md:text-5xl">
         A self-governing association of people who believe{' '}
-        <span className="italic text-[#d4af37]">everyone has a book in them</span> — and want to
-        help them write it.
+        <span className="italic text-[#d4af37]">every story deserves its reader</span> — and know
+        how to bring them together.
       </h2>
       <div className="mt-12 grid gap-10 md:grid-cols-2">
         <div>
@@ -150,9 +153,9 @@ function WhatSection() {
             apprenticeship. Standards mattered. Reputation mattered. The work was the point.
           </p>
           <p className="mt-6 text-lg leading-relaxed text-[#c9c2b0]">
-            The Penworth Guild reopens that idea for the modern marketing age. You are not an
-            affiliate. You are a member of a community with a promotion ladder, an AI support team,
-            an education track, and an annual retreat for its most accomplished members.
+            The Penworth Guild reopens that idea for the modern literary age. You find the writer
+            who&apos;s been holding a book inside them — and you find the reader who&apos;s been waiting
+            for exactly that book. Two hats, one craft, one career.
           </p>
         </div>
         <div className="rounded-xl border border-[#1e2436] bg-[#0f1424] p-8">
@@ -428,6 +431,48 @@ function ProcessSection() {
             />
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function EcosystemCrossLinkSection() {
+  return (
+    <section className="border-t border-[#1e2436] bg-[#070a12]">
+      <div className="mx-auto max-w-5xl px-6 py-20">
+        <p className="text-center text-xs uppercase tracking-widest text-[#8a8370] mb-10">
+          One ecosystem. Three doors.
+        </p>
+        <div className="grid gap-6 md:grid-cols-2">
+          <a
+            href="https://penworth.ai"
+            className="group rounded-xl border border-[#1e2436] bg-[#0f1424] p-8 transition hover:border-[#d4af37]/40"
+          >
+            <div className="text-xs font-semibold uppercase tracking-widest text-[#d4af37] mb-3">
+              See what our writers make
+            </div>
+            <div className="font-serif text-2xl tracking-tight text-[#e7e2d4]">
+              penworth.ai &rarr;
+            </div>
+            <p className="mt-3 text-sm text-[#c9c2b0]">
+              The authoring platform. Every book in the Store begins here.
+            </p>
+          </a>
+          <a
+            href="https://store.penworth.ai"
+            className="group rounded-xl border border-[#1e2436] bg-[#0f1424] p-8 transition hover:border-[#d4af37]/40"
+          >
+            <div className="text-xs font-semibold uppercase tracking-widest text-[#d4af37] mb-3">
+              See what our readers read
+            </div>
+            <div className="font-serif text-2xl tracking-tight text-[#e7e2d4]">
+              store.penworth.ai &rarr;
+            </div>
+            <p className="mt-3 text-sm text-[#c9c2b0]">
+              Books the rest of the world doesn&apos;t sell. Ebook, audiobook, Cinematic Livebook.
+            </p>
+          </a>
+        </div>
       </div>
     </section>
   );

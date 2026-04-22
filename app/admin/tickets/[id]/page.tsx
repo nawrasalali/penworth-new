@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ArrowLeft } from 'lucide-react';
 import { TicketControls } from './TicketControls';
@@ -66,7 +67,11 @@ export default async function AdminTicketDetailPage({
   // Right-side snapshot — v_nora_member_context is the contract.
   // If the user isn't in the view (e.g., non-member filing from store
   // surface), we get null and render a minimal panel.
-  const { data: memberContext } = await supabase
+  // Read via service role: the view is locked down from anon/authenticated
+  // at the grant level (it exposes cross-user data). Admin gating is
+  // enforced by the admin/layout role check upstream.
+  const admin = createServiceClient();
+  const { data: memberContext } = await admin
     .from('v_nora_member_context')
     .select('*')
     .eq('user_id', ticket.user_id)

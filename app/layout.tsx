@@ -11,24 +11,24 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Penworth - AI Document Writing Platform',
+    default: 'Penworth — The literary ecosystem',
     template: '%s | Penworth',
   },
-  description: 'From idea to final document in hours. Books, academic papers, business plans — Penworth transforms your expertise into professionally written, publication-ready documents with AI.',
-  keywords: ['AI writing', 'document writing', 'book writing', 'business plan', 'academic writing', 'AI author', 'publish with AI'],
+  description: "The book inside you, finished this week. Tell your story once — Penworth writes it, publishes it, produces the audiobook and Cinematic Livebook, and puts it in front of readers who will want to read it, hear it, and see it come to life.",
+  keywords: ['write a book', 'publish a book', 'audiobook', 'Cinematic Livebook', 'literary ecosystem', 'Penworth Guild', 'self-publishing'],
   authors: [{ name: 'Penworth' }],
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: 'https://penworth.ai',
     siteName: 'Penworth',
-    title: 'Penworth - AI Document Writing Platform',
-    description: 'From idea to final document in hours. Write with AI.',
+    title: 'Penworth — The book inside you, finished this week.',
+    description: 'The literary ecosystem. Writers bring the ideas. Readers live the experience. Guildmembers connect them — and earn a craftsperson\'s living doing it.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Penworth - AI Document Writing Platform',
-    description: 'From idea to final document in hours. Write with AI.',
+    title: 'Penworth — The book inside you, finished this week.',
+    description: 'The literary ecosystem. Writers bring the ideas. Readers live the experience.',
   },
   robots: {
     index: true,
