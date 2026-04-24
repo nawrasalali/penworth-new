@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+// Ideogram image generation typically takes 15-30 seconds. Without this
+// explicit maxDuration, Vercel kills the route at the 10-second default
+// and the user sees the Generate button spin forever, then no cover
+// appears. Matches the 300s ceiling used by the Author pipeline AI
+// routes (CEO-043 Phase 0, commit e48ca5c).
+export const maxDuration = 300;
+
 // KDP Cover Specifications (6x9 book at 300 DPI)
 const KDP_SPECS = {
   FRONT_COVER: {
