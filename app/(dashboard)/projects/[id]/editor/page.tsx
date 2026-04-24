@@ -947,32 +947,54 @@ function EditorContentNew() {
 
   // Handler: Generate cover
   const handleGenerateCover = async (type: 'front' | 'back', prompt?: string) => {
-    const response = await fetch('/api/covers/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        projectId,
-        sessionId: session?.id,
-        coverType: type,
-        prompt,
-        bookTitle: session?.book_title || project?.title || t('editor.untitled', locale),
-        authorName: session?.author_name || t('editor.author', locale),
-      }),
-    });
-    
-    const data = await response.json();
-    if (data.error) {
-      toast.error(data.error);
-      return;
-    }
-    
-    toast.success(`${type === 'front' ? 'Front' : 'Back'} cover generated!`);
-    
-    // Refresh session to get updated cover URL
-    const sessionResponse = await fetch(`/api/interview-session?projectId=${projectId}`);
-    const sessionData = await sessionResponse.json();
-    if (sessionData.session) {
-      setSession(sessionData.session);
+    // Wrap the whole flow so a network failure, Vercel HTML timeout page,
+    // or any non-JSON response surfaces as a visible error to the user.
+    // Previously handleGenerateCover had no try/catch; a thrown fetch or
+    // a response.json() parse error would propagate up to the child
+    // component's try/finally, flip the button back to normal in one
+    // frame, and leave the user staring at a dead button with no toast.
+    try {
+      const response = await fetch('/api/covers/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          sessionId: session?.id,
+          coverType: type,
+          prompt,
+          bookTitle: session?.book_title || project?.title || t('editor.untitled', locale),
+          authorName: session?.author_name || t('editor.author', locale),
+        }),
+      });
+
+      // Read as text first so we can present a useful message even when
+      // the server returned HTML (504 timeout, static 500 page, etc).
+      const raw = await response.text();
+      let data: { error?: string; imageUrl?: string } = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        data = { error: `Cover service returned an unexpected response (HTTP ${response.status}). Please try again.` };
+      }
+
+      if (!response.ok || data.error) {
+        const msg = data.error || `Cover generation failed (HTTP ${response.status})`;
+        console.error('[cover] generate failed:', response.status, raw.slice(0, 400));
+        toast.error(msg);
+        return;
+      }
+
+      toast.success(`${type === 'front' ? 'Front' : 'Back'} cover generated!`);
+
+      // Refresh session to get updated cover URL
+      const sessionResponse = await fetch(`/api/interview-session?projectId=${projectId}`);
+      const sessionData = await sessionResponse.json();
+      if (sessionData.session) {
+        setSession(sessionData.session);
+      }
+    } catch (err: any) {
+      console.error('[cover] unexpected client error:', err);
+      toast.error(err?.message || 'Could not reach cover service. Check your connection and try again.');
     }
   };
 

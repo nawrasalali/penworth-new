@@ -96,11 +96,24 @@ export async function POST(request: NextRequest) {
       ideogramPrompt += '\n\nIMPORTANT: Do NOT include any text, words, letters, or typography in the image. Create a subtle, elegant background suitable for text overlay. Leave the center area relatively simple for description text.';
     }
 
+    // Explicit env guard. Previously a missing IDEOGRAM_API_KEY silently
+    // produced a 401 from Ideogram and we returned a generic "Failed to
+    // generate cover image" — hard to debug from the client. Now we say
+    // exactly what's wrong so the Founder (or Vercel dashboard) can act.
+    const ideogramKey = process.env.IDEOGRAM_API_KEY;
+    if (!ideogramKey) {
+      console.error('[covers/generate] IDEOGRAM_API_KEY is not set on this deployment');
+      return NextResponse.json(
+        { error: 'Cover service is not configured on the server (IDEOGRAM_API_KEY missing). Founder action required: set the env var on Vercel and redeploy.' },
+        { status: 503 }
+      );
+    }
+
     // Call Ideogram API
     const ideogramResponse = await fetch('https://api.ideogram.ai/generate', {
       method: 'POST',
       headers: {
-        'Api-Key': process.env.IDEOGRAM_API_KEY || '',
+        'Api-Key': ideogramKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -115,11 +128,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (!ideogramResponse.ok) {
-      const error = await ideogramResponse.text();
-      console.error('Ideogram API error:', error);
+      const errorText = await ideogramResponse.text();
+      console.error('[covers/generate] Ideogram API error:', ideogramResponse.status, errorText);
+      // Surface the actual upstream status + snippet so the user (and us)
+      // can diagnose without hunting through logs.
+      const snippet = errorText.slice(0, 200);
       return NextResponse.json(
-        { error: 'Failed to generate cover image' },
-        { status: 500 }
+        { error: `Cover service upstream error (HTTP ${ideogramResponse.status}): ${snippet}` },
+        { status: 502 }
       );
     }
 
