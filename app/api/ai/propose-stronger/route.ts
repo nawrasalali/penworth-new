@@ -5,6 +5,8 @@ import { modelFor, maxTokensFor } from '@/lib/ai/model-router';
 import { createClient } from '@/lib/supabase/server';
 import { getUserLanguage, languageDirective } from '@/lib/ai/user-language';
 
+export const maxDuration = 300;
+
 const anthropic = new Anthropic();
 
 interface ProposedIdea {

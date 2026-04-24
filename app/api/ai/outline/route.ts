@@ -11,6 +11,8 @@ import {
 import { getTemplate } from '@/lib/ai/document-templates';
 import { fetchOutlineBundle, interpolateTemplate } from '@/lib/ai/outline-prompts-db';
 
+export const maxDuration = 300;
+
 /**
  * Outline endpoint — wired to resolve_outline_prompt (CEO-034).
  *

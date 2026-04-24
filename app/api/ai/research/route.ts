@@ -5,6 +5,8 @@ import { modelFor, maxTokensFor, calculateCost } from '@/lib/ai/model-router';
 import { loadAgentBrief, formatBriefForPrompt } from '@/lib/ai/agent-brief';
 import { getTemplate, CITATION_STYLES } from '@/lib/ai/document-templates';
 
+export const maxDuration = 300;
+
 const anthropic = new Anthropic();
 
 /**

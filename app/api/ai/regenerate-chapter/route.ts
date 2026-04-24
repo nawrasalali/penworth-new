@@ -7,6 +7,8 @@ import { CREDIT_COSTS } from '@/types/agent-workflow';
 import { shouldDeductCreditsForProject } from '@/lib/projects/should-deduct-credits';
 import { logAuditFromRequest } from '@/lib/audit';
 
+export const maxDuration = 300;
+
 const anthropic = new Anthropic();
 
 /**

@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getUserLanguage, languageDirective } from '@/lib/ai/user-language';
 import { getValidationRubric } from '@/lib/ai/interview-questions';
 
+export const maxDuration = 300;
+
 const anthropic = new Anthropic();
 
 /**
