@@ -10,6 +10,7 @@ import {
   Cpu,
   Users,
   ListTodo,
+  Settings,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -96,6 +97,15 @@ export default async function CommandCenterPage() {
             >
               <ListTodo className="h-4 w-4" />
               <span className="text-sm font-semibold">Orchestration</span>
+            </Link>
+          )}
+          {session.adminRole === 'super_admin' && (
+            <Link
+              href="/admin/command-center/settings/recipients"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted"
+            >
+              <Settings className="h-4 w-4" />
+              <span className="text-sm font-semibold">Settings</span>
             </Link>
           )}
           <Link
