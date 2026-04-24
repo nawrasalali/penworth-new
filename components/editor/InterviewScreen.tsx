@@ -268,7 +268,9 @@ export function InterviewScreen({
       : currentQuestion?.question;
 
     return (
-      <div className="flex-1 flex flex-col p-6 max-w-2xl mx-auto w-full">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-6 pb-10 max-w-2xl mx-auto w-full">
         {/* Chosen idea banner — visible throughout the interview as a north star */}
         {chosenIdea && (
           <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3">
@@ -452,13 +454,17 @@ export function InterviewScreen({
             {t('interview.stopAndNext', locale)}
           </Button>
         </div>
+          </div>
+        </div>
       </div>
     );
   }
   
   // Follow-up Phase
   return (
-    <div className="flex-1 flex flex-col p-6 max-w-3xl mx-auto w-full">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6 pb-10 max-w-3xl mx-auto w-full">
       <div className="mb-6 text-center">
         <h1 className="text-xl font-bold mb-2">{t('interview.followupTitle', locale)}</h1>
         <p className="text-muted-foreground">
@@ -511,6 +517,8 @@ export function InterviewScreen({
           {t('interview.pleaseAnswerAll', locale)}
         </p>
       )}
+        </div>
+      </div>
     </div>
   );
 }

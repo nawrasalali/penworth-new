@@ -68,7 +68,9 @@ export function QAScreen({
   };
 
   return (
-    <div className="flex-1 flex flex-col p-6 max-w-2xl mx-auto w-full">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6 pb-10 max-w-2xl mx-auto w-full">
       {/* Header */}
       <div className="mb-6 text-center">
         <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
@@ -170,6 +172,8 @@ export function QAScreen({
           {t('qa.pleaseCheckAll', locale)}
         </p>
       )}
+        </div>
+      </div>
     </div>
   );
 }

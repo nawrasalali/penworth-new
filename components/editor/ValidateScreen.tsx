@@ -135,7 +135,9 @@ export function ValidateScreen({
   // INPUT
   if (phase === 'input') {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 max-w-2xl mx-auto">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto">
+          <div className="min-h-full flex flex-col items-center justify-center p-8 pb-10 max-w-2xl mx-auto">
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <Sparkles className="h-8 w-8 text-primary" />
@@ -156,6 +158,8 @@ export function ValidateScreen({
           <Button onClick={handleValidate} className="w-full mt-3" disabled={!topic.trim()}>
             {rubric.buttonLabel} <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
+        </div>
+          </div>
         </div>
       </div>
     );
