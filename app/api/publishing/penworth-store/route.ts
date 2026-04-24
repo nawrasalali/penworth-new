@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { creditReferralIfEligible } from '@/lib/referrals';
-import { slugify } from '@/lib/utils';
+
+// Inline slugify — used to be imported from lib/utils, but the repo has
+// both `lib/utils.ts` (which wins module resolution for '@/lib/utils')
+// and `lib/utils/index.ts` (which is where slugify actually lives).
+// Rather than refactor the barrel for one call-site, we inline the
+// 5-line function here. Same implementation as lib/utils/index.ts.
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
 
 /**
  * Publish a completed project to Penworth Store.
