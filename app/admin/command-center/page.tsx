@@ -69,9 +69,11 @@ export default async function CommandCenterPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      {/* ---- header ---- */}
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
+      {/* ---- header ----
+          Stack vertically on mobile/tablet; action buttons wrap so
+          Orchestration/Settings/Alerts don't overflow the right edge. */}
+      <div className="mb-6 flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <ShieldCheck className="h-5 w-5 text-primary" />
             <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
@@ -89,11 +91,11 @@ export default async function CommandCenterPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 md:shrink-0">
           {session.adminRole === 'super_admin' && (
             <Link
               href="/admin/command-center/orchestration"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted whitespace-nowrap"
             >
               <ListTodo className="h-4 w-4" />
               <span className="text-sm font-semibold">Orchestration</span>
@@ -102,7 +104,7 @@ export default async function CommandCenterPage() {
           {session.adminRole === 'super_admin' && (
             <Link
               href="/admin/command-center/settings/recipients"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted whitespace-nowrap"
             >
               <Settings className="h-4 w-4" />
               <span className="text-sm font-semibold">Settings</span>
@@ -110,7 +112,7 @@ export default async function CommandCenterPage() {
           )}
           <Link
             href="/admin/command-center/alerts"
-            className="relative inline-flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted"
+            className="relative inline-flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted whitespace-nowrap"
           >
             <Bell className="h-4 w-4" />
             <span className="text-sm font-semibold">Alerts</span>

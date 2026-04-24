@@ -169,9 +169,13 @@ export default async function AdminPage() {
   // ---------- RENDER ----------
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <div>
+      {/* Header
+          On mobile/tablet the title column and the four nav buttons
+          previously shared a single flex row which crammed everything.
+          We stack vertically below `md` and let the action row wrap so
+          no button gets clipped off the right edge on narrow viewports. */}
+      <div className="mb-8 flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <ShieldCheck className="h-5 w-5 text-primary" />
             <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
@@ -183,47 +187,49 @@ export default async function AdminPage() {
             Live business snapshot. Numbers are direct reads from production.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/admin/guild"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted"
-          >
-            <ShieldCheck className="h-3.5 w-3.5" /> Guild review
-          </Link>
-          <Link
-            href="/admin/guild/payouts"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted"
-          >
-            <DollarSign className="h-3.5 w-3.5" /> Guild payouts
-          </Link>
-          <Link
-            href="/admin/computer"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted"
-          >
-            <Cpu className="h-3.5 w-3.5" /> Computer sessions
-          </Link>
-          <Link
-            href="/admin/compliance"
-            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted ${
-              breachedTotal > 0
-                ? 'border-red-500/60 bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-300'
-                : approachingTotal > 0
-                ? 'border-amber-500/60 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300'
-                : ''
-            }`}
-          >
-            <Scale className="h-3.5 w-3.5" /> Compliance
-            {breachedTotal > 0 && (
-              <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-red-600 text-white text-[10px] font-bold">
-                {breachedTotal}
-              </span>
-            )}
-            {breachedTotal === 0 && approachingTotal > 0 && (
-              <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-amber-600 text-white text-[10px] font-bold">
-                {approachingTotal}
-              </span>
-            )}
-          </Link>
+        <div className="flex flex-col items-start md:items-end gap-2 md:shrink-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/admin/guild"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted whitespace-nowrap"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" /> Guild review
+            </Link>
+            <Link
+              href="/admin/guild/payouts"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted whitespace-nowrap"
+            >
+              <DollarSign className="h-3.5 w-3.5" /> Guild payouts
+            </Link>
+            <Link
+              href="/admin/computer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted whitespace-nowrap"
+            >
+              <Cpu className="h-3.5 w-3.5" /> Computer sessions
+            </Link>
+            <Link
+              href="/admin/compliance"
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted whitespace-nowrap ${
+                breachedTotal > 0
+                  ? 'border-red-500/60 bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-300'
+                  : approachingTotal > 0
+                  ? 'border-amber-500/60 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300'
+                  : ''
+              }`}
+            >
+              <Scale className="h-3.5 w-3.5" /> Compliance
+              {breachedTotal > 0 && (
+                <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-red-600 text-white text-[10px] font-bold">
+                  {breachedTotal}
+                </span>
+              )}
+              {breachedTotal === 0 && approachingTotal > 0 && (
+                <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-amber-600 text-white text-[10px] font-bold">
+                  {approachingTotal}
+                </span>
+              )}
+            </Link>
+          </div>
           <div className="text-xs text-muted-foreground">
             Last refreshed {new Date().toLocaleTimeString()}
           </div>
