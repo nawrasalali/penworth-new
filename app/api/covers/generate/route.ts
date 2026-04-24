@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 
 // Ideogram image generation typically takes 15-30 seconds. Without this
 // explicit maxDuration, Vercel kills the route at the 10-second default
@@ -7,6 +8,26 @@ import { createClient } from '@/lib/supabase/server';
 // appears. Matches the 300s ceiling used by the Author pipeline AI
 // routes (CEO-043 Phase 0, commit e48ca5c).
 export const maxDuration = 300;
+
+// TEMPORARY diagnostic: write one row per pipeline stage so the CEO
+// session can see exactly where a cover-generate attempt dies even
+// without Vercel runtime-log access. Remove once the silent-failure
+// bug is root-caused. Uses service client (bypasses RLS) because we
+// want the trace written regardless of the user's auth state.
+async function trace(stage: string, details?: string, userId?: string, sessionId?: string) {
+  try {
+    const admin = createServiceClient();
+    await admin.from('_cover_diag_trace').insert({
+      stage,
+      details: details?.slice(0, 800) ?? null,
+      user_id: userId ?? null,
+      session_id: sessionId ?? null,
+    });
+  } catch {
+    // swallow — we must never fail the real request because the diag
+    // table had a hiccup.
+  }
+}
 
 // KDP Cover Specifications (6x9 book at 300 DPI)
 const KDP_SPECS = {
@@ -29,23 +50,32 @@ interface CoverRequest {
 }
 
 export async function POST(request: NextRequest) {
+  // Snapshot a few high-signal request bits so even if auth fails we
+  // know the request reached our function and what client sent it.
+  const ua = request.headers.get('user-agent')?.slice(0, 120) ?? '';
+  await trace('entry', `ua=${ua}`);
+
   try {
     const supabase = await createClient();
-    
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
+      await trace('auth_fail', 'no user from supabase.auth.getUser()');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    await trace('auth_ok', null as any, user.id);
 
     const body: CoverRequest = await request.json();
     const { projectId, sessionId, coverType, prompt, bookTitle, authorName, bookDescription } = body;
 
     if (!projectId || !sessionId || !coverType || !bookTitle) {
+      await trace('body_invalid', JSON.stringify({ projectId, sessionId, coverType, bookTitle }).slice(0, 300), user.id, sessionId);
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
     }
+    await trace('body_ok', `type=${coverType} promptLen=${(prompt ?? '').length}`, user.id, sessionId);
 
     // Check if this is a regeneration (costs credits)
     const { data: session } = await supabase
@@ -102,14 +132,17 @@ export async function POST(request: NextRequest) {
     // exactly what's wrong so the Founder (or Vercel dashboard) can act.
     const ideogramKey = process.env.IDEOGRAM_API_KEY;
     if (!ideogramKey) {
+      await trace('env_missing', 'IDEOGRAM_API_KEY', user.id, sessionId);
       console.error('[covers/generate] IDEOGRAM_API_KEY is not set on this deployment');
       return NextResponse.json(
         { error: 'Cover service is not configured on the server (IDEOGRAM_API_KEY missing). Founder action required: set the env var on Vercel and redeploy.' },
         { status: 503 }
       );
     }
+    await trace('env_ok', `keyLen=${ideogramKey.length}`, user.id, sessionId);
 
     // Call Ideogram API
+    await trace('ideogram_call_start', null as any, user.id, sessionId);
     const ideogramResponse = await fetch('https://api.ideogram.ai/generate', {
       method: 'POST',
       headers: {
@@ -126,9 +159,11 @@ export async function POST(request: NextRequest) {
         },
       }),
     });
+    await trace('ideogram_response', `status=${ideogramResponse.status}`, user.id, sessionId);
 
     if (!ideogramResponse.ok) {
       const errorText = await ideogramResponse.text();
+      await trace('ideogram_fail', `status=${ideogramResponse.status} body=${errorText.slice(0, 500)}`, user.id, sessionId);
       console.error('[covers/generate] Ideogram API error:', ideogramResponse.status, errorText);
       // Surface the actual upstream status + snippet so the user (and us)
       // can diagnose without hunting through logs.
@@ -143,11 +178,13 @@ export async function POST(request: NextRequest) {
     const imageUrl = ideogramData.data?.[0]?.url;
 
     if (!imageUrl) {
+      await trace('ideogram_no_image', JSON.stringify(ideogramData).slice(0, 500), user.id, sessionId);
       return NextResponse.json(
         { error: 'No image generated' },
         { status: 500 }
       );
     }
+    await trace('ideogram_ok', `url=${imageUrl.slice(0, 200)}`, user.id, sessionId);
 
     // Update session with new cover URL
     const updateField = coverType === 'front' 
@@ -162,10 +199,16 @@ export async function POST(request: NextRequest) {
           back_cover_regenerations: regenerations + 1 
         };
 
-    await supabase
+    const { error: updateErr } = await supabase
       .from('interview_sessions')
       .update(updateField)
       .eq('id', sessionId);
+
+    if (updateErr) {
+      await trace('db_update_fail', updateErr.message, user.id, sessionId);
+    } else {
+      await trace('db_update_ok', null as any, user.id, sessionId);
+    }
 
     // Log regeneration if credits were used
     if (isRegeneration) {
@@ -180,6 +223,7 @@ export async function POST(request: NextRequest) {
         });
     }
 
+    await trace('done', `regen=${regenerations + 1}`, user.id, sessionId);
     return NextResponse.json({
       success: true,
       imageUrl,
@@ -187,10 +231,11 @@ export async function POST(request: NextRequest) {
       regenerationCount: regenerations + 1,
     });
 
-  } catch (error) {
+  } catch (error: any) {
+    await trace('exception', String(error?.message ?? error).slice(0, 500));
     console.error('Error generating cover:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: `Internal server error: ${error?.message ?? 'unknown'}` },
       { status: 500 }
     );
   }
