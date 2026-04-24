@@ -958,9 +958,9 @@ interface ShowcasePlatform {
 const SHOWCASE_MARKETPLACE: ShowcasePlatform = {
   slug: 'penworth',
   name: 'Penworth Publishing Marketplace',
-  tagline: 'Free global audience. AI audiobook. Visual chapters.',
-  royalty: '70% to author',
-  reach: 'Global · ebook + audiobook',
+  tagline: 'Free global audience. AI audiobook. Livebook on us.',
+  royalty: '75% ebook · 45% audiobook · Livebook on us',
+  reach: 'Global · ebook + audiobook + Livebook',
 };
 
 const SHOWCASE_AUTO: ShowcasePlatform[] = [
@@ -1023,7 +1023,7 @@ function PublishShowcase({ locale = 'en' }: { locale?: Locale }) {
           icon={<Zap className="h-5 w-5" />}
           title={t('publish.showcase.mech1Title', locale)}
           subtitle={t('publish.showcase.mech1Subtitle', locale)}
-          body="Penworth's own storefront publishes your ebook and AI-narrated audiobook the moment you're done. 70% royalty, no gatekeeper."
+          body="Penworth's own storefront publishes your ebook and AI-narrated audiobook the moment you're done. 75% royalty on ebook, 45% on audiobook, no gatekeeper. Livebook production is on us — we bring readers to your book."
           count={t('publish.showcase.mech1Count', locale)}
         />
         <MechanismCard

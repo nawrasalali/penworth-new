@@ -388,7 +388,7 @@ export default function SellPage() {
               <p className="text-sm text-gray-500 mt-2">
                 {parseFloat(price) === 0 
                   ? 'Your book will be free to download'
-                  : `You'll earn $${(parseFloat(price) * 0.85).toFixed(2)} per sale (85% after fees)`}
+                  : `You'll earn $${(parseFloat(price) * 0.75).toFixed(2)} per sale (75% of list price). Livebook production is on Penworth — we build and monetise it separately.`}
               </p>
             </CardContent>
           </Card>
