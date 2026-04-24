@@ -977,8 +977,37 @@ function EditorContentNew() {
   };
 
   // Handler: Upload author photo
+  //
+  // Posts the file to /api/author/photo which writes to the public
+  // `covers` bucket under author-photos/{userId}/{sessionId}.{ext} and
+  // updates interview_sessions.author_photo_url. After success we
+  // refresh the session so the new URL flows into CoverDesignScreen
+  // without a page reload.
   const handleUploadAuthorPhoto = async (file: File) => {
-    toast.info(t('editor.photoSoon', locale));
+    try {
+      const fd = new FormData();
+      fd.append('projectId', projectId);
+      fd.append('file', file);
+
+      const resp = await fetch('/api/author/photo', { method: 'POST', body: fd });
+      const data = await resp.json();
+      if (!resp.ok || data.error) {
+        toast.error(data.error || t('editor.photoUploadFailed', locale));
+        return;
+      }
+
+      toast.success(t('editor.photoUploaded', locale));
+
+      // Refresh session so CoverDesignScreen picks up author_photo_url.
+      const sessionResponse = await fetch(`/api/interview-session?projectId=${projectId}`);
+      const sessionData = await sessionResponse.json();
+      if (sessionData.session) {
+        setSession(sessionData.session);
+      }
+    } catch (err) {
+      console.error('photo upload error:', err);
+      toast.error(t('editor.photoUploadFailed', locale));
+    }
   };
 
   // Handler: Extract from LinkedIn
