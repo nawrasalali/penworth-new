@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import CommissionCalculator from '@/components/guild/commission-calculator';
 
 export default async function GuildLandingPage() {
   // If the viewer is an authenticated user who's already a guild member
@@ -347,43 +348,9 @@ function EconomicsSection() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[#d4af37]/20 bg-gradient-to-br from-[#0f1424] to-[#0a0e1a] p-8 md:p-10">
-          <div className="text-xs font-semibold uppercase tracking-widest text-[#d4af37]">
-            Earnings calculator
-          </div>
-          <div className="mt-4 font-serif text-2xl leading-tight tracking-tight text-[#e7e2d4]">
-            What a Journeyman earns at 25%, with 10 active retained referrals on Pro ($19/mo):
-          </div>
-          <div className="mt-8 space-y-3">
-            <CalcRow label="Per referral, per month" value="$4.75" />
-            <CalcRow label="10 active referrals, per month" value="$47.50" />
-            <CalcRow label="10 active referrals × 12 months" value="$570.00" highlight />
-          </div>
-          <div className="mt-8 rounded-md bg-[#0a0e1a] p-5 text-sm leading-relaxed text-[#8a8370]">
-            At Master tier (35% on Max subscribers at $49/mo) with 100 active referrals, that
-            becomes <span className="font-semibold text-[#d4af37]">$1,715/month</span>, or{' '}
-            <span className="font-semibold text-[#d4af37]">$20,580/year</span>.
-          </div>
-        </div>
+        <CommissionCalculator />
       </div>
     </section>
-  );
-}
-
-function CalcRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
-  return (
-    <div
-      className={`flex items-center justify-between rounded-md px-4 py-3 ${
-        highlight ? 'border border-[#d4af37]/30 bg-[#d4af37]/5' : 'bg-[#0a0e1a]'
-      }`}
-    >
-      <span className={`text-sm ${highlight ? 'text-[#e7e2d4]' : 'text-[#c9c2b0]'}`}>{label}</span>
-      <span
-        className={`font-serif text-xl tracking-tight ${highlight ? 'text-[#d4af37]' : 'text-[#e7e2d4]'}`}
-      >
-        {value}
-      </span>
-    </div>
   );
 }
 
