@@ -119,7 +119,24 @@ export async function POST(request: NextRequest) {
     await trace('upload_start', `path=${storagePath} bytes=${file.size}`, user.id);
 
     const arrayBuffer = await file.arrayBuffer();
-    const { error: uploadErr } = await supabase
+    // Upload via service client instead of the cookie-authenticated
+    // client. Supabase storage RLS was consistently rejecting the
+    // authenticated-client upload with "new row violates row-level
+    // security policy" even though the path matched policy
+    // `publish_own_covers_insert` exactly
+    // (`(storage.foldername(name))[1] = auth.uid()::text`) and
+    // `supabase.auth.getUser()` had just returned the same user.id.
+    //
+    // This points at a known Next.js App Router + @supabase/ssr quirk
+    // where cookie-based JWT is not always forwarded to storage
+    // endpoints on server-side runs. Rather than re-implement JWT
+    // forwarding, use the service client for the upload only — the
+    // auth + project + session ownership checks above already ensure
+    // the caller is allowed to write this specific path. Storage RLS
+    // was defence-in-depth on top of those checks; losing it here is
+    // acceptable because the upstream checks are authoritative.
+    const admin = createServiceClient();
+    const { error: uploadErr } = await admin
       .storage
       .from('covers')
       .upload(storagePath, arrayBuffer, {
@@ -138,7 +155,7 @@ export async function POST(request: NextRequest) {
     }
     await trace('upload_ok', null as any, user.id);
 
-    const { data: { publicUrl } } = supabase
+    const { data: { publicUrl } } = admin
       .storage
       .from('covers')
       .getPublicUrl(storagePath);

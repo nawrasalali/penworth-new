@@ -100,14 +100,14 @@ export async function POST(request: NextRequest) {
     if (isRegeneration) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('credits')
+        .select('credits_balance')
         .eq('id', user.id)
         .single();
 
-      if (!profile || profile.credits < creditCost) {
-        await trace('insufficient_credits', `have=${profile?.credits ?? 0} need=${creditCost}`, user.id, sessionId);
+      if (!profile || (profile.credits_balance ?? 0) < creditCost) {
+        await trace('insufficient_credits', `have=${profile?.credits_balance ?? 0} need=${creditCost}`, user.id, sessionId);
         return NextResponse.json(
-          { error: `Not enough credits to regenerate. You have ${profile?.credits ?? 0}, need ${creditCost}. Your first cover generation is free; each regeneration after that costs ${creditCost} credits.`, required: creditCost, available: profile?.credits || 0 },
+          { error: `Not enough credits to regenerate. You have ${profile?.credits_balance ?? 0}, need ${creditCost}. Your first cover generation is free; each regeneration after that costs ${creditCost} credits.`, required: creditCost, available: profile?.credits_balance || 0 },
           { status: 402 }
         );
       }
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
       // Deduct credits
       await supabase
         .from('profiles')
-        .update({ credits: profile.credits - creditCost })
+        .update({ credits_balance: (profile.credits_balance ?? 0) - creditCost })
         .eq('id', user.id);
     }
 
