@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import {
   AlertTriangle,
   Activity,
+  Coins,
   DollarSign,
   LifeBuoy,
   ShieldCheck,
@@ -108,6 +109,15 @@ export default async function CommandCenterPage() {
             >
               <Settings className="h-4 w-4" />
               <span className="text-sm font-semibold">Settings</span>
+            </Link>
+          )}
+          {session.adminRole === 'super_admin' && (
+            <Link
+              href="/admin/command-center/grants"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted whitespace-nowrap"
+            >
+              <Coins className="h-4 w-4" />
+              <span className="text-sm font-semibold">Grant credits</span>
             </Link>
           )}
           <Link
