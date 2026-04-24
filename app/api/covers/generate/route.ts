@@ -118,7 +118,27 @@ export async function POST(request: NextRequest) {
     let ideogramPrompt: string;
 
     if (coverType === 'front') {
-      ideogramPrompt = prompt || buildDefaultFrontCoverPrompt(bookTitle, bookDescription);
+      // BUG FIX (CEO-072): when the user picked a suggestion chip (e.g.
+      // "Bold and eye-catching with vibrant colors"), the old code sent
+      // ONLY that style tag to Ideogram with no book context. With
+      // style_type=REALISTIC + magic_prompt=AUTO, Ideogram interpreted
+      // a style-only brief as stock food photography and produced a
+      // bowl of fruit for a book about AI. Fix: the book's title and
+      // subject ALWAYS ride in the prompt. The user's chosen prompt
+      // becomes the *style* directive layered on top.
+      const userStyle = (prompt ?? '').trim();
+      if (userStyle) {
+        const topicLine = bookDescription
+          ? `Book title: "${bookTitle}". Subject: ${bookDescription}.`
+          : `Book title: "${bookTitle}".`;
+        ideogramPrompt =
+          `${topicLine}\n\nVisual style: ${userStyle}.\n\n` +
+          `Create a book cover whose imagery directly evokes the book's subject. ` +
+          `Keep the style direction but never produce generic stock imagery (no food, no abstract fruit, ` +
+          `no unrelated photography). The cover must feel specific to this book.`;
+      } else {
+        ideogramPrompt = buildDefaultFrontCoverPrompt(bookTitle, bookDescription);
+      }
       // Add instruction to NOT include text
       ideogramPrompt += '\n\nIMPORTANT: Do NOT include any text, words, letters, or typography in the image. The image should be purely visual with no text elements. Leave space at the top and bottom for text overlay.';
     } else {
@@ -155,7 +175,11 @@ export async function POST(request: NextRequest) {
           aspect_ratio: 'ASPECT_2_3', // Book cover ratio
           model: 'V_2',
           magic_prompt_option: 'AUTO',
-          style_type: 'REALISTIC', // or 'DESIGN' for more stylized
+          // DESIGN produces stylized graphic-design output that reads as
+          // a book cover. REALISTIC nudges Ideogram toward stock
+          // photography — which is how a book about AI ended up with
+          // a fruit photo (CEO-072).
+          style_type: 'DESIGN',
         },
       }),
     });
