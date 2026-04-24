@@ -19,6 +19,7 @@ import {
   Heart,
   User,
   Baby,
+  Sparkles,
 } from 'lucide-react';
 import type { ContentType } from '@/types';
 
@@ -211,7 +212,7 @@ function NewProjectContent() {
             Back to Projects
           </button>
           <h1 className="text-3xl font-bold tracking-tight">Create New Project</h1>
-          <p className="text-muted-foreground mt-1">What kind of document are you writing?</p>
+          <p className="text-muted-foreground mt-1">What kind of book are you writing?</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -281,7 +282,7 @@ function NewProjectContent() {
                 Your Special Pro grant for {grantCategoryLabel} is available
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                This document will be created at no cost to your credit balance.
+                This book will be created at no cost to your credit balance.
               </p>
             </div>
           </div>
