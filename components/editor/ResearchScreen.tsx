@@ -55,7 +55,9 @@ export function ResearchScreen({
   const selectedCount = resources.filter(r => r.isSelected).length;
 
   return (
-    <div className="flex-1 flex flex-col p-6 max-w-3xl mx-auto w-full">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6 pb-10 max-w-3xl mx-auto w-full">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
@@ -100,7 +102,7 @@ export function ResearchScreen({
               <label
                 key={resource.id}
                 className={cn(
-                  'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                  'flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
                   resource.isSelected 
                     ? 'bg-primary/10 border-primary' 
                     : 'hover:bg-muted'
@@ -110,12 +112,12 @@ export function ResearchScreen({
                   type="checkbox"
                   checked={resource.isSelected}
                   onChange={() => onToggleResource(resource.id)}
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="h-4 w-4 rounded border-gray-300 mt-0.5 flex-shrink-0"
                 />
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm">{resource.title}</div>
                   {resource.summary && (
-                    <div className="text-xs text-muted-foreground truncate">
+                    <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
                       {resource.summary}
                     </div>
                   )}
@@ -217,6 +219,8 @@ export function ResearchScreen({
           {t('research.selectAtLeastOne', locale)}
         </p>
       )}
+        </div>
+      </div>
     </div>
   );
 }
