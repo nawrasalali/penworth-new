@@ -83,7 +83,13 @@ export async function POST(request: NextRequest) {
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
     // Deterministic path per session so re-uploads overwrite cleanly and
     // we never accumulate orphaned headshots for the same author.
-    const storagePath = `author-photos/${user.id}/${session.id}.${ext || 'jpg'}`;
+    //
+    // IMPORTANT: userId must be the first folder segment. The `covers`
+    // bucket's RLS policy (publish_own_covers_insert) requires
+    // `(storage.foldername(name))[1] = auth.uid()::text` on INSERT. An
+    // `author-photos/{userId}/...` layout would be rejected; we put
+    // userId first and use `author-photos` as a subfolder instead.
+    const storagePath = `${user.id}/author-photos/${session.id}.${ext || 'jpg'}`;
 
     const arrayBuffer = await file.arrayBuffer();
     const { error: uploadErr } = await supabase
