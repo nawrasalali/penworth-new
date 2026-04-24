@@ -64,11 +64,12 @@ const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/;
 let zoneCache: Set<string> | null = null;
 function supportedTimezones(): Set<string> | null {
   if (zoneCache) return zoneCache;
-  // @ts-expect-error — supportedValuesOf is a relatively new Intl API
-  if (typeof Intl.supportedValuesOf !== 'function') return null;
+  const supported = (
+    Intl as unknown as { supportedValuesOf?: (key: string) => string[] }
+  ).supportedValuesOf;
+  if (typeof supported !== 'function') return null;
   try {
-    // @ts-expect-error — see above
-    const zones: string[] = Intl.supportedValuesOf('timeZone');
+    const zones = supported('timeZone');
     zoneCache = new Set(zones);
     return zoneCache;
   } catch {
