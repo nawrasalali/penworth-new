@@ -322,6 +322,33 @@ function EditorContentNew() {
     publishing: 'waiting',
   };
 
+  // Auto-start QA checks when the user lands on the QA step with no prior run.
+  //
+  // Previously startQAChecks() was invoked from exactly one place: the 'complete'
+  // message of the Writing SSE stream. That meant users who reloaded mid-writing,
+  // navigated away and came back after writing finished, or lost their SSE
+  // connection would land on /editor at current_agent='qa' staring at six
+  // pending checkboxes and a disabled "I agree & continue" button — the automatic
+  // review never started because nothing triggered it.
+  //
+  // This effect runs once per mount, only when we're actually on the QA step
+  // and haven't already kicked off or completed a run. The qaAutoStartedRef
+  // guards against React Strict Mode double-invoke and against re-firing if
+  // qaChecks state churns.
+  const qaAutoStartedRef = useRef(false);
+  useEffect(() => {
+    if (loading) return;
+    if (currentAgent !== 'qa') return;
+    if (qaAutoStartedRef.current) return;
+    if (isCheckingQA) return;
+    // Only auto-start if every check is still 'pending' — i.e. we haven't
+    // already completed a run in this session or hydrated passed/warning state.
+    const allPending = qaChecks.length > 0 && qaChecks.every(c => c.status === 'pending');
+    if (!allPending) return;
+    qaAutoStartedRef.current = true;
+    startQAChecks();
+  }, [loading, currentAgent, qaChecks, isCheckingQA]);
+
   // Author info
   // Author info: session first (user already edited), else profile fallback
   const authorInfo: AuthorInfo = {
