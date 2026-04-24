@@ -23,21 +23,21 @@ export const revalidate = 0;
  *
  * Founder's instrument panel. Per-role visibility:
  *
- *   super_admin    â every panel (system capacity, pipeline, agent load,
+ *   super_admin    — every panel (system capacity, pipeline, agent load,
  *                    incidents, alerts, financial, CS)
- *   ops_admin      â pipeline + agent load + incidents + CS ticket counts
- *   finance_admin  â MRR / webhook health / commission / AI cost panels
- *   cs_admin       â open tickets + stuck sessions + probation members
+ *   ops_admin      — pipeline + agent load + incidents + CS ticket counts
+ *   finance_admin  — MRR / webhook health / commission / AI cost panels
+ *   cs_admin       — open tickets + stuck sessions + probation members
  *
  * Hydration is a single query against the role-specific view
  * (v_command_center_{super_admin,ops,finance,cs}). Each view has a
  * has_admin_role() WHERE clause so a non-scoped admin who somehow
  * reached this route would get an empty result rather than data
- * leakage â though they shouldn't reach it, because the layout +
+ * leakage — though they shouldn't reach it, because the layout +
  * requireAdminRole gate them first.
  *
  * Alerts UI (notification bell, ack/resolve buttons) comes in a
- * follow-up commit â this page is the first cut.
+ * follow-up commit — this page is the first cut.
  */
 export default async function CommandCenterPage() {
   // Any admin role can land here; scoping happens per-panel below.
@@ -192,8 +192,8 @@ function NowStrip({ data, adminRole }: { data: any; adminRole: AdminRole }) {
   const capacity = adminRole === 'super_admin' ? data?.system_capacity : null;
 
   const pipelinesRunning =
-    capacity?.pipelines_running_now ?? pipeline?.sessions_active ?? 'â';
-  const noraActive = capacity?.nora_active_now ?? 'â';
+    capacity?.pipelines_running_now ?? pipeline?.sessions_active ?? '—';
+  const noraActive = capacity?.nora_active_now ?? '—';
   const stuckNow = pipeline?.sessions_stuck ?? 0;
   const successRate = pipeline?.success_rate_24h_pct;
 
@@ -207,7 +207,7 @@ function NowStrip({ data, adminRole }: { data: any; adminRole: AdminRole }) {
       <NowCell
         icon={Activity}
         label="24h success"
-        value={successRate != null ? `${Number(successRate).toFixed(0)}%` : 'â'}
+        value={successRate != null ? `${Number(successRate).toFixed(0)}%` : '—'}
         accent="text-emerald-500"
       />
     </div>
@@ -234,7 +234,7 @@ function NowCell({
         <Icon className={`h-4 w-4 ${accent}`} />
       </div>
       <div className={`text-2xl font-bold tabular-nums ${accent}`}>
-        {value ?? 'â'}
+        {value ?? '—'}
       </div>
     </div>
   );
@@ -267,7 +267,7 @@ function CapacityStat({ label, value }: { label: string; value: string | number 
         {label}
       </div>
       <div className="text-lg font-bold tabular-nums">
-        {value == null ? 'â' : Number(value).toLocaleString()}
+        {value == null ? '—' : Number(value).toLocaleString()}
       </div>
     </div>
   );
@@ -284,7 +284,7 @@ function IncidentsPanel({ incidents }: { incidents: any[] }) {
           Pipeline incidents
         </h2>
         <span className="text-xs text-muted-foreground">
-          {open.length} open Â· {incidents.length} recent
+          {open.length} open · {incidents.length} recent
         </span>
       </div>
       {incidents.length === 0 ? (
@@ -306,14 +306,14 @@ function IncidentsPanel({ incidents }: { incidents: any[] }) {
                 <div className="text-sm font-medium flex items-center gap-2">
                   <SeverityBadge severity={inc.severity} />
                   <span className="truncate">
-                    {inc.incident_type.replace('_', ' ')} Â· {inc.agent ?? 'â'}
+                    {inc.incident_type.replace('_', ' ')} · {inc.agent ?? '—'}
                   </span>
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
                   {formatDistanceToNow(new Date(inc.detected_at), {
                     addSuffix: true,
                   })}
-                  {' Â· session '}
+                  {' · session '}
                   <code className="font-mono">{String(inc.session_id).slice(0, 8)}</code>
                 </div>
               </div>
@@ -321,7 +321,7 @@ function IncidentsPanel({ incidents }: { incidents: any[] }) {
                 href={`/admin/command-center/incidents/${inc.id}`}
                 className="text-xs font-semibold text-primary hover:underline shrink-0"
               >
-                {inc.resolved ? 'View' : 'Resolve â'}
+                {inc.resolved ? 'View' : 'Resolve →'}
               </Link>
             </div>
           ))}
@@ -386,12 +386,12 @@ function FinancePanel({ data }: { data: any }) {
           value={
             data?.minutes_since_last_webhook != null
               ? Number(data.minutes_since_last_webhook).toFixed(0)
-              : 'â'
+              : '—'
           }
           accent={Number(data?.minutes_since_last_webhook ?? 0) > 360 ? 'text-red-500' : undefined}
         />
-        <FinStat label="AI cost 1h" value={data?.ai_cost_1h != null ? `$${Number(data.ai_cost_1h).toFixed(2)}` : 'â'} />
-        <FinStat label="AI cost 24h" value={data?.ai_cost_24h != null ? `$${Number(data.ai_cost_24h).toFixed(2)}` : 'â'} />
+        <FinStat label="AI cost 1h" value={data?.ai_cost_1h != null ? `$${Number(data.ai_cost_1h).toFixed(2)}` : '—'} />
+        <FinStat label="AI cost 24h" value={data?.ai_cost_24h != null ? `$${Number(data.ai_cost_24h).toFixed(2)}` : '—'} />
         {data?.ai_cost_mtd != null && (
           <FinStat label="AI cost MTD" value={`$${Number(data.ai_cost_mtd).toFixed(2)}`} />
         )}
@@ -444,13 +444,13 @@ function SupportPanel({ data, adminRole }: { data: any; adminRole: AdminRole }) 
         Support
       </h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-        <FinStat label="Tickets open" value={openTickets ?? 'â'} />
+        <FinStat label="Tickets open" value={openTickets ?? '—'} />
         <FinStat
           label={adminRole === 'super_admin' ? 'Nora active (1h)' : 'Nora open convos 24h'}
-          value={noraConvos ?? 'â'}
+          value={noraConvos ?? '—'}
         />
-        <FinStat label="Members probation" value={probation ?? 'â'} />
-        <FinStat label="Fraud flags open" value={fraud ?? 'â'} />
+        <FinStat label="Members probation" value={probation ?? '—'} />
+        <FinStat label="Fraud flags open" value={fraud ?? '—'} />
         {failures != null && (
           <FinStat
             label="Authors failed 24h"
@@ -474,7 +474,7 @@ function RecentAlertsPanel({ alerts }: { alerts: any[] }) {
           Recent alerts
         </h2>
         <Link href="/admin/command-center/alerts" className="text-xs font-semibold text-primary hover:underline">
-          View all â
+          View all →
         </Link>
       </div>
       <div className="space-y-2">
@@ -489,7 +489,7 @@ function RecentAlertsPanel({ alerts }: { alerts: any[] }) {
                 <span className="truncate">{a.title}</span>
               </div>
               <div className="text-xs text-muted-foreground mt-0.5">
-                {formatDistanceToNow(new Date(a.sent_at), { addSuffix: true })} Â· {a.category} Â· {a.delivery_status}
+                {formatDistanceToNow(new Date(a.sent_at), { addSuffix: true })} · {a.category} · {a.delivery_status}
               </div>
             </div>
             {!a.acknowledged_at && (
@@ -497,7 +497,7 @@ function RecentAlertsPanel({ alerts }: { alerts: any[] }) {
                 href={`/admin/command-center/alerts/${a.id}`}
                 className="text-xs font-semibold text-primary hover:underline shrink-0"
               >
-                Ack â
+                Ack →
               </Link>
             )}
           </div>
