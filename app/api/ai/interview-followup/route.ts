@@ -6,6 +6,8 @@ import { getUserLanguage, languageDirective } from '@/lib/ai/user-language';
 import { getTemplate } from '@/lib/ai/document-templates';
 import { getValidationRubric } from '@/lib/ai/interview-questions';
 
+export const maxDuration = 300;
+
 const anthropic = new Anthropic();
 
 interface DynamicFollowup {
