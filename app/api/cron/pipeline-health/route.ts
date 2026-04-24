@@ -27,20 +27,24 @@ export const dynamic = 'force-dynamic';
  *        retry:true                        → fire an Inngest event to
  *                                            resume the agent; mark
  *                                            session 'recovering'
- *        retry:false, action:'escalate_to_user'   → session is
- *                                            definitively dead; mark
- *                                            'failed' and email the
- *                                            author
- *        retry:false, action:'escalate_to_admin'  → chronic stuck
- *                                            pattern; alert already
- *                                            fired by incident trigger;
- *                                            leave session 'stuck' and
- *                                            mark the incident
- *                                            escalated
+ *        retry:false, action:'escalate_to_admin'  → terminal state.
+ *                                            Two reasons reach here:
+ *                                            retry_budget_exhausted
+ *                                            (failure_count ≥ 5) and
+ *                                            chronic_stuck_pattern
+ *                                            (> 5 historical stuck
+ *                                            incidents on this session).
+ *                                            Alert already fired by the
+ *                                            incident trigger; mark the
+ *                                            session 'failed' if budget
+ *                                            exhausted so the UI stops
+ *                                            spinning, else leave 'stuck'
+ *                                            for the chronic case.
  *
- * This cron is the single authority for auto-recovery. The incident
- * trigger pages the founder for awareness; this cron does the actual
- * routing between retry / user notification / admin escalation.
+ * Authors are never emailed when their pipeline is stuck. That's an
+ * internal problem (CEO-031); ops owns it via the founder-facing alert
+ * stream. This cron is the single authority for auto-recovery and
+ * routes only between retry / admin escalation.
  *
  * Idempotent by construction: pipeline_detect_stuck_sessions only
  * returns sessions that don't already have an unresolved stuck_agent
@@ -120,7 +124,7 @@ export async function GET(request: NextRequest) {
       const d = decision as {
         retry: boolean;
         reason: string;
-        action?: 'escalate_to_user' | 'escalate_to_admin';
+        action?: 'escalate_to_admin';
         retry_attempt?: number;
         current_agent?: string;
         failure_count?: number;
@@ -191,7 +195,7 @@ export async function GET(request: NextRequest) {
         // agents get the event too but no consumer yet — they'll show
         // up in dashboards as 'recovering' without progressing, which
         // is fine: the stuck detector will flag them again, failure_count
-        // will rise, and they'll eventually escalate_to_user.
+        // will rise, and they'll eventually escalate_to_admin.
         try {
           await inngest.send({
             name: 'pipeline.restart-agent',
@@ -217,108 +221,61 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      if (d.action === 'escalate_to_user') {
-        // ---- USER-FACING FAILURE ----
-        // Mark the session definitively failed so the UI switches from
-        // "Nora is investigating" to the retry/resume affordance.
-        await admin
-          .from('interview_sessions')
-          .update({
-            pipeline_status: 'failed',
-            agent_heartbeat_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            user_notified_at: new Date().toISOString(),
-          })
-          .eq('id', s.session_id);
-
-        // Also mark the project errored so the SSE stream closes.
-        const { data: sess } = await admin
-          .from('interview_sessions')
-          .select('project_id')
-          .eq('id', s.session_id)
-          .single();
-        if (sess?.project_id) {
-          await admin
-            .from('projects')
-            .update({
-              status: 'error',
-              metadata: {
-                errorMessage: 'Exhausted auto-retry budget',
-                failedAt: new Date().toISOString(),
-              },
-            })
-            .eq('id', sess.project_id);
-        }
-
-        // Queue the user email via alert_log. The alert_dispatch path
-        // handles dedup + recipient routing for recipients_json; we
-        // just feed it an entry targeting the author's own email.
-        // alert_recipients routing is category-based, not per-user, so
-        // for author-facing failure mail we bypass it entirely and
-        // write recipients_json directly.
-        //
-        // Email source: profiles.email is populated on signup and
-        // readable by the service role. auth.users isn't PostgREST-
-        // addressable, so we don't try.
-        const { data: prof } = await admin
-          .from('profiles')
-          .select('email, full_name')
-          .eq('id', s.user_id)
-          .maybeSingle();
-        const authorEmail = prof?.email ?? null;
-        const authorName = prof?.full_name ?? 'Author';
-
-        if (authorEmail) {
-          await admin.from('alert_log').insert({
-            source_type: 'manual',
-            source_id: s.session_id,
-            severity: 'p2',
-            category: 'user_support',
-            title: 'Your document hit a problem — progress saved',
-            body:
-              `Hi ${authorName},\n\n` +
-              `We ran into a problem writing your document and our auto-retry budget is exhausted.\n\n` +
-              `Your progress so far is saved. You can pick up where we left off from your dashboard.\n\n` +
-              `If this keeps happening please reply to this email and our team will look into it directly.`,
-            dedup_key: `user_failure:${s.session_id}`,
-            recipients_json: [{ email: authorEmail, name: authorName }],
-            delivery_status: 'pending',
-          });
-        } else {
-          console.warn(`[pipeline-health] no email for user ${s.user_id} — user notification skipped`);
-        }
-
-        // Mark the incident resolved (escalated to user is a terminal
-        // state from the auto-recovery loop's perspective).
-        await admin
-          .from('pipeline_incidents')
-          .update({
-            resolved: true,
-            resolved_at: new Date().toISOString(),
-            resolution_note: `Escalated to user after ${d.failure_count ?? '?'} failed attempts`,
-            recovery_action_taken: 'escalate_to_user',
-            user_notified_at: new Date().toISOString(),
-          })
-          .eq('id', s.incident_id);
-
-        results.push({
-          session_id: s.session_id,
-          outcome: 'escalated_to_user',
-          failure_count: d.failure_count,
-          notified_email: authorEmail ? 'queued' : 'missing',
-        });
-        continue;
-      }
-
       if (d.action === 'escalate_to_admin') {
-        // ---- CHRONIC STUCK PATTERN ----
-        // Alert was already fired by the incident trigger. Just mark
-        // the incident as escalated and leave the session 'stuck' —
-        // the founder will resolve manually from the Command Center.
+        // ---- TERMINAL STATE: ADMIN ESCALATION ----
+        // Two reasons reach here:
+        //   • retry_budget_exhausted — failure_count ≥ 5. Flip the
+        //     session to 'failed' so the UI stops showing "recovering"
+        //     and error the project so any open SSE stream closes.
+        //   • chronic_stuck_pattern — session has > 5 historical stuck
+        //     incidents. Leave session 'stuck'; the founder will resolve
+        //     manually from Command Center.
+        //
+        // No author email in either case. That's the whole point of
+        // CEO-031: stuck-agent failures are an internal problem and
+        // the founder owns them via the alert stream.
+        if (d.reason === 'retry_budget_exhausted') {
+          await admin
+            .from('interview_sessions')
+            .update({
+              pipeline_status: 'failed',
+              agent_heartbeat_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', s.session_id);
+
+          const { data: sess } = await admin
+            .from('interview_sessions')
+            .select('project_id')
+            .eq('id', s.session_id)
+            .single();
+          if (sess?.project_id) {
+            await admin
+              .from('projects')
+              .update({
+                status: 'error',
+                metadata: {
+                  errorMessage: 'Exhausted auto-retry budget',
+                  failedAt: new Date().toISOString(),
+                },
+              })
+              .eq('id', sess.project_id);
+          }
+        }
+
+        // Mark the incident escalated + resolved. The incident trigger
+        // already paged the founder when this incident first fired;
+        // nothing more to dispatch here.
         await admin
           .from('pipeline_incidents')
           .update({
             escalated_to_admin: true,
+            resolved: true,
+            resolved_at: new Date().toISOString(),
+            resolution_note:
+              d.reason === 'retry_budget_exhausted'
+                ? `Escalated to admin after ${d.failure_count ?? '?'} failed attempts`
+                : `Escalated to admin — chronic stuck pattern (${d.stuck_count ?? '?'} incidents)`,
             recovery_action_taken: 'escalate_to_admin',
           })
           .eq('id', s.incident_id);
@@ -326,6 +283,8 @@ export async function GET(request: NextRequest) {
         results.push({
           session_id: s.session_id,
           outcome: 'escalated_to_admin',
+          reason: d.reason,
+          failure_count: d.failure_count,
           stuck_count: d.stuck_count,
         });
         continue;

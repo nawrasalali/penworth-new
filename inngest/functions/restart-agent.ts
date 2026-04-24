@@ -12,8 +12,9 @@ const supabase = createClient(
  *
  * Fired by two places:
  *   1. /api/cron/pipeline-health — auto-retry path. Bumps failure_count
- *      before firing. Carries `attempt: 1|2|3` and terminates via the
- *      escalate_to_user branch once failure_count hits the cap.
+ *      before firing. Carries `attempt: 1..5` and terminates via the
+ *      escalate_to_admin branch once failure_count hits the cap
+ *      (CEO-031: retry ceiling=5, authors never emailed on stuck agents).
  *   2. /api/admin/incidents/[id]/force-retry — super-admin override.
  *      Carries `attempt: -1` sentinel. No cap — a human is watching.
  *
