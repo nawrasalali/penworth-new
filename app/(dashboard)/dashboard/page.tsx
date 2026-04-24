@@ -9,8 +9,9 @@ import {
   TrendingUp,
   ArrowRight,
   BookOpen,
-  GraduationCap,
-  Briefcase,
+  PenLine,
+  User,
+  Heart,
   Coins,
   Crown,
   Handshake,
@@ -18,16 +19,19 @@ import {
 import { formatRelativeTime, formatWordCount, CONTENT_TYPE_LABELS, STATUS_COLORS } from '@/lib/utils';
 import { t, isSupportedLocale, type Locale, type StringKey } from '@/lib/i18n/strings';
 
+// Quick start templates: the four most-common book types a Penworth writer
+// starts from. These align with book category IDs in /projects/new so the
+// `?type=` query pre-selects the category on the new-project page.
 const quickStartTemplates: Array<{
   icon: typeof BookOpen;
   labelKey: StringKey;
   descKey: StringKey;
   type: string;
 }> = [
-  { icon: BookOpen, labelKey: 'dashboard.tpl.book', descKey: 'dashboard.tpl.book.desc', type: 'book' },
-  { icon: FileText, labelKey: 'dashboard.tpl.paper', descKey: 'dashboard.tpl.paper.desc', type: 'paper' },
-  { icon: Briefcase, labelKey: 'dashboard.tpl.businessPlan', descKey: 'dashboard.tpl.businessPlan.desc', type: 'business_plan' },
-  { icon: GraduationCap, labelKey: 'dashboard.tpl.educational', descKey: 'dashboard.tpl.educational.desc', type: 'educational' },
+  { icon: BookOpen, labelKey: 'dashboard.tpl.nonFiction', descKey: 'dashboard.tpl.nonFiction.desc', type: 'non-fiction' },
+  { icon: PenLine,  labelKey: 'dashboard.tpl.fiction',    descKey: 'dashboard.tpl.fiction.desc',    type: 'fiction'     },
+  { icon: User,     labelKey: 'dashboard.tpl.memoir',     descKey: 'dashboard.tpl.memoir.desc',     type: 'memoir'      },
+  { icon: Heart,    labelKey: 'dashboard.tpl.selfHelp',   descKey: 'dashboard.tpl.selfHelp.desc',   type: 'self-help'   },
 ];
 
 const PLAN_COLORS = {
