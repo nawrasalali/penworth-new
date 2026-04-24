@@ -92,7 +92,6 @@ export const CONTENT_TYPE_LABELS: Record<string, string> = {
   'user_manual': 'User Manual',
   'specification': 'Specification',
   // Creative
-  'screenplay': 'Screenplay',
   'short_story': 'Short Story',
   'essay_collection': 'Essay Collection',
   // Fallback

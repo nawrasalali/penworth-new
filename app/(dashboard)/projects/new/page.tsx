@@ -6,22 +6,11 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
   BookOpen,
-  Briefcase,
-  GraduationCap,
-  Scale,
-  Code,
-  Sparkles,
   MoreHorizontal,
   ArrowLeft,
   Loader2,
   FileText,
-  Presentation,
-  LineChart,
   BookMarked,
-  FileCheck2,
-  ShieldCheck,
-  Gavel,
-  Wrench,
   BookType,
   Feather,
   PenLine,
@@ -30,10 +19,6 @@ import {
   Heart,
   User,
   Baby,
-  DollarSign,
-  Notebook,
-  FileSearch,
-  Target,
 } from 'lucide-react';
 import type { ContentType } from '@/types';
 
@@ -42,7 +27,7 @@ import type { ContentType } from '@/types';
 // Each category groups specific content types that share an author intent.
 // =============================================================================
 
-type CategoryId = 'books' | 'business' | 'academic' | 'legal' | 'technical' | 'creative' | 'other';
+type CategoryId = 'books' | 'other';
 
 interface ContentOption {
   id: ContentType;
@@ -64,101 +49,31 @@ const CATEGORIES: Category[] = [
   {
     id: 'books',
     label: 'Books',
-    description: 'Full-length manuscripts, memoirs, and narrative non-fiction',
+    description: 'Every form of book Penworth writes — fiction, non-fiction, memoir, poetry, and more',
     icon: BookOpen,
     accent: 'text-blue-600',
     options: [
-      { id: 'non-fiction',  label: 'Non-Fiction',        description: 'Expert guides, frameworks, or how-to books', icon: BookOpen },
-      { id: 'fiction',      label: 'Fiction',            description: 'Novels and narrative storytelling',          icon: PenLine },
-      { id: 'self-help',    label: 'Self-Help',          description: 'Personal growth and transformation',          icon: Heart },
-      { id: 'memoir',       label: 'Memoir',             description: 'Your life story or a specific chapter',       icon: User },
-      { id: 'biography',    label: 'Biography',          description: "Someone else's life story",                    icon: BookMarked },
-      { id: 'children',     label: "Children's Book",    description: 'Illustrated or chapter books for kids',       icon: Baby },
-      { id: 'cookbook',     label: 'Cookbook',           description: 'Recipes and culinary storytelling',            icon: Coffee },
-      { id: 'travel',       label: 'Travel Guide',       description: 'Destination guides and travel narratives',    icon: Map },
-    ],
-  },
-  {
-    id: 'business',
-    label: 'Business',
-    description: 'Plans, proposals, reports, and business books',
-    icon: Briefcase,
-    accent: 'text-emerald-600',
-    options: [
-      { id: 'business_plan',    label: 'Business Plan',    description: 'For investors, lenders, or internal use',        icon: Target },
-      { id: 'proposal',         label: 'Proposal',         description: 'Client, grant, or project proposals',            icon: FileCheck2 },
-      { id: 'white_paper',      label: 'White Paper',      description: 'Industry research or thought-leadership',        icon: FileSearch },
-      { id: 'pitch_deck',       label: 'Pitch Deck',       description: 'Fundraising or sales presentation',              icon: Presentation },
-      { id: 'financial_model',  label: 'Financial Model',  description: 'Projections, forecasts, and analysis',           icon: LineChart },
-      { id: 'report',           label: 'Report',           description: 'Market analysis, earnings, or strategy reports', icon: FileText },
-      { id: 'business',         label: 'Business Book',    description: 'A full-length business or leadership book',       icon: DollarSign },
-    ],
-  },
-  {
-    id: 'academic',
-    label: 'Academic',
-    description: 'Theses, papers, research, and educational material',
-    icon: GraduationCap,
-    accent: 'text-violet-600',
-    options: [
-      { id: 'thesis',          label: 'Thesis',            description: "Master's thesis with full methodology",         icon: GraduationCap },
-      { id: 'dissertation',    label: 'Dissertation',      description: 'Doctoral dissertation with original research',   icon: BookType },
-      { id: 'research_paper',  label: 'Research Paper',    description: 'Peer-reviewed or journal-style paper',           icon: FileSearch },
-      { id: 'paper',           label: 'Academic Paper',    description: 'Course paper, essay, or short-form scholarship', icon: Notebook },
-      { id: 'educational',     label: 'Educational Material', description: 'Curriculum, lesson plans, or courseware',    icon: BookMarked },
-      { id: 'academic',        label: 'Academic Book',     description: 'Full-length scholarly or textbook',               icon: BookOpen },
-    ],
-  },
-  {
-    id: 'legal',
-    label: 'Legal',
-    description: 'Contracts, policies, briefs, and governance documents',
-    icon: Scale,
-    accent: 'text-amber-600',
-    options: [
-      { id: 'contract',          label: 'Contract',           description: 'Service agreements, employment, freelance',  icon: FileCheck2 },
-      { id: 'nda',               label: 'NDA',                description: 'Non-disclosure / confidentiality agreement', icon: ShieldCheck },
-      { id: 'terms_of_service',  label: 'Terms of Service',   description: 'Product or SaaS terms of use',                icon: Gavel },
-      { id: 'privacy_policy',    label: 'Privacy Policy',     description: 'Data collection and privacy disclosures',     icon: ShieldCheck },
-      { id: 'policy_document',   label: 'Policy Document',    description: 'HR, internal, or corporate policy',           icon: FileText },
-      { id: 'legal_brief',       label: 'Legal Brief',        description: 'Memoranda, briefs, or legal analysis',        icon: Scale },
-    ],
-  },
-  {
-    id: 'technical',
-    label: 'Technical',
-    description: 'Documentation, specifications, and technical books',
-    icon: Code,
-    accent: 'text-sky-600',
-    options: [
-      { id: 'technical_doc',  label: 'Technical Documentation', description: 'Engineering or systems documentation', icon: FileText },
-      { id: 'api_docs',       label: 'API Documentation',       description: 'Reference docs for developers',          icon: Code },
-      { id: 'user_manual',    label: 'User Manual',             description: 'Product or software manual',             icon: Notebook },
-      { id: 'specification',  label: 'Specification',           description: 'Technical spec or RFC-style document',   icon: Wrench },
-      { id: 'technical',      label: 'Technical Book',          description: 'Full-length technical book',             icon: BookOpen },
-    ],
-  },
-  {
-    id: 'creative',
-    label: 'Creative',
-    description: 'Poetry, short fiction, screenplays, and essays',
-    icon: Sparkles,
-    accent: 'text-rose-600',
-    options: [
-      { id: 'poetry',            label: 'Poetry Collection', description: 'Curated volume of poems',            icon: Feather },
-      { id: 'short_story',       label: 'Short Story',       description: 'Single short story or novelette',    icon: PenLine },
-      { id: 'screenplay',        label: 'Screenplay',        description: 'Film or TV screenplay',              icon: Presentation },
-      { id: 'essay_collection',  label: 'Essay Collection',  description: 'Collection of personal essays',      icon: BookType },
+      { id: 'non-fiction',       label: 'Non-Fiction',        description: 'Expert guides, frameworks, or how-to books',   icon: BookOpen },
+      { id: 'fiction',           label: 'Fiction',            description: 'Novels and narrative storytelling',            icon: PenLine },
+      { id: 'memoir',            label: 'Memoir',             description: 'Your life story or a specific chapter',        icon: User },
+      { id: 'poetry',            label: 'Poetry Collection',  description: 'Curated volume of poems',                      icon: Feather },
+      { id: 'self-help',         label: 'Self-Help',           description: 'Personal growth and transformation',           icon: Heart },
+      { id: 'biography',         label: 'Biography',          description: "Someone else's life story",                     icon: BookMarked },
+      { id: 'children',          label: "Children's Book",    description: 'Illustrated or chapter books for kids',        icon: Baby },
+      { id: 'cookbook',          label: 'Cookbook',           description: 'Recipes and culinary storytelling',            icon: Coffee },
+      { id: 'travel',            label: 'Travel Guide',       description: 'Destination guides and travel narratives',     icon: Map },
+      { id: 'short_story',       label: 'Short Story',        description: 'Single short story or novelette',              icon: PenLine },
+      { id: 'essay_collection',  label: 'Essay Collection',   description: 'Collection of personal essays',                icon: BookType },
     ],
   },
   {
     id: 'other',
     label: 'Other',
-    description: 'Custom content that doesn\'t fit the categories above',
+    description: "Custom books that don't fit the categories above",
     icon: MoreHorizontal,
     accent: 'text-slate-600',
     options: [
-      { id: 'other', label: 'Custom Document', description: 'Describe what you want to write', icon: FileText },
+      { id: 'other', label: 'Custom Book', description: 'Describe what you want to write', icon: FileText },
     ],
   },
 ];
@@ -170,26 +85,20 @@ const CATEGORIES: Category[] = [
 /**
  * Maps the CategoryId (UI-layer grouping) to the Guild showcase-grant macro
  * category used by guild_showcase_grants.category. MUST stay in sync with
- * public.guild_content_type_to_category() in the database — but we don't
- * need to replicate the full content_type mapping here because the new-
- * project flow already selects the UI category first (CategoryId), and that
- * CategoryId maps cleanly to a macro.
+ * public.guild_content_type_to_category() in the database.
  *
- * UI 'books'    → macro 'book'
- * UI 'business' → macro 'business'
- * UI 'academic' → macro 'academic'
- * UI 'legal'    → macro 'legal'
- * UI 'technical'→ macro 'technical'
- * UI 'creative' → no grant eligibility (DB function returns NULL for
- *                 most creative types unless they map to 'book')
- * UI 'other'    → no grant eligibility (DB function returns NULL)
+ * CEO-038 (2026-04-23): trimmed from 5 mappings to 1. Penworth is a
+ * book-writing platform; non-book categories were removed from the picker,
+ * so only the 'books' UI category maps to a grant macro ('book'). The
+ * DB function public.guild_content_type_to_category() still returns the
+ * legacy macros for historical project rows, but the /projects/new flow
+ * only ever surfaces the book path now.
+ *
+ * UI 'books' → macro 'book'
+ * UI 'other' → no grant eligibility (DB function returns NULL)
  */
 const CATEGORY_ID_TO_GRANT_MACRO: Partial<Record<CategoryId, string>> = {
   books: 'book',
-  business: 'business',
-  academic: 'academic',
-  legal: 'legal',
-  technical: 'technical',
 };
 
 function NewProjectContent() {

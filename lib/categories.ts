@@ -1,6 +1,14 @@
 /**
  * Shared category taxonomy for Penworth content types.
  *
+ * CEO-038 (2026-04-23): trimmed to book types only. Penworth is a book-writing
+ * platform; non-book document types (business plans, legal contracts, academic
+ * theses, technical docs) are no longer surfaced in the picker even though the
+ * ContentType union retains them for historical project rows.
+ *
+ * Screenplay removed per Founder directive — a screenplay is a script, not a
+ * book, and the Author pipeline's craft prompts target prose formats.
+ *
  * Used by:
  *   - /projects/new   — category picker when creating a project
  *   - /projects       — grouping on the My Projects page
@@ -10,24 +18,9 @@
  */
 
 import type { ContentType } from '@/types';
-import {
-  BookOpen,
-  Briefcase,
-  GraduationCap,
-  Scale,
-  Code,
-  Sparkles,
-  MoreHorizontal,
-} from 'lucide-react';
+import { BookOpen, MoreHorizontal } from 'lucide-react';
 
-export type CategoryId =
-  | 'books'
-  | 'business'
-  | 'academic'
-  | 'legal'
-  | 'technical'
-  | 'creative'
-  | 'other';
+export type CategoryId = 'books' | 'other';
 
 export interface CategoryDef {
   id: CategoryId;
@@ -43,94 +36,28 @@ export const CATEGORIES: CategoryDef[] = [
   {
     id: 'books',
     label: 'Books',
-    description: 'Full-length manuscripts, memoirs, and narrative non-fiction',
+    description: 'Every form of book Penworth writes — fiction, non-fiction, memoir, poetry, and more',
     icon: BookOpen,
     accent: 'text-blue-600',
     contentTypes: [
       'non-fiction',
       'fiction',
-      'self-help',
       'memoir',
+      'poetry',
+      'self-help',
       'biography',
       'children',
       'cookbook',
       'travel',
+      'short_story',
+      'essay_collection',
       'book',
     ],
   },
   {
-    id: 'business',
-    label: 'Business',
-    description: 'Plans, proposals, reports, and business books',
-    icon: Briefcase,
-    accent: 'text-emerald-600',
-    contentTypes: [
-      'business_plan',
-      'proposal',
-      'white_paper',
-      'pitch_deck',
-      'financial_model',
-      'report',
-      'business',
-    ],
-  },
-  {
-    id: 'academic',
-    label: 'Academic',
-    description: 'Theses, papers, research, and educational material',
-    icon: GraduationCap,
-    accent: 'text-violet-600',
-    contentTypes: [
-      'thesis',
-      'dissertation',
-      'research_paper',
-      'paper',
-      'educational',
-      'academic',
-    ],
-  },
-  {
-    id: 'legal',
-    label: 'Legal',
-    description: 'Contracts, policies, briefs, and governance documents',
-    icon: Scale,
-    accent: 'text-amber-600',
-    contentTypes: [
-      'contract',
-      'nda',
-      'terms_of_service',
-      'privacy_policy',
-      'policy_document',
-      'policy',
-      'legal_brief',
-    ],
-  },
-  {
-    id: 'technical',
-    label: 'Technical',
-    description: 'Documentation, specifications, and technical books',
-    icon: Code,
-    accent: 'text-sky-600',
-    contentTypes: [
-      'technical_doc',
-      'api_docs',
-      'user_manual',
-      'specification',
-      'technical',
-    ],
-  },
-  {
-    id: 'creative',
-    label: 'Creative',
-    description: 'Poetry, short fiction, screenplays, and essays',
-    icon: Sparkles,
-    accent: 'text-rose-600',
-    contentTypes: ['poetry', 'short_story', 'screenplay', 'essay_collection'],
-  },
-  {
     id: 'other',
     label: 'Other',
-    description: "Custom content that doesn't fit the categories above",
+    description: "Custom books that don't fit the categories above",
     icon: MoreHorizontal,
     accent: 'text-slate-600',
     contentTypes: ['other'],
