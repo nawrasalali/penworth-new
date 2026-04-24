@@ -52,6 +52,16 @@ const MARGIN_BOTTOM = 54;  // 0.75"
 const MARGIN_INSIDE = 54;  // 0.75" — pdfkit lacks facing-page margins; use symmetric
 const MARGIN_OUTSIDE = 54; // 0.75"
 
+// Margins used on "chrome" pages (covers, title page, copyright, ToC,
+// About the Author). Chrome pages use absolute positioning for all
+// draws, so layout margins are irrelevant — but pdfkit also uses
+// `page.margins` as the input to its text-overflow heuristic (it adds
+// a page whenever `y + lineHeight > page.height - margins.bottom`).
+// Zeroing margins on chrome pages prevents overlay draws at y > 594
+// (e.g. back-cover blurb, footer stamps) from triggering phantom blank
+// pages at the end of the document.
+const CHROME_MARGINS = { top: 0, bottom: 0, left: 0, right: 0 };
+
 // ---- Typography ----
 // pdfkit ships these as built-in Type 1 fonts; no embedding needed.
 const F_BODY = 'Times-Roman';
@@ -279,6 +289,26 @@ function splitChapterTitle(raw: string): { label: string | null; clean: string }
   return { label: null, clean: trimmed };
 }
 
+/**
+ * Split a book title on its first colon into (main, subtitle). Bestseller
+ * covers treat the pre-colon portion as the primary title at display size
+ * and the post-colon portion as the subtitle at a smaller italic size —
+ * renders a 130-character monolithic title as two legible tiers instead
+ * of nine wrapped lines.
+ */
+function splitTitle(full: string): { main: string; subtitle: string | null } {
+  const s = (full || '').trim();
+  const colonIdx = s.indexOf(':');
+  if (colonIdx > 0 && colonIdx < s.length - 2) {
+    const main = s.slice(0, colonIdx).trim();
+    const sub = s.slice(colonIdx + 1).trim();
+    if (main.length >= 3 && main.length <= 60) {
+      return { main, subtitle: sub || null };
+    }
+  }
+  return { main: s, subtitle: null };
+}
+
 interface Span {
   text: string;
   bold: boolean;
@@ -420,59 +450,84 @@ function drawFullBleedImage(
 }
 
 function drawCoverOverlayBackdrop(doc: PDFKit.PDFDocument, pageW: number, pageH: number) {
-  // Top band for title (~35% of height) and bottom band for author (~18%).
-  // Semi-opaque black lets the underlying image read through.
-  doc.save();
-  doc.fillOpacity(0.55);
-  doc.rect(0, 0, pageW, pageH * 0.35).fill('#000');
-  doc.rect(0, pageH * 0.82, pageW, pageH * 0.18).fill('#000');
-  doc.restore();
-  doc.fillOpacity(1);
+  // Gradient fade from opaque black at the top edge to transparent a quarter
+  // of the way down — keeps the imagery visible behind the title rather than
+  // hiding it under a flat slab (v2 rendered ~35% of the cover as solid
+  // black which buried the artwork). Same treatment, shorter, at the bottom
+  // for the author byline.
+  const topH = pageH * 0.30;
+  const topGrad = doc.linearGradient(0, 0, 0, topH);
+  topGrad.stop(0, '#000', 0.85);
+  topGrad.stop(0.7, '#000', 0.45);
+  topGrad.stop(1, '#000', 0);
+  doc.rect(0, 0, pageW, topH).fill(topGrad);
+
+  const botH = pageH * 0.14;
+  const botY = pageH - botH;
+  const botGrad = doc.linearGradient(0, botY, 0, pageH);
+  botGrad.stop(0, '#000', 0);
+  botGrad.stop(0.5, '#000', 0.55);
+  botGrad.stop(1, '#000', 0.85);
+  doc.rect(0, botY, pageW, botH).fill(botGrad);
+
+  doc.fillColor('#000');
 }
 
 function drawFrontCoverOverlay(
   doc: PDFKit.PDFDocument,
-  title: string,
-  subtitle: string | null,
+  fullTitle: string,
   author: string | null,
   pageW: number,
   pageH: number,
 ) {
   drawCoverOverlayBackdrop(doc, pageW, pageH);
 
-  const titleTop = pageH * 0.07;
-  const titleBoxW = pageW - 64;
-  const titleX = 32;
+  const { main, subtitle } = splitTitle(fullTitle);
 
+  const titleBoxW = pageW - 48;
+  const titleX = 24;
+
+  // Main title — auto-scaled to stay inside roughly the top sixth of the
+  // page regardless of length. Long main titles shrink; short titles stay
+  // display-size.
   doc.fillColor('#FFF').font(F_HEAD);
-
-  // Auto-scale title size to fit the available height so short titles
-  // render large and long titles shrink gracefully instead of overflowing.
-  let titleSize = 30;
-  while (titleSize > 16) {
-    doc.fontSize(titleSize);
-    const h = doc.heightOfString(title, { width: titleBoxW, align: 'center' });
-    if (h <= pageH * 0.24) break;
-    titleSize -= 1;
+  const mainMaxH = pageH * 0.14;
+  let mainSize = 40;
+  while (mainSize > 18) {
+    doc.fontSize(mainSize);
+    const h = doc.heightOfString(main, { width: titleBoxW, align: 'center' });
+    if (h <= mainMaxH) break;
+    mainSize -= 1;
   }
-  doc.fontSize(titleSize).text(title, titleX, titleTop, {
-    width: titleBoxW,
-    align: 'center',
+  const mainY = pageH * 0.05;
+  doc.fontSize(mainSize).text(main, titleX, mainY, {
+    width: titleBoxW, align: 'center',
   });
 
+  // Subtitle — italic serif, smaller, one step below the main title.
   if (subtitle) {
-    doc.moveDown(0.4);
-    doc.font(F_BODY_ITALIC).fontSize(Math.max(10, titleSize * 0.5)).fillColor('#FFF').text(
-      subtitle, { width: titleBoxW, align: 'center' },
-    );
+    const subtitleMaxH = pageH * 0.11;
+    doc.font(F_BODY_ITALIC).fillColor('#FFF');
+    let subSize = Math.max(12, Math.round(mainSize * 0.42));
+    while (subSize > 9) {
+      doc.fontSize(subSize);
+      const h = doc.heightOfString(subtitle, { width: titleBoxW, align: 'center' });
+      if (h <= subtitleMaxH) break;
+      subSize -= 1;
+    }
+    doc.moveDown(0.5);
+    doc.fontSize(subSize).text(subtitle, titleX, doc.y, {
+      width: titleBoxW, align: 'center',
+    });
   }
 
+  // Author byline at the bottom.
   if (author) {
-    const authorY = pageH * 0.87;
-    doc.fillColor('#FFF').font(F_SANS_BOLD).fontSize(13).text(
+    const authorY = pageH - 42;
+    doc.fillColor('#FFF').font(F_SANS_BOLD).fontSize(12).text(
       author.toUpperCase(),
-      32, authorY,
-      { width: pageW - 64, align: 'center', characterSpacing: 3, lineBreak: false },
+      24, authorY,
+      { width: pageW - 48, align: 'center', characterSpacing: 3, lineBreak: false },
     );
   }
 
@@ -537,36 +592,67 @@ function drawPlainFrontCover(
   doc.fillColor('#000');
 }
 
-function drawHalfTitle(doc: PDFKit.PDFDocument, title: string, pageW: number, pageH: number) {
-  const boxW = pageW - MARGIN_INSIDE - MARGIN_OUTSIDE;
-  doc.fillColor('#000').font(F_HEAD).fontSize(18).text(
-    title, MARGIN_OUTSIDE, pageH * 0.4,
-    { width: boxW, align: 'center' },
-  );
-}
-
 function drawTitlePage(
   doc: PDFKit.PDFDocument,
-  title: string,
+  fullTitle: string,
   author: string | null,
   pageW: number,
   pageH: number,
 ) {
   const x = MARGIN_OUTSIDE;
   const boxW = pageW - MARGIN_INSIDE - MARGIN_OUTSIDE;
+  const { main, subtitle } = splitTitle(fullTitle);
 
-  doc.fillColor('#000').font(F_HEAD).fontSize(22).text(
-    title, x, pageH * 0.28,
-    { width: boxW, align: 'center' },
-  );
+  // Main title — serif, bold, large, centered in the upper third.
+  doc.fillColor('#000').font(F_HEAD);
+  let mainSize = 28;
+  while (mainSize > 16) {
+    doc.fontSize(mainSize);
+    const h = doc.heightOfString(main, { width: boxW, align: 'center' });
+    if (h <= pageH * 0.14) break;
+    mainSize -= 1;
+  }
+  doc.fontSize(mainSize).text(main, x, pageH * 0.22, {
+    width: boxW, align: 'center',
+  });
 
-  if (author) {
-    doc.moveDown(3);
-    doc.font(F_BODY_ITALIC).fontSize(12).text('by', { width: boxW, align: 'center' });
-    doc.moveDown(0.3);
-    doc.font(F_HEAD).fontSize(15).text(author, { width: boxW, align: 'center' });
+  // Subtitle — italic serif, smaller, sat below the main title.
+  if (subtitle) {
+    doc.moveDown(0.8);
+    doc.font(F_BODY_ITALIC);
+    let subSize = Math.max(11, Math.round(mainSize * 0.48));
+    while (subSize > 10) {
+      doc.fontSize(subSize);
+      const h = doc.heightOfString(subtitle, { width: boxW, align: 'center' });
+      if (h <= pageH * 0.12) break;
+      subSize -= 1;
+    }
+    doc.fontSize(subSize).fillColor('#333').text(subtitle, x, doc.y, {
+      width: boxW, align: 'center',
+    });
   }
 
+  // Ornament rule
+  const ruleY = pageH * 0.6;
+  doc.save();
+  doc.strokeColor('#999').lineWidth(0.6);
+  doc.moveTo(pageW / 2 - 40, ruleY).lineTo(pageW / 2 + 40, ruleY).stroke();
+  doc.restore();
+
+  // Author
+  if (author) {
+    doc.fillColor('#333').font(F_BODY_ITALIC).fontSize(12).text(
+      'by', x, ruleY + 20,
+      { width: boxW, align: 'center' },
+    );
+    doc.moveDown(0.3);
+    doc.fillColor('#000').font(F_HEAD).fontSize(15).text(
+      author, x, doc.y,
+      { width: boxW, align: 'center' },
+    );
+  }
+
+  // Publisher line — bottom of page
   doc.font(F_SANS).fontSize(9).fillColor('#444').text(
     'PENWORTH',
     x, pageH - MARGIN_BOTTOM - 20,
@@ -622,8 +708,13 @@ interface TocEntry {
 /**
  * Render the ToC. Each entry is a single row with the label + title on
  * the left, a dotted leader, and the page number on the right.
- * Fixed-height rows (20pt) avoid the v1 overlap bug where multi-line
- * titles crashed into the next entry.
+ *
+ * v2 bug: pdfkit's `lineBreak: false` does not fully prevent wrapping
+ * when the text exceeds the `width` parameter — it still breaks at
+ * whitespace inside the too-wide string and pushes remainder to a new
+ * line, crashing the ToC layout. v3 fix: truncate to a guaranteed-fit
+ * width BEFORE calling text(), measuring the ellipsis-inclusive string,
+ * then pass a generous `width` so pdfkit has no reason to wrap.
  */
 function drawToc(
   doc: PDFKit.PDFDocument,
@@ -640,7 +731,8 @@ function drawToc(
 
   let y = MARGIN_TOP + 50;
   const pageNumBoxW = 30;
-  const leftBoxMax = boxW - pageNumBoxW - 12;
+  const leaderGap = 14;          // visual space between text end and leader dots
+  const leftMaxWidth = boxW - pageNumBoxW - leaderGap - 8;
 
   for (const entry of entries) {
     const useItalic = !entry.label;
@@ -650,41 +742,46 @@ function drawToc(
 
     doc.font(useItalic ? F_BODY_ITALIC : F_BODY).fontSize(11).fillColor('#111');
 
-    // Truncate to fit a single line — convention in most trade books.
+    // Measure with ellipsis appended. If the full string fits, no ellipsis.
+    // Otherwise, shrink by one character at a time until (text + '…') fits.
     let text = rawDisplay;
-    while (doc.widthOfString(text) > leftBoxMax && text.length > 6) {
-      text = text.slice(0, -2);
+    if (doc.widthOfString(text) > leftMaxWidth) {
+      while (text.length > 6 && doc.widthOfString(text + '…') > leftMaxWidth) {
+        text = text.slice(0, -1);
+      }
+      text = text.replace(/\s+$/, '') + '…';
     }
-    if (text !== rawDisplay) text = text.replace(/\s+$/, '') + '…';
 
+    // Pass a generous width so pdfkit treats the line as single-line;
+    // `lineBreak: false` alone is insufficient in this pdfkit version.
     doc.text(text, x, y, {
-      width: leftBoxMax,
+      width: boxW,
       align: 'left',
       lineBreak: false,
     });
 
-    // Dotted leader
+    // Dotted leader between text end and page number
     const textEnd = x + doc.widthOfString(text) + 4;
     const pageNumX = x + boxW - pageNumBoxW;
-    if (pageNumX - textEnd > 12) {
+    if (pageNumX - textEnd > leaderGap) {
       doc.save();
       doc.fillColor('#999');
-      let leaderX = textEnd;
-      while (leaderX < pageNumX - 8) {
+      let leaderX = textEnd + 4;
+      while (leaderX < pageNumX - 6) {
         doc.circle(leaderX, y + 7, 0.6).fill();
         leaderX += 4;
       }
       doc.restore();
     }
 
-    // Page number
+    // Page number — right-aligned
     doc.font(F_BODY).fontSize(11).fillColor('#111').text(
       String(entry.page),
       pageNumX, y,
       { width: pageNumBoxW, align: 'right', lineBreak: false },
     );
 
-    y += 20;
+    y += 22;
   }
 }
 
@@ -885,37 +982,55 @@ async function generatePDF(
       const author = extras.authorName;
 
       // 1. Front cover
+      // The initial page is auto-created by the PDFDocument constructor
+      // with document margins. Override to zero for the same reason
+      // CHROME_MARGINS exists: overlay draws use absolute positioning,
+      // and non-zero margins here cause pdfkit to misinterpret those
+      // draws as overflowing the page.
+      doc.page.margins = { ...CHROME_MARGINS };
       if (frontCover) {
         drawFullBleedImage(doc, frontCover, pageW, pageH);
-        drawFrontCoverOverlay(doc, title, null, author, pageW, pageH);
+        drawFrontCoverOverlay(doc, title, author, pageW, pageH);
       } else {
         drawPlainFrontCover(doc, title, author, pageW, pageH);
       }
       pageRole.set(currentPage(), { kind: 'chrome' });
 
-      // 2. Half-title
-      doc.addPage();
-      drawHalfTitle(doc, title, pageW, pageH);
-      pageRole.set(currentPage(), { kind: 'chrome' });
-
-      // 3. Title page
-      doc.addPage();
+      // 2. Title page
+      // (The half-title page was dropped in v3 — for titles that don't
+      //  have a meaningfully shorter half-title form, it produced a page
+      //  that duplicated the title page's content and read as a bug.)
+      //
+      // All chrome pages are created with zero margins so absolute-
+      // positioned draws (overlays, blurbs, author bios) can't trigger
+      // pdfkit's text-overflow heuristic — which was the source of the
+      // "heaps of empty pages" after the back cover.
+      doc.addPage({ margins: CHROME_MARGINS });
       drawTitlePage(doc, title, author, pageW, pageH);
       pageRole.set(currentPage(), { kind: 'chrome' });
 
-      // 4. Copyright
-      doc.addPage();
+      // 3. Copyright
+      doc.addPage({ margins: CHROME_MARGINS });
       drawCopyrightPage(doc, title, author, pageW, pageH);
       pageRole.set(currentPage(), { kind: 'chrome' });
 
-      // 5. Table of contents placeholder — filled after the body so
-      //    page numbers reflect actual body starts.
-      doc.addPage();
+      // 4. Table of contents placeholder — filled after the body so
+      //    the page numbers reflect the ACTUAL displayed page numbers
+      //    in the printed footer, not the absolute PDF page indices.
+      doc.addPage({ margins: CHROME_MARGINS });
       const tocPageIdx = currentPage();
       pageRole.set(tocPageIdx, { kind: 'chrome' });
 
-      // 6. Chapters
-      const tocEntries: TocEntry[] = [];
+      // 5. Chapters
+      // Each tocEntry carries the absolute buffer index of its opener
+      // page; the displayed page number is computed in pass 2 once the
+      // whole book is laid out.
+      interface TocEntryBuild {
+        label: string | null;
+        title: string;
+        openerAbs: number;
+      }
+      const tocEntries: TocEntryBuild[] = [];
 
       for (const chapter of chapters) {
         const { label, clean } = splitChapterTitle(chapter.title);
@@ -924,7 +1039,8 @@ async function generatePDF(
         // Chapter opener
         doc.addPage();
         drawChapterOpener(doc, label, displayTitle, pageW, pageH);
-        pageRole.set(currentPage(), { kind: 'opener' });
+        const openerAbs = currentPage();
+        pageRole.set(openerAbs, { kind: 'opener' });
 
         // Body
         doc.addPage();
@@ -934,7 +1050,7 @@ async function generatePDF(
           : displayTitle).toUpperCase();
         pageRole.set(bodyStart, { kind: 'body', header: runningHeader });
 
-        tocEntries.push({ label, title: displayTitle, page: bodyStart + 1 });
+        tocEntries.push({ label, title: displayTitle, openerAbs });
 
         const blocks = parseChapterContent(chapter.content);
         let firstParaOfChapter = true;
@@ -968,15 +1084,21 @@ async function generatePDF(
         }
       }
 
-      // 7. About the Author
-      if (extras.aboutAuthor || authorPhoto || extras.authorName) {
-        doc.addPage();
+      // 6. About the Author
+      // Skip this page entirely when the data is too thin to make a
+      // real page — a 3-word bio on an otherwise blank 6x9 reads as a
+      // layout bug.
+      const bioLen = (extras.aboutAuthor || '').trim().length;
+      const hasUsefulAuthorData =
+        (bioLen >= 40) || !!authorPhoto || (!!extras.authorName && bioLen > 0);
+      if (hasUsefulAuthorData) {
+        doc.addPage({ margins: CHROME_MARGINS });
         drawAboutAuthor(doc, extras.authorName, extras.aboutAuthor, authorPhoto, pageW, pageH);
         pageRole.set(currentPage(), { kind: 'chrome' });
       }
 
-      // 8. Back cover
-      doc.addPage();
+      // 7. Back cover
+      doc.addPage({ margins: CHROME_MARGINS });
       if (backCover) {
         drawFullBleedImage(doc, backCover, pageW, pageH);
         drawBackCoverOverlay(doc, extras.blurb, extras.authorName, pageW, pageH);
@@ -986,20 +1108,56 @@ async function generatePDF(
       }
       pageRole.set(currentPage(), { kind: 'chrome' });
 
-      // Pass 2: fill in ToC
-      doc.switchToPage(tocPageIdx);
-      drawToc(doc, tocEntries, pageW);
-
-      // Pass 3: running header + page number + watermark
+      // =========================================================
+      // Pass 2: compute displayed page numbers, then fill in ToC
+      // =========================================================
+      // The PRINTED page number in the footer starts at 1 on the first
+      // non-chrome page (the Introduction opener) and increments only
+      // on non-chrome pages. The ToC must reference THESE numbers, not
+      // the absolute PDF page indices — v2's bug was pointing the ToC
+      // at page 7 while the footer said 1 on the same page.
       const range = doc.bufferedPageRange();
-      let displayedPageNum = 0;
+      const displayedNumByAbs = new Map<number, number>();
+      let counter = 0;
+      for (let i = range.start; i < range.start + range.count; i++) {
+        const role = pageRole.get(i);
+        if (role?.kind === 'chrome') continue;
+        counter++;
+        displayedNumByAbs.set(i, counter);
+      }
+
+      const tocEntriesFinal: TocEntry[] = tocEntries.map(e => ({
+        label: e.label,
+        title: e.title,
+        page: displayedNumByAbs.get(e.openerAbs) ?? 0,
+      }));
+
+      doc.switchToPage(tocPageIdx);
+      drawToc(doc, tocEntriesFinal, pageW);
+
+      // =========================================================
+      // Pass 3: running header + page number + watermark
+      // =========================================================
+      // pdfkit's text flow auto-adds a new page when the cursor plus the
+      // line height would exceed page.maxY() (= pageH - page.margins.bottom).
+      // Our footer stamps sit at y = pageH - 30 which is BELOW the 54pt
+      // bottom margin, so without this guard pdfkit appends one overflow
+      // page per non-chrome page — the source of v2/v3's "heaps of empty
+      // pages after the back cover". Since pass 3 uses absolute
+      // positioning, the margins serve no layout purpose here; zeroing
+      // them per page before stamping suppresses the heuristic.
       for (let i = range.start; i < range.start + range.count; i++) {
         const role = pageRole.get(i) || { kind: 'body' as const, header: '' };
         if (role.kind === 'chrome') continue;
 
         doc.switchToPage(i);
-        displayedPageNum++;
+        const displayedNum = displayedNumByAbs.get(i);
+        if (!displayedNum) continue;
 
+        // Suppress pdfkit's overflow heuristic for this stamping round.
+        doc.page.margins = { top: 0, bottom: 0, left: 0, right: 0 };
+
+        // Running header: body pages only (openers get no header).
         if (role.kind === 'body' && role.header) {
           doc.font(F_SANS).fontSize(8).fillColor('#888').text(
             role.header,
@@ -1013,22 +1171,27 @@ async function generatePDF(
           );
         }
 
-        doc.font(F_BODY).fontSize(9).fillColor('#666').text(
-          String(displayedPageNum),
-          MARGIN_OUTSIDE, pageH - 30,
-          {
-            width: pageW - MARGIN_INSIDE - MARGIN_OUTSIDE,
-            align: 'center',
-            lineBreak: false,
-          },
-        );
-
-        if (includeBranding) {
-          doc.font(F_SANS_ITALIC).fontSize(7).fillColor('#aaa').text(
-            'by penworth.ai',
-            pageW - MARGIN_OUTSIDE - 80, pageH - 30,
-            { width: 80, align: 'right', lineBreak: false },
+        // Page number: body pages only. Openers count toward the
+        // numbering but the number itself is suppressed (trade-book
+        // convention — opener is a display page).
+        if (role.kind === 'body') {
+          doc.font(F_BODY).fontSize(9).fillColor('#666').text(
+            String(displayedNum),
+            MARGIN_OUTSIDE, pageH - 30,
+            {
+              width: pageW - MARGIN_INSIDE - MARGIN_OUTSIDE,
+              align: 'center',
+              lineBreak: false,
+            },
           );
+
+          if (includeBranding) {
+            doc.font(F_SANS_ITALIC).fontSize(7).fillColor('#aaa').text(
+              'by penworth.ai',
+              pageW - MARGIN_OUTSIDE - 80, pageH - 30,
+              { width: 80, align: 'right', lineBreak: false },
+            );
+          }
         }
       }
       doc.fillColor('#000');
