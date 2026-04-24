@@ -1037,14 +1037,69 @@ function EditorContentNew() {
     toast.info(t('editor.linkedinSoon', locale));
   };
 
-  // Handler: View PDF
-  const handleViewPDF = () => {
-    toast.info(t('editor.pdfOpening', locale));
+  // Handler: View PDF — fetches a rendered PDF from /api/export and opens
+  // it in a new tab via a blob URL. The export route applies v2 watermark
+  // rules (free tier gets a 'by penworth.ai' footer; paid tiers are clean).
+  const handleViewPDF = async () => {
+    try {
+      toast.info(t('editor.pdfOpening', locale));
+      const resp = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, format: 'pdf' }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: 'Export failed' }));
+        toast.error(err.error || 'Unable to render PDF');
+        return;
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank');
+      if (!win) {
+        // Popup blocked — fall back to download
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${project?.title || 'book'}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      console.error('View PDF failed:', err);
+      toast.error('Unable to render PDF');
+    }
   };
 
-  // Handler: Download
-  const handleDownload = () => {
-    toast.info(t('editor.downloadStarting', locale));
+  // Handler: Download — fetches a DOCX from /api/export and triggers a
+  // browser download. Same watermark rules as PDF.
+  const handleDownload = async () => {
+    try {
+      toast.info(t('editor.downloadStarting', locale));
+      const resp = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, format: 'docx' }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: 'Export failed' }));
+        toast.error(err.error || 'Unable to export DOCX');
+        return;
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${project?.title || 'book'}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      console.error('Download failed:', err);
+      toast.error('Unable to export DOCX');
+    }
   };
 
   // Handler: Publish — one-click publish to Penworth Store (the 17th platform

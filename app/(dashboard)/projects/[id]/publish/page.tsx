@@ -91,16 +91,15 @@ function PublishingPageContent() {
       if (platformsData) setPlatforms(platformsData);
       if (projectData) setProject(projectData);
       
-      // Check if already published to Penworth
+      // Check if already published to Penworth.
+      // Source of truth is projects.status (flipped to 'published' by
+      // /api/publishing/penworth-store on success). Querying
+      // marketplace_listings.status='published' used to be the check here,
+      // but the API route correctly creates listings with status='active',
+      // so that check always returned false and the UI let users
+      // re-publish the same project endlessly.
       if (projectData) {
-        const { data: listing } = await supabase
-          .from('marketplace_listings')
-          .select('id')
-          .eq('project_id', projectId)
-          .eq('status', 'published')
-          .single();
-        
-        if (listing) setPublishedToPenworth(true);
+        setPublishedToPenworth(projectData.status === 'published');
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -111,45 +110,25 @@ function PublishingPageContent() {
   
   const handlePublishToPenworth = async () => {
     if (!project) return;
-    
+
     setPublishingToPenworth(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-      
-      // Get user's tier (profiles.plan is the actual column — the
-      // old code queried 'subscription_tier' which doesn't exist and
-      // made isFreeTier always return true, letting every user
-      // publish to the Free tier of Penworth Store regardless of
-      // their actual plan).
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('plan')
-        .eq('id', user.id)
-        .single();
-      
-      const isFreeTier = !profile?.plan || profile.plan === 'free';
-      
-      // Create marketplace listing.
-      // Schema note: 'status' = 'published' serves as the publish-state
-      // flag. There is no 'published_at' column — the created_at timestamp
-      // captures when status transitioned to 'published' in practice
-      // because rows are inserted straight into that state.
-      const { error } = await supabase
-        .from('marketplace_listings')
-        .insert({
-          project_id: project.id,
-          seller_id: user.id,
-          title: project.title,
-          description: project.description,
-          status: 'published',
-          is_free_tier: isFreeTier,
-          word_count: project.metadata?.word_count || 0,
-          chapter_count: project.metadata?.chapter_count || 0,
-        });
-      
-      if (error) throw error;
-      
+      // Route through the official API so project_publications is created,
+      // projects.status is flipped to 'published', narration kicks off, and
+      // the referral credit hook runs. The prior implementation inserted
+      // into marketplace_listings directly from the client, which skipped
+      // all of that — producing "published in the UI, invisible on the
+      // Store" bugs. See /app/api/publishing/penworth-store/route.ts.
+      const resp = await fetch('/api/publishing/penworth-store', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: project.id, priceUsd: 0 }),
+      });
+      const data = await resp.json().catch(() => ({ error: 'Publishing failed' }));
+      if (!resp.ok || data.error) {
+        throw new Error(data.error || 'Publishing failed');
+      }
+
       setPublishedToPenworth(true);
     } catch (error) {
       console.error('Error publishing to Penworth:', error);
