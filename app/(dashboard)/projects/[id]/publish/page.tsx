@@ -20,6 +20,10 @@ import {
   Store,
   ArrowLeft
 } from 'lucide-react';
+import {
+  PublishToStoreModal,
+  type PublishSuccessPayload,
+} from '@/components/publish/PublishToStoreModal';
 
 interface PublishingPlatform {
   id: string;
@@ -57,6 +61,7 @@ function PublishingPageContent() {
   const [generatingGuide, setGeneratingGuide] = useState<string | null>(null);
   const [publishingToPenworth, setPublishingToPenworth] = useState(false);
   const [publishedToPenworth, setPublishedToPenworth] = useState(false);
+  const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [generatedGuides, setGeneratedGuides] = useState<Record<string, string>>({});
   
   const supabase = createClient();
@@ -108,32 +113,23 @@ function PublishingPageContent() {
     }
   };
   
-  const handlePublishToPenworth = async () => {
+  // Click on "One-Click Publish" just opens the pre-publish modal. The
+  // modal collects price/categories/subtitle/tags, posts to
+  // /api/publishing/penworth-store, and calls handlePublishSuccess on
+  // success. This replaces the prior inline fetch so the author actually
+  // gets to configure their Store listing before it goes live.
+  const handlePublishToPenworth = () => {
     if (!project) return;
+    setPublishModalOpen(true);
+  };
 
-    setPublishingToPenworth(true);
-    try {
-      // Route through the official API so project_publications is created,
-      // projects.status is flipped to 'published', narration kicks off, and
-      // the referral credit hook runs. The prior implementation inserted
-      // into marketplace_listings directly from the client, which skipped
-      // all of that — producing "published in the UI, invisible on the
-      // Store" bugs. See /app/api/publishing/penworth-store/route.ts.
-      const resp = await fetch('/api/publishing/penworth-store', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: project.id, priceUsd: 0 }),
-      });
-      const data = await resp.json().catch(() => ({ error: 'Publishing failed' }));
-      if (!resp.ok || data.error) {
-        throw new Error(data.error || 'Publishing failed');
-      }
-
-      setPublishedToPenworth(true);
-    } catch (error) {
-      console.error('Error publishing to Penworth:', error);
-    } finally {
-      setPublishingToPenworth(false);
+  const handlePublishSuccess = (result: PublishSuccessPayload) => {
+    setPublishedToPenworth(true);
+    // Open the live Store listing in a new tab so the author can share it.
+    // Absolute cross-subdomain URL (store.penworth.ai), so window.open —
+    // Next's router handles only in-app paths.
+    if (typeof window !== 'undefined') {
+      window.open(result.storeUrl, '_blank', 'noopener,noreferrer');
     }
   };
   
@@ -402,6 +398,17 @@ function PublishingPageContent() {
           </Button>
         </div>
       </div>
+
+      {project && (
+        <PublishToStoreModal
+          open={publishModalOpen}
+          onOpenChange={setPublishModalOpen}
+          projectId={project.id}
+          defaultTitle={project.title}
+          defaultContentType={project.content_type}
+          onSuccess={handlePublishSuccess}
+        />
+      )}
     </div>
   );
 }

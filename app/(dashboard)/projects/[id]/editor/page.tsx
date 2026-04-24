@@ -28,6 +28,10 @@ import { ResearchScreen } from '@/components/editor/ResearchScreen';
 import { OutlineScreen } from '@/components/editor/OutlineScreen';
 import { WritingScreen } from '@/components/editor/WritingScreen';
 import { QAScreen } from '@/components/editor/QAScreen';
+import {
+  PublishToStoreModal,
+  type PublishSuccessPayload,
+} from '@/components/publish/PublishToStoreModal';
 import { CoverDesignScreen } from '@/components/editor/CoverDesignScreen';
 import { PublishScreen } from '@/components/editor/PublishScreen';
 import { DocumentPreview } from '@/components/editor/DocumentPreview';
@@ -1102,51 +1106,49 @@ function EditorContentNew() {
     }
   };
 
-  // Handler: Publish — one-click publish to Penworth Store (the 17th platform
-  // Penworth owns fully). Creates a live marketplace listing at /marketplace/[id].
-  const handlePublish = async () => {
-    try {
-      toast.info(t('editor.publishingToStore', locale));
-      const resp = await fetch('/api/publishing/penworth-store', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, priceUsd: 0 }), // default: free listing
-      });
-      const data = await resp.json();
-      if (!resp.ok || data.error) {
-        toast.error(data.error || 'Publishing failed');
-        return;
-      }
-      toast.success(`Live on Penworth Store — ${data.stats.chapterCount} chapters, ${data.stats.totalWords.toLocaleString()} words`);
+  // Pre-publish modal state. handlePublish below just opens the modal; the
+  // modal posts to /api/publishing/penworth-store and calls back into
+  // handlePublishSuccess on success — which fires the audiobook narration
+  // kickoff and redirects the author to their new Store listing.
+  const [publishModalOpen, setPublishModalOpen] = useState(false);
 
-      // Fire-and-forget audiobook narration. The response can take several
-      // minutes for a full book, so we don't await it — the author is
-      // redirected immediately, and the marketplace AudiobookPlayer will
-      // appear on their listing as chapters finish narrating.
-      fetch('/api/publishing/penworth-store/narrate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
+  const handlePublish = () => {
+    setPublishModalOpen(true);
+  };
+
+  const handlePublishSuccess = (result: PublishSuccessPayload) => {
+    toast.success(
+      `Live on Penworth Store — ${result.stats.chapterCount} chapters, ${result.stats.totalWords.toLocaleString()} words`,
+    );
+
+    // Fire-and-forget audiobook narration. Several minutes for a full book,
+    // so we don't await it — the author is redirected immediately and the
+    // listing's AudiobookPlayer will appear as chapters finish narrating.
+    fetch('/api/publishing/penworth-store/narrate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId }),
+    })
+      .then(async (r) => {
+        if (r.status === 402 || r.status === 403) {
+          // Gated (admin-only rollout) — silent no-op.
+          return;
+        }
+        if (r.ok) {
+          toast.success('Audio narration started — it will appear on your listing within minutes.', {
+            duration: 5000,
+          });
+        }
       })
-        .then(async (r) => {
-          if (r.status === 402 || r.status === 403) {
-            // Gated — silent no-op (rollout: admin-only)
-            return;
-          }
-          if (r.ok) {
-            toast.success('Audio narration started — it will appear on your listing within minutes.', { duration: 5000 });
-          }
-        })
-        .catch(() => {
-          // Network or 503 (ELEVENLABS_API_KEY not set) — silent no-op so the
-          // publish success toast isn't drowned out by a narration error.
-        });
+      .catch(() => {
+        // Network or 503 (ELEVENLABS_API_KEY not set) — silent no-op.
+      });
 
-      // Take the author to their live listing so they can share it
-      router.push(data.externalUrl);
-    } catch (err) {
-      console.error('Publish failed:', err);
-      toast.error(t('editor.publishFailed', locale));
+    // Open the live Store listing in a new tab. We intentionally do NOT use
+    // router.push(storeUrl) because storeUrl is absolute cross-subdomain
+    // (store.penworth.ai) — Next's router only handles in-app paths.
+    if (typeof window !== 'undefined') {
+      window.open(result.storeUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -1413,6 +1415,15 @@ function EditorContentNew() {
           locale={locale}
         />
       </div>
+
+      <PublishToStoreModal
+        open={publishModalOpen}
+        onOpenChange={setPublishModalOpen}
+        projectId={projectId}
+        defaultTitle={session?.book_title || project?.title}
+        defaultContentType={project?.content_type}
+        onSuccess={handlePublishSuccess}
+      />
     </div>
   );
 }
