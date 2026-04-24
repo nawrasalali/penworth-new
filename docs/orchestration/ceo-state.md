@@ -1,116 +1,129 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-24 ~10:00 UTC by CEO Claude session (claude-opus-4-7)
+**Last updated:** 2026-04-24 18:00 UTC (equivalent 2026-04-25 03:30 ACST Adelaide) by CEO Claude session (CEO-031 Phase 1 + unstick)
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Production health — verified 2026-04-24 end-of-session
+## Production health — verified 2026-04-24 18:00 UTC
 
 | Signal | State |
 |---|---|
-| Latest main commit | `e48ca5c` — CEO-043 Phase 0 (maxDuration=300 on 7 non-edge AI routes) |
-| Prior main commit | `45e2b80` — CEO-005 recipients CRUD UI |
-| Stuck sessions right now | 0 |
-| Open incidents | 0 (false-alarm `15918d26` resolved this session; see CEO-048) |
+| Supabase migrations applied | 126+ (latest: `ceo031_detector_exclude_publishing_and_stuck_current_only`) |
+| Latest main commit (writer) | `909a0207` — feat(publish): Store-first one-click publish with pre-publish modal — **BUILD ERROR** (Founder's in-flight work) |
+| Prior main commit (writer) | `f72c015` — fix(pipeline-health): don't resolve chronic-stuck incidents (this session) — READY, current production |
+| Writer Vercel latest READY | `f72c015` |
+| Store latest production deploy | `8fe2330` (CEO-076 livebook v2) — READY |
+| Stuck sessions right now | **0** (was 1 this morning; Founder's "The Rewired Self" manually unstuck — see CEO-031) |
+| Open incidents | 0 |
 | Webhooks failed 24h | 0 |
-| Unacked alerts 24h | 0 (alert `2a7b1772` acked this session) |
+| Unacked alerts | 0 (was 2 at session start — acked) |
 | Guild applications pending | 0 |
-| Guild active members | 1 (Founder, Fellow tier, referral code `NAWRAS`) |
+| Guild active members | 1 (Founder, Fellow tier) |
 | Store live listings | 1 ("The New Rich") |
-| Interview sessions ever completed | 0 of 14 — this is the primary production-readiness gap |
 
 ## Founder context
 
 - **Name:** Nawras Alali
-- **Timezone:** Adelaide, South Australia
-- **Role:** leadership + approvals only; execution delegated to CEO
+- **Timezone:** Adelaide, South Australia (ACST, UTC+9:30 since 2026-04-06)
+- **Role now:** leadership + approvals; execution delegated to CEO
 - **Preferred comms:** direct, no abbreviations, top-recommendation-first, "go" = approved
-- **Standing approvals given this session:** go 043 (Phase 0 shipped + Phase 1+ authorised as failure-rate-ordered Claude Code dispatches); go 023 (live-mode Stripe product creation authorised once access is unblocked); merge 005 (shipped).
+
+## What shipped in the most recent CEO session (2026-04-24 / 25)
+
+1. Migration `ceo031_detector_exclude_publishing_and_stuck_current_only`: excludes `current_agent='publishing'` from stuck detection (publishing is human-driven), and tightens the "active" check to the current agent specifically.
+2. Commit `f72c015`: splits escalate_to_admin incident update — only resolves when session leaves detector scope. Fixes CEO-009 ghost-incident loop.
+3. Manual unstick of Founder's "The Rewired Self" (session `fb09f345`). Outline data verified intact: 9 sections, 7 body chapters, 1 front + 1 back matter.
+4. 144 ghost `stuck_agent` incidents on fb09f345 consolidated with a resolution-note trace.
+5. 2 stale alerts acknowledged.
+6. Ghost-incident loop verified extinguished: 0 new rows, 0 new alerts, 0 stuck sessions since unstick.
 
 ## The CEO position
 
+- **New Claude project:** "Penworth CEO"
 - **Authoritative mandate:** `docs/orchestration/ceo-mandate.md`
 - **Operating playbook:** `docs/orchestration/ceo-playbook.md`
 - **Claude Code runbook:** `docs/orchestration/claude-code-runbook.md`
 - **Session rituals:** `docs/orchestration/session-rituals.md`
-- **Latest handover:** `docs/orchestration/handovers/2026-04-24-0950-ceo005-ceo043phase0-session.md`
 
-## Active work — open tasks summary
+## Active work — open tasks summary (verified 2026-04-24 18:00 UTC)
 
-Counts by status as of this document:
-
-| Status | Count (approximate) |
+| Status | Count |
 |---|---|
-| open (I own) | ~10 |
-| in_progress | ~2 (CEO-031, CEO-043) |
-| blocked | ~6 (including CEO-023 newly blocked on Stripe access, CEO-017/CEO-014 blocked on pipeline completion) |
-| awaiting_founder | ~8 |
-| done this session | CEO-005 (CEO-021 and CEO-028 were already done prior) |
+| open (ceo owns) | 9 (down from 18 at session start due to closures) |
+| in_progress | 3 (CEO-031 Phase 2 remaining; CEO-043 Phase 1+ per-agent wiring; CEO-051) |
+| blocked | 6 |
+| awaiting_founder | 11 |
 
-Live state: `SELECT * FROM ceo_orchestration_tasks WHERE status != 'done' ORDER BY priority, status, created_at;`
+Live priority-sorted query: `SELECT * FROM ceo_orchestration_tasks WHERE status != 'done' ORDER BY priority, created_at;`
 
-## What the Founder needs to decide, in order of urgency
+## What the Founder needs to decide or do, in order of urgency
 
-### Needed to unblock revenue
+### P0 — immediate
 
-1. **CEO-023 Stripe products (blocked on Stripe access):** Enable Stripe MCP in Settings → Connectors, OR add `STRIPE_SECRET_KEY` (live-mode `sk_live_...`) to project instructions. After that, next CEO session ships live-mode products in ~15 minutes using the runbook in the task's `last_update_note`.
+1. **BUILD ERROR on latest main (`909a0207`)** — Founder's CEO-077 commit is failing Vercel build. Production is still on `f72c015` (READY), but any new push will be blocked until this is fixed. First next-session action is to inspect build logs and either roll forward with a fix or have the Founder revert. Dpl ID: `dpl_G7Ysi76Q2PKy6n7R1vVS2B3itw6b`.
 
-### Needed to unblock pipeline launch
+2. **CEO-017 (p0, blocked)**: Friendly-tester cohort — deferred until end-to-end book completes; still waiting.
 
-2. **Next-session validation of CEO-043 Phase 0:** Run one interview session end-to-end after the `e48ca5c` deploy goes READY. If it completes, CEO-017 (friendly testers) and CEO-014 (Store seed books) unblock automatically and per-agent wiring (Phase 1) begins. If it doesn't, root-cause reopens.
+### P1 — this week
 
-### Needed this week
+3. **CEO-043 (p1, in_progress)**: Phase 0 shipped; Phase 1+ is per-agent DB-prompt wiring, dispatch via Claude Code briefs.
+4. **CEO-014 (p1, blocked)**: 20 Store seed books — deferred on same dependency as CEO-017.
+5. **CEO-023 (p1, blocked on Founder)**: Stripe Plus/Premium. Needs either Stripe MCP connector enabled OR STRIPE_SECRET_KEY added to project instructions.
+6. **CEO-053 (p1, awaiting founder)**: voice recording root cause — Founder, which screen produced the "Clone failed (401)" toast?
+7. **CEO-058 (p1, awaiting founder)**: ELEVENLABS_API_KEY is now in project instructions — CEO-058 can likely progress next session using it.
+8. **CEO-022, CEO-018, CEO-011**: external vendor / counsel engagements still awaiting founder authorisation.
+9. **CEO-077 (p1, awaiting founder)** → now also the ERROR deploy (above).
 
-3. **CEO-011 Anthropic tier upgrade** — awaiting founder: authorise draft or take the call.
-4. **CEO-018 Pen-test engagement** — awaiting founder authorisation of engagement letter ($15-25k).
-5. **CEO-022 IP counsel engagement** — Visual Audiobook + Cinematic Livebook provisionals.
+### P2 — when convenient
 
-### When convenient
-
-6. **CEO-003 book_title live verification** — 5 minutes of founder clicking.
-7. **CEO-010 Tier 2 Nora probe** — 8 scenarios.
-8. **CEO-025 compliance deletion** — 5 policy questions.
-9. **CEO-013 Help FAQ translations** — external reviewer authorisation.
+10. **CEO-003, CEO-010, CEO-025, CEO-046**: small founder-time asks.
 
 ## What I'm doing next without asking
 
-Founder's blanket approval remains for:
+- Investigate `909a0207` build error, file a hotfix if the root cause is obvious (class: probably a TypeScript error in the new publish route, same pattern as the earlier CEO-059 hotfix on store repo).
+- CEO-031 Phase 2: extend `inngest/functions/restart-agent.ts` with consumers for the other agents (currently only `writing` has a consumer). Likely a Claude Code brief.
+- Watch for a second/third stuck session to confirm the detector fix works under real load (not just on one test case).
 
-- Small bug fixes, internal docs, briefs for Claude Code
-- Orchestration infrastructure
-- Anything that doesn't touch production Stripe live-mode, DNS, or external vendor contracts
+## Shipped this session (2026-04-24/25)
 
-Top of my queue for next session:
-1. Verify `e48ca5c` Vercel deploy is READY.
-2. Trigger one end-to-end interview session and watch completion.
-3. On completion: author Claude Code brief for validate translation layer (CEO-043 Phase 1 item 1).
-4. If CEO-023 is unblocked by then: execute Stripe live-mode product creation runbook.
+Commits:
+1. `f72c015` on main — pipeline-health cron chronic-incident fix (READY in prod).
 
-## Shipped this session (2026-04-24, second CEO session)
+Migrations:
+1. `ceo031_detector_exclude_publishing_and_stuck_current_only`
 
-1. `45e2b80` (PR #1 squash-merge) — CEO-005 recipients CRUD UI (8 files; acceptance tests met by code review; audit-log instrumentation complete; drive-by FR i18n fix inside same commit).
-2. `e48ca5c` (PR #2 squash-merge) — CEO-043 Phase 0: maxDuration=300 on 7 non-edge AI routes + research brief persisted to repo.
-3. Resolved false-alarm infrastructure incident `15918d26` (sandbox-TLS-inspection artifact, third recurrence); acked alert `2a7b1772`; logged CEO-048 to harden the filer.
-4. Task queue updates: CEO-005 → done, CEO-043 → in_progress (ceo-owned), CEO-023 → blocked with concrete unblock ask.
+DB state changes:
+1. Session `fb09f345` pipeline_status: stuck → active, failure_count reset.
+2. 144 pipeline_incidents rows consolidated with resolution trace.
+3. 2 alert_log rows acknowledged.
+
+Task-state closures:
+1. CEO-009 → done
+2. CEO-054 → done
+3. CEO-063 → done
+4. CEO-059 → done
+5. CEO-076 → done
 
 ## Open threads I'm tracking
 
-- **CEO-043 Phase 1+** — six per-agent wiring briefs to dispatch via Claude Code, sequenced by failure rate. Starts next session if Phase 0 deploy produces a completed book.
-- **CEO-031** — in_progress (p0); Phase 1 shipped earlier today as `e27ba77`; Phase 2 code + Phase 3 Part A still outstanding.
-- **CEO-048** — p2 infra, harden incident filer against sandbox-CA false-alarm signature.
-- **Vercel MCP connector 403** — list_deployments returned 403 this session. May be a connector re-auth issue; next session retries; if still failing, Founder reconnects Vercel in Settings → Connectors.
+- **CEO-031 Phase 2** — restart-agent consumers for non-writing agents. Next session work.
+- **CEO-077 ERROR deploy** — Founder's commit. First thing to triage next session.
+- **CEO-070/CEO-071 cover generation** — surfaced diag traces; awaiting Founder's next click to pin upstream Ideogram error pattern.
 
 ## Known production risks (current)
 
-None at p0 or p1 severity. The pipeline-completion zero remains the primary production-readiness gap, and the CEO-043 Phase 0 patch directly targets its root cause hypothesis.
+- **P1**: `909a0207` ERROR deploy blocks any further pushes from deploying. Not serving — current prod is `f72c015` READY — but new work is gated.
+- None at P0 severity.
 
 ## Things never to assume
 
 1. The Founder has read an earlier session's chat history. Always re-state.
-2. A task in the backlog hasn't been worked on by another session. Always check `last_update_note`.
-3. `HTTP 503 "DNS cache overflow"` from bash-tool curl against `*.vercel.com` is a **sandbox-TLS-inspection artifact, not a Vercel outage.** Never file an incident or page the Founder on this signature. Verify via `Vercel:list_deployments` MCP + non-Vercel host control (`curl httpbin.org`). Three misfires observed (CEO-028 on 04-22, false-alarm on 04-24 this morning, false-alarm on 04-24 this session). CEO-048 tracks the filer hardening that will end this pattern permanently.
+2. A chat-to-chat handover pasted by the Founder is complete. Always verify against DB + repo.
+3. A task in the backlog hasn't been worked on by another session. Always check `last_update_note`.
+4. **NEW**: HTTP 503 "DNS cache overflow" (18 bytes) from curl in bash_tool is the Anthropic sandbox-egress TLS Inspection CA — not a real Vercel outage. Use Vercel MCP tools, not bash curl, when checking deploy state.
+5. **NEW**: The Vercel team ID in project instructions is duplicated — the "Tools" section has `team_6YlFO6rqSl9ouKa8UkeoUEwmW` (wrong, trailing W), the "Infrastructure" section has `team_6YlFO6rqSl9ouKa8UkeoUEwm` (correct). Use the correct one.
 
 ---
 
