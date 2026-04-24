@@ -156,12 +156,22 @@ export async function POST(request: NextRequest) {
           `${topicLine}\n\nVisual style: ${userStyle}.\n\n` +
           `Create a book cover whose imagery directly evokes the book's subject. ` +
           `Keep the style direction but never produce generic stock imagery (no food, no abstract fruit, ` +
-          `no unrelated photography). The cover must feel specific to this book.`;
+          `no unrelated photography). The cover must feel specific to this book.\n\n` +
+          `Composition: design this like a New York Times bestseller cover — a single strong central visual ` +
+          `motif, symmetrically framed, shot in the middle third of the canvas so the top third can carry a ` +
+          `large title and the bottom eighth can carry an author name. High contrast between the focal ` +
+          `subject and the background. The top and bottom edges should be visually quieter (darker, softer, ` +
+          `or simpler) than the center so overlaid typography reads cleanly. Avoid busy patterns near the ` +
+          `edges. 6x9 portrait orientation.`;
       } else {
         ideogramPrompt = buildDefaultFrontCoverPrompt(titleForPrompt, effectiveSubject);
       }
-      // Add instruction to NOT include text
-      ideogramPrompt += '\n\nIMPORTANT: Do NOT include any text, words, letters, or typography in the image. The image should be purely visual with no text elements. Leave space at the top and bottom for text overlay.';
+      // Text is overlaid in PDF/Store render — keep the image clean.
+      ideogramPrompt +=
+        '\n\nIMPORTANT: Do NOT include any text, words, letters, numerals, or typography anywhere in the ' +
+        'image. Title and author name will be added later as a typography overlay. To support that overlay, ' +
+        'leave the top 35% of the canvas visually quieter (darker background or uncluttered space) and the ' +
+        'bottom 18% cleaner than the center. No logos, no symbols that resemble letters.';
     } else {
       ideogramPrompt = buildBackCoverPrompt(titleForPrompt, effectiveSubject);
       ideogramPrompt += '\n\nIMPORTANT: Do NOT include any text, words, letters, or typography in the image. Create a subtle, elegant background suitable for text overlay. Leave the center area relatively simple for description text.';
@@ -330,9 +340,9 @@ function deriveSubjectFromOutline(outlineData: unknown): string {
 function buildDefaultFrontCoverPrompt(bookTitle: string, description?: string): string {
   // Analyze the title to suggest appropriate imagery
   const lowerTitle = bookTitle.toLowerCase();
-  
+
   let styleGuide = 'Professional book cover design, high-quality, elegant composition, suitable for publishing';
-  
+
   // Genre detection from title/description
   if (lowerTitle.includes('business') || lowerTitle.includes('success') || lowerTitle.includes('leadership')) {
     styleGuide = 'Modern business book cover, clean minimalist design, professional corporate aesthetic, abstract geometric shapes, gradient colors, sophisticated and authoritative';
@@ -352,7 +362,17 @@ function buildDefaultFrontCoverPrompt(bookTitle: string, description?: string): 
     styleGuide = 'Technology book cover, futuristic sleek design, digital aesthetic, modern and innovative';
   }
 
-  return `${styleGuide}. The imagery should evoke the themes of "${bookTitle}". ${description ? `Context: ${description}` : ''} Create a visually striking cover that would stand out on bookstore shelves and online thumbnails.`;
+  return (
+    `${styleGuide}. The imagery should evoke the themes of "${bookTitle}". ` +
+    `${description ? `Context: ${description}. ` : ''}` +
+    `Composition: design this like a New York Times bestseller cover — a single strong central visual motif, ` +
+    `symmetrically framed, shot in the middle third of the canvas so the top third can carry a large title and ` +
+    `the bottom eighth can carry an author name. Use high contrast between the focal subject and the ` +
+    `background. The top and bottom edges should be visually quieter (darker, softer, or simpler) than the ` +
+    `center so overlaid typography reads cleanly. Avoid busy patterns near the edges. Target a commercial ` +
+    `trade-paperback aesthetic: refined, considered, recognizably a book — not a stock photograph, not an ` +
+    `illustration collage. 6x9 portrait orientation.`
+  );
 }
 
 function buildBackCoverPrompt(bookTitle: string, description?: string): string {
