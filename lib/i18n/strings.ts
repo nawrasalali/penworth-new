@@ -2606,7 +2606,7 @@ const fr: Bundle = {
   'dashboard.newProject': 'Nouveau projet',
   'dashboard.creditsAvailable': 'Crédits disponibles',
   'dashboard.monthlyPurchasedTemplate': '{monthly} mensuels + {purchased} achetés',
-  'dashboard.livresThisMonth': 'Livres ce mois',
+  'dashboard.documentsThisMonth': 'Livres ce mois',
   'dashboard.remaining': '{n} restants',
   'dashboard.wordsGenerated': 'Mots générés',
   'dashboard.last30Days': 'Les 30 derniers jours',
