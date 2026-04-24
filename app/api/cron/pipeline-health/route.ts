@@ -263,19 +263,36 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Mark the incident escalated + resolved. The incident trigger
-        // already paged the founder when this incident first fired;
-        // nothing more to dispatch here.
+        // Mark the incident escalated. Whether we also mark it resolved
+        // depends on whether the session is leaving the detector's scope:
+        //
+        //   retry_budget_exhausted → session.pipeline_status='failed'.
+        //     The detector only scans active/stuck/recovering, so this
+        //     session will not be re-detected. Safe to resolve.
+        //
+        //   chronic_stuck_pattern → session stays 'stuck'. If we resolve
+        //     the incident here, pipeline_detect_stuck_sessions' "no open
+        //     incident" guard will pass again on the next tick and it
+        //     will INSERT a fresh row → ghost-incident loop (CEO-009).
+        //     Leave resolved=false so the guard stays armed. The incident
+        //     trigger has already paged the founder; ops owns it now.
+        const isTerminal = d.reason === 'retry_budget_exhausted';
         await admin
           .from('pipeline_incidents')
           .update({
             escalated_to_admin: true,
-            resolved: true,
-            resolved_at: new Date().toISOString(),
-            resolution_note:
-              d.reason === 'retry_budget_exhausted'
-                ? `Escalated to admin after ${d.failure_count ?? '?'} failed attempts`
-                : `Escalated to admin — chronic stuck pattern (${d.stuck_count ?? '?'} incidents)`,
+            ...(isTerminal
+              ? {
+                  resolved: true,
+                  resolved_at: new Date().toISOString(),
+                  resolution_note: `Escalated to admin after ${d.failure_count ?? '?'} failed attempts`,
+                }
+              : {
+                  // Open, escalated. Next cron tick sees this incident
+                  // and skips re-inserting. Founder clears it manually
+                  // from Command Center when they've handled it.
+                  resolution_note: `Escalated to admin — chronic stuck pattern (${d.stuck_count ?? '?'} incidents). Kept open for detector idempotency; resolve manually when handled.`,
+                }),
             recovery_action_taken: 'escalate_to_admin',
           })
           .eq('id', s.incident_id);
