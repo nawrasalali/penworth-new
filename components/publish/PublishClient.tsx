@@ -404,7 +404,7 @@ export function PublishClient({
             )}
             <div className="min-w-0 text-left">
               <div className="font-semibold truncate">{selected?.title || 'Untitled'}</div>
-              <div className="text-xs text-muted-foreground">{selected?.content_type || 'document'}</div>
+              <div className="text-xs text-muted-foreground">{selected?.content_type || 'book'}</div>
             </div>
           </div>
           <ChevronDown className={`h-4 w-4 shrink-0 transition ${docDropdownOpen ? 'rotate-180' : ''}`} />

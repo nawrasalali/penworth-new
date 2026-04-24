@@ -435,7 +435,7 @@ function PipelineHealthBanner({
         <AlertOctagon className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
         <div className="flex-1">
           <p className="text-sm font-semibold text-red-200">
-            We hit a problem writing your document
+            We hit a problem writing your book
           </p>
           <p className="text-sm text-red-100/80 mt-1 leading-relaxed">
             Your progress is saved. You can resume from the last completed

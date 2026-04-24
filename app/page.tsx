@@ -50,37 +50,21 @@ const LANGUAGES = [
 const DOCUMENT_TYPES = {
   en: {
     title: 'Whatever book you came here to write',
-    subtitle: 'A novel. A memoir. A book of essays. A dissertation. A business book that does not read like every other business book.',
+    subtitle: 'A novel. A memoir. A book of essays. A book that does not read like every other.',
     categories: [
       {
         name: 'Books',
         types: ['Fiction', 'Non-Fiction', 'Memoir', 'Self-Help', 'Biography', 'Children\'s Books', 'Poetry', 'Cookbook', 'Travel Guide'],
       },
-      {
-        name: 'Academic & Scientific',
-        types: ['Research Papers', 'Thesis', 'Dissertations', 'Technical Documentation', 'White Papers'],
-      },
-      {
-        name: 'Business & Finance',
-        types: ['Business Plans', 'Financial Reports', 'Proposals', 'Case Studies', 'Market Analysis'],
-      },
     ],
   },
   ar: {
     title: 'أيُّ كتابٍ جئتَ إلى هنا لتكتُبَه',
-    subtitle: 'روايةٌ. سيرةٌ ذاتيّة. كتابُ مقالات. أطروحةٌ جامعيَّة. كتابٌ في الأعمال لا يُقرَأُ كبقيَّةِ كتب الأعمال.',
+    subtitle: 'روايةٌ. سيرةٌ ذاتيّة. كتابُ مقالات. كتابٌ لا يُقرَأُ كبقيَّةِ الكتب.',
     categories: [
       {
         name: 'الكتب',
         types: ['روايات', 'غير خيالي', 'مذكرات', 'تطوير ذاتي', 'سيرة ذاتية', 'كتب أطفال', 'شعر', 'كتب طبخ', 'دليل سفر'],
-      },
-      {
-        name: 'أكاديمي وعلمي',
-        types: ['أوراق بحثيّة', 'ماجستير', 'دكتوراه', 'توثيق تقنيّ', 'أوراق بيضاء'],
-      },
-      {
-        name: 'أعمال ومالية',
-        types: ['خطط عمل', 'تقارير ماليّة', 'مقترحات', 'دراسات حالة', 'تحليل سوق'],
       },
     ],
   },
@@ -523,7 +507,7 @@ export default function HomePage() {
               <p className="text-lg text-neutral-600 dark:text-neutral-400">{docTypes.subtitle}</p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 gap-8 max-w-2xl mx-auto">
               {docTypes.categories.map((category, i) => (
                 <div key={i} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
                   <h3 className="font-semibold text-lg mb-4 text-amber-600 dark:text-amber-400">{category.name}</h3>

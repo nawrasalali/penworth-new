@@ -321,7 +321,7 @@ export default function PricingPage() {
             },
             {
               q: 'What is a credit?',
-              a: 'Credits power your document generation. 1,000 credits = 1 standard document. Pro and Max subscribers can purchase additional credit packs when needed.',
+              a: 'Credits power your book generation. 1,000 credits = 1 standard book. Pro and Max subscribers can purchase additional credit packs when needed.',
             },
             {
               q: 'What about teams?',
