@@ -201,7 +201,88 @@ export async function POST(request: NextRequest) {
             updateData.research_data = data;
             break;
           case 'outline':
-            updateData.outline_data = data;
+            // CEO-048 followup: the outline is expensive (one full LLM
+            // generation + user review + approval). Prior to this fix,
+            // this endpoint did `updateData.outline_data = data` —
+            // blindly accepting whatever the client POSTed, which
+            // wiped the derived `body` / `chapters` / `frontMatter` /
+            // `backMatter` / `templateMeta` fields that the writing
+            // agent depends on. Result: approved outlines silently
+            // lost the structure writing needed, and chapter-generation
+            // did zero work for 15+ minutes before the reaper found it.
+            //
+            // Guardrail now:
+            //   1. If the incoming payload has `sections[]`, rebuild
+            //      `body` / `chapters` / `frontMatter` / `backMatter`
+            //      from it before persisting. This matches what
+            //      /api/ai/outline:buildSuccessOutlineData produces.
+            //   2. If derived fields are already present and the
+            //      incoming payload lacks them, merge rather than
+            //      overwrite. That way a UI PATCH that only sends
+            //      `{ approved: true }` can update approval without
+            //      destroying the structure.
+            //   3. Always stamp `lastSavedAt` so we can trace which
+            //      save overwrote what.
+            {
+              const incoming = (data ?? {}) as Record<string, unknown>;
+              const existing = (session.outline_data ?? {}) as Record<string, unknown>;
+
+              const sections = Array.isArray(incoming.sections)
+                ? (incoming.sections as Array<Record<string, unknown>>)
+                : Array.isArray(existing.sections)
+                  ? (existing.sections as Array<Record<string, unknown>>)
+                  : null;
+
+              let derived: Record<string, unknown> = {};
+              if (sections && sections.length > 0) {
+                const chapters = sections
+                  .filter((s) => s.type === 'chapter')
+                  .map((s, i) => ({
+                    number: i + 1,
+                    key: s.id,
+                    title: s.title,
+                    description: s.description,
+                    keyPoints: s.keyPoints,
+                    estimatedWords: s.estimatedWords,
+                  }));
+                const frontMatter = sections
+                  .filter((s) => s.type === 'front_matter')
+                  .map((s) => ({
+                    title: s.title,
+                    description: s.description,
+                    keyPoints: s.keyPoints,
+                    estimatedWords: s.estimatedWords,
+                    key: s.id,
+                  }));
+                const backMatter = sections
+                  .filter((s) => s.type === 'back_matter')
+                  .map((s) => ({
+                    title: s.title,
+                    description: s.description,
+                    keyPoints: s.keyPoints,
+                    estimatedWords: s.estimatedWords,
+                    key: s.id,
+                  }));
+                derived = {
+                  body: chapters,
+                  chapters, // legacy alias
+                  frontMatter,
+                  backMatter,
+                };
+              }
+
+              updateData.outline_data = {
+                // Start from what already exists so a partial save
+                // cannot strip fields it does not know about.
+                ...existing,
+                // Apply the client's intent on top.
+                ...incoming,
+                // Re-derived structural fields win over both (fresh
+                // derivation from the authoritative sections[]).
+                ...derived,
+                lastSavedAt: new Date().toISOString(),
+              };
+            }
             break;
           case 'writing':
             updateData.writing_data = data;
