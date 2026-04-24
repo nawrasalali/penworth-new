@@ -77,10 +77,15 @@ export async function POST(request: NextRequest) {
     }
     await trace('body_ok', `type=${coverType} promptLen=${(prompt ?? '').length}`, user.id, sessionId);
 
-    // Check if this is a regeneration (costs credits)
+    // Check if this is a regeneration (costs credits).
+    // We also pull book_title + outline_data here so the prompt builder
+    // below can derive a rich "subject" line even when the client did
+    // not bother to send bookDescription (most callers don't — both
+    // the editor page and hooks/use-agent-workflow.ts omit it or pass
+    // empty string).
     const { data: session } = await supabase
       .from('interview_sessions')
-      .select('front_cover_regenerations, back_cover_regenerations')
+      .select('front_cover_regenerations, back_cover_regenerations, book_title, outline_data')
       .eq('id', sessionId)
       .single();
 
@@ -100,8 +105,9 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!profile || profile.credits < creditCost) {
+        await trace('insufficient_credits', `have=${profile?.credits ?? 0} need=${creditCost}`, user.id, sessionId);
         return NextResponse.json(
-          { error: 'Insufficient credits', required: creditCost, available: profile?.credits || 0 },
+          { error: `Not enough credits to regenerate. You have ${profile?.credits ?? 0}, need ${creditCost}. Your first cover generation is free; each regeneration after that costs ${creditCost} credits.`, required: creditCost, available: profile?.credits || 0 },
           { status: 402 }
         );
       }
@@ -117,6 +123,21 @@ export async function POST(request: NextRequest) {
     // IMPORTANT: We tell Ideogram NOT to include text - we overlay it ourselves
     let ideogramPrompt: string;
 
+    // Server-side subject derivation (CEO-072 follow-up).
+    //
+    // The client-side callers of this endpoint (editor page + the
+    // use-agent-workflow hook) do NOT send bookDescription, or send it
+    // as empty string. Relying on the 60-char book title alone means
+    // Ideogram can still produce off-topic imagery — the 14:48 UTC
+    // fruit-bowl failure on "The Rewired Self" happened partly for
+    // that reason. Derive a subject blurb from the outline's first
+    // two chapter titles + their leading key point, which is the
+    // richest single signal about what the book is actually about.
+    const titleForPrompt = (session?.book_title || bookTitle || '').trim();
+    const derivedSubject = deriveSubjectFromOutline(session?.outline_data);
+    const effectiveSubject = (bookDescription?.trim() || derivedSubject || '').slice(0, 500);
+    await trace('subject_ok', `titleLen=${titleForPrompt.length} subjLen=${effectiveSubject.length} fromOutline=${!bookDescription?.trim() && !!derivedSubject}`, user.id, sessionId);
+
     if (coverType === 'front') {
       // BUG FIX (CEO-072): when the user picked a suggestion chip (e.g.
       // "Bold and eye-catching with vibrant colors"), the old code sent
@@ -128,21 +149,21 @@ export async function POST(request: NextRequest) {
       // becomes the *style* directive layered on top.
       const userStyle = (prompt ?? '').trim();
       if (userStyle) {
-        const topicLine = bookDescription
-          ? `Book title: "${bookTitle}". Subject: ${bookDescription}.`
-          : `Book title: "${bookTitle}".`;
+        const topicLine = effectiveSubject
+          ? `Book title: "${titleForPrompt}". Subject: ${effectiveSubject}.`
+          : `Book title: "${titleForPrompt}".`;
         ideogramPrompt =
           `${topicLine}\n\nVisual style: ${userStyle}.\n\n` +
           `Create a book cover whose imagery directly evokes the book's subject. ` +
           `Keep the style direction but never produce generic stock imagery (no food, no abstract fruit, ` +
           `no unrelated photography). The cover must feel specific to this book.`;
       } else {
-        ideogramPrompt = buildDefaultFrontCoverPrompt(bookTitle, bookDescription);
+        ideogramPrompt = buildDefaultFrontCoverPrompt(titleForPrompt, effectiveSubject);
       }
       // Add instruction to NOT include text
       ideogramPrompt += '\n\nIMPORTANT: Do NOT include any text, words, letters, or typography in the image. The image should be purely visual with no text elements. Leave space at the top and bottom for text overlay.';
     } else {
-      ideogramPrompt = buildBackCoverPrompt(bookTitle, bookDescription);
+      ideogramPrompt = buildBackCoverPrompt(titleForPrompt, effectiveSubject);
       ideogramPrompt += '\n\nIMPORTANT: Do NOT include any text, words, letters, or typography in the image. Create a subtle, elegant background suitable for text overlay. Leave the center area relatively simple for description text.';
     }
 
@@ -263,6 +284,47 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Pull a rich "subject" blurb out of the stored outline_data jsonb so
+ * Ideogram has something to latch onto beyond a short book title.
+ *
+ * Client-side callers of /api/covers/generate currently don't send
+ * bookDescription — the editor page and use-agent-workflow hook both
+ * omit it or pass empty string. Rather than plumbing a new field
+ * through two clients, we derive the subject here from whatever the
+ * outline agent has already written.
+ *
+ * Strategy: take the first two chapter titles + the first key point
+ * of chapter 1, which is consistently the "what this book is about"
+ * signal under our outline agent's format (see the outline_data
+ * example in interview_sessions — keys: body[].title, body[].keyPoints[]).
+ *
+ * Returns an empty string if we can't get anything useful. Defensive
+ * against any shape — outline_data is jsonb, so we validate each
+ * property access.
+ */
+function deriveSubjectFromOutline(outlineData: unknown): string {
+  if (!outlineData || typeof outlineData !== 'object') return '';
+  const body = (outlineData as any).body;
+  if (!Array.isArray(body) || body.length === 0) return '';
+
+  const parts: string[] = [];
+
+  const firstTitle = typeof body[0]?.title === 'string' ? body[0].title.trim() : '';
+  if (firstTitle) parts.push(firstTitle);
+
+  const firstKeyPoint =
+    Array.isArray(body[0]?.keyPoints) && typeof body[0].keyPoints[0] === 'string'
+      ? body[0].keyPoints[0].trim()
+      : '';
+  if (firstKeyPoint) parts.push(firstKeyPoint);
+
+  const secondTitle = typeof body[1]?.title === 'string' ? body[1].title.trim() : '';
+  if (secondTitle) parts.push(secondTitle);
+
+  return parts.join(' — ').slice(0, 400);
 }
 
 function buildDefaultFrontCoverPrompt(bookTitle: string, description?: string): string {
