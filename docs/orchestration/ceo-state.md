@@ -1,6 +1,6 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-25 ~08:35 UTC by CEO Claude session (CEO-082 close-out — store perf shipped, CEO-095/096 spawned)
+**Last updated:** 2026-04-25 ~09:00 UTC by CEO Claude session (CEO-095 close-out — store data-layer caching shipped, CEO-098 spawned for SiteHeader refactor)
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
@@ -30,14 +30,20 @@
 - **Role now:** leadership + approvals; execution delegated to CEO
 - **Preferred comms:** direct, no abbreviations, top-recommendation-first, "go" = approved
 
-## What shipped in the most recent CEO session (2026-04-25 evening — CEO-082 close-out)
+## What shipped in the most recent CEO session (2026-04-25 ~09:00 UTC — CEO-095 close-out)
 
-1. Commit `63bbda7` on penworth-store/main: explicit `force-dynamic` on `app/book/[slug]/page.tsx` mirroring the homepage pattern. Vercel deploy `dpl_CSrnEcHAy1HDnc7g7XPWb4pdegCS` READY in production.
-2. CEO-082 closed (`done`) with full audit. Five fixes confirmed effective in production: storage cacheControl 1-year-immutable upgrade, font self-hosting via next/font/google, cover-image weight cap via literal sizes prop, homepage Promise.all + dedup across rails, priorityFirst hint on first rendered rail.
-3. CEO-095 spawned (`open`, p1, ceo-owned, store): the `revalidate=300` exports on `/browse` and `/collections` from earlier CEO-082 commits are no-ops because `lib/supabase/server.ts createClient()` reads `cookies()` from `next/headers`, forcing dynamic rendering. Cause-#1 of the original 2s-lag diagnosis (no HTML caching, ~60% of lag) is therefore not yet fixed in production. Bounded ~30-60 min; recommended fix is switching the two anonymous-only catalog pages to `createServiceClient()`.
-4. CEO-096 spawned (`open`, p2, ceo-owned, store): performance measurement (Lighthouse + Speed Insights) for CEO-082 before/after. Depends on CEO-095 landing first. Path forward: bash curl to `api.vercel.com/v13/...` with `VERCEL_API_TOKEN` works; the Vercel MCP layer specifically is broken (403) and is the wrong path.
-5. State-file correction: the "things never to assume" rule #4 was over-broad ("use Vercel MCP, not bash curl") — corrected to reflect that the bash-curl path is actually the working one, and only the specific HTTP 503 "DNS cache overflow" signature is the sandbox-egress red herring.
-6. Handover note: `docs/orchestration/handovers/2026-04-25-ceo082-closeout.md` — full session record including the third recurrence of the git-identity misfire and the path that made deploy land.
+1. Commit `0a217e0` on penworth-store/main: `perf(store): make /browse + /collections caching effective (CEO-095)`. Vercel deploy `dpl_5oT6C6Rr3gFfmpq6HbcxhKfiarGS` READY in production. Switches `getPublicCollections`, `getFilteredListings`, `getCategoryFacets`, `getLanguageFacets` from `createClient` (cookie-reading) to `createServiceClient`. Wraps the three `/browse` data functions in `unstable_cache` (300s TTL, tag `store-listings`) so DB roundtrips are cached server-side per filter combination. Removes the dead `revalidate=300` on `/browse` and replaces with explicit `force-dynamic` + rationale comment.
+2. CEO-095 closed (`done`) with audit. /browse data layer caching is effective in production. /collections data layer is isolated.
+3. CEO-098 spawned (`open`, p2, ceo, store) — `Extract auth-aware nav from SiteHeader into client component to unblock edge caching`. Discovered post-deploy: /collections is STILL dynamic at the edge despite the data-layer fix because `components/store/site-header.tsx` lines 10–11 call `createClient() + supabase.auth.getUser()` to render the auth nav, and SiteHeader is on every page. This is the same wall CEO-092 hit on homepage and book-detail; the fix pattern (extract auth-aware fragment to client component) is already in the repo. Bounded ~1-2 hours.
+4. Handover note: `docs/orchestration/handovers/2026-04-25-ceo095-closeout.md` — full session record including the searchParams discovery for /browse and the SiteHeader discovery for /collections.
+
+## What shipped earlier this evening (2026-04-25 — CEO-082 close-out)
+
+1. Commit `63bbda7` on penworth-store/main: explicit `force-dynamic` on `app/book/[slug]/page.tsx` mirroring the homepage pattern. Vercel deploy `dpl_CSrnEcHAy1HDnc7g7XPWb4pdegCS` READY.
+2. CEO-082 closed with full audit. Five fixes confirmed effective in production: storage cacheControl 1-year-immutable upgrade, font self-hosting via next/font/google, cover-image weight cap via literal sizes prop, homepage Promise.all + dedup across rails, priorityFirst hint on first rendered rail.
+3. CEO-095 spawned (now closed in the section above) and CEO-096 spawned (`open`, p2, ceo, store) for performance measurement once CEO-098 lands.
+4. State-file correction: rule #4 in "things never to assume" was over-broad — corrected to reflect the bash-curl path is the working one for Vercel REST API; only the specific HTTP 503 "DNS cache overflow" signature is the sandbox-egress red herring.
+5. Handover note: `docs/orchestration/handovers/2026-04-25-ceo082-closeout.md`.
 
 ## What shipped earlier today (2026-04-24 / 25)
 
@@ -141,12 +147,12 @@ Branch `feat/remove-certified-tier` on penworth-store has a Vercel deploy in ERR
 
 ## Open threads I'm tracking
 
-- **CEO-095** (p1, store) — store ISR is a no-op because `lib/supabase/server.ts createClient()` reads cookies; the `revalidate=300` exports on /browse and /collections do nothing. Recommended: switch those two pages to `createServiceClient()`. Bounded ~30-60 min.
-- **CEO-096** (p2, store) — store performance measurement (Lighthouse + Speed Insights). Depends on CEO-095 landing first. Use `api.vercel.com/v13/...` REST with `VERCEL_API_TOKEN`, not the broken Vercel MCP layer.
-- **CEO-031 Phase 2** — restart-agent consumers for non-writing agents. Next session work.
-- **CEO-077 ERROR deploy** — Founder's commit. First thing to triage next session.
+- **CEO-098** (p2, store) — extract auth-aware nav from SiteHeader into a client component. Last blocker for /collections (and other anonymous-safe pages) becoming truly edge-cacheable. Pattern already in the repo from CEO-092. Bounded ~1-2 hours.
+- **CEO-096** (p2, store) — performance measurement (Lighthouse + Speed Insights). Most meaningful AFTER CEO-098 lands, so the numbers reflect the fully-fixed state. Use `api.vercel.com/v13/...` REST with `VERCEL_API_TOKEN`, not the broken Vercel MCP layer.
+- **CEO-031 Phase 2** — restart-agent consumers for non-writing agents.
+- **CEO-077 ERROR deploy** — Founder's commit. Triage when convenient.
 - **CEO-070/CEO-071 cover generation** — surfaced diag traces; awaiting Founder's next click to pin upstream Ideogram error pattern.
-- **`feat/remove-certified-tier` deploy ERROR** on penworth-store (`sha=4cc87c2f`, flagged by previous session). Triage with `api.vercel.com/v13/deployments/...?teamId=...` to read `readyStateReason` and `seatBlock` fields — likely a `COMMIT_AUTHOR_REQUIRED` block given the recurrence pattern.
+- **`feat/remove-certified-tier` deploy ERROR** on penworth-store. Triage with `api.vercel.com/v13/deployments/...` to read `readyStateReason` and `seatBlock` — likely another `COMMIT_AUTHOR_REQUIRED` block.
 
 ## Known production risks (current)
 
