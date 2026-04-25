@@ -1,20 +1,20 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-25 ~08:20 UTC by CEO Claude session (CEO-094 livebooks-nav swap; PR #1 penworth-store)
+**Last updated:** 2026-04-25 ~08:35 UTC by CEO Claude session (CEO-082 close-out — store perf shipped, CEO-095/096 spawned)
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Production health — verified 2026-04-25 ~08:20 UTC
+## Production health — verified 2026-04-25 ~08:35 UTC
 
 | Signal | State |
 |---|---|
-| Supabase migrations applied | 127 (latest: `028_guild_paid_author_policy` this session) |
-| Latest main commit (writer) | `227941f` — feat(referrals): signup wiring + dashboard rewrite (this session) |
-| Prior main commit (writer) | `c2df108` — feat(referrals,guild): rewire economics + paid-author policy (this session) |
+| Supabase migrations applied | 127 (latest: `028_guild_paid_author_policy`) |
+| Latest main commit (writer) | `227941f` — feat(referrals): signup wiring + dashboard rewrite |
+| Prior main commit (writer) | `c2df108` — feat(referrals,guild): rewire economics + paid-author policy |
 | Writer Vercel latest READY | `227941f` |
-| Store latest production deploy | `668f31b2` (CEO-094 livebooks nav swap) — READY |
+| Store latest production deploy | `63bbda7` (CEO-082 force-dynamic on /book/[slug]) — READY as `dpl_CSrnEcHAy1HDnc7g7XPWb4pdegCS` |
 | Stuck sessions right now | 0 |
 | Open incidents | 0 |
 | Webhooks failed 24h | 0 |
@@ -30,7 +30,16 @@
 - **Role now:** leadership + approvals; execution delegated to CEO
 - **Preferred comms:** direct, no abbreviations, top-recommendation-first, "go" = approved
 
-## What shipped in the most recent CEO session (2026-04-24 / 25)
+## What shipped in the most recent CEO session (2026-04-25 evening — CEO-082 close-out)
+
+1. Commit `63bbda7` on penworth-store/main: explicit `force-dynamic` on `app/book/[slug]/page.tsx` mirroring the homepage pattern. Vercel deploy `dpl_CSrnEcHAy1HDnc7g7XPWb4pdegCS` READY in production.
+2. CEO-082 closed (`done`) with full audit. Five fixes confirmed effective in production: storage cacheControl 1-year-immutable upgrade, font self-hosting via next/font/google, cover-image weight cap via literal sizes prop, homepage Promise.all + dedup across rails, priorityFirst hint on first rendered rail.
+3. CEO-095 spawned (`open`, p1, ceo-owned, store): the `revalidate=300` exports on `/browse` and `/collections` from earlier CEO-082 commits are no-ops because `lib/supabase/server.ts createClient()` reads `cookies()` from `next/headers`, forcing dynamic rendering. Cause-#1 of the original 2s-lag diagnosis (no HTML caching, ~60% of lag) is therefore not yet fixed in production. Bounded ~30-60 min; recommended fix is switching the two anonymous-only catalog pages to `createServiceClient()`.
+4. CEO-096 spawned (`open`, p2, ceo-owned, store): performance measurement (Lighthouse + Speed Insights) for CEO-082 before/after. Depends on CEO-095 landing first. Path forward: bash curl to `api.vercel.com/v13/...` with `VERCEL_API_TOKEN` works; the Vercel MCP layer specifically is broken (403) and is the wrong path.
+5. State-file correction: the "things never to assume" rule #4 was over-broad ("use Vercel MCP, not bash curl") — corrected to reflect that the bash-curl path is actually the working one, and only the specific HTTP 503 "DNS cache overflow" signature is the sandbox-egress red herring.
+6. Handover note: `docs/orchestration/handovers/2026-04-25-ceo082-closeout.md` — full session record including the third recurrence of the git-identity misfire and the path that made deploy land.
+
+## What shipped earlier today (2026-04-24 / 25)
 
 1. Migration `ceo031_detector_exclude_publishing_and_stuck_current_only`: excludes `current_agent='publishing'` from stuck detection (publishing is human-driven), and tightens the "active" check to the current agent specifically.
 2. Commit `f72c015`: splits escalate_to_admin incident update — only resolves when session leaves detector scope. Fixes CEO-009 ghost-incident loop.
@@ -38,6 +47,8 @@
 4. 144 ghost `stuck_agent` incidents on fb09f345 consolidated with a resolution-note trace.
 5. 2 stale alerts acknowledged.
 6. Ghost-incident loop verified extinguished: 0 new rows, 0 new alerts, 0 stuck sessions since unstick.
+7. Migration `028_guild_paid_author_policy` and commits `c2df108` + `227941f`: referral rewire (1000 credits referrer, 100 welcome, no cap; Guild upgrade banner at 3+ referrals; Guild monthly fee retired in favour of Pro/Max-after-90-days requirement).
+8. Commit `668f31b2` on penworth-store/main (PR #1): CEO-094 top-nav swap For Authors → Livebooks. 13 files. Final shape: single nav-swap commit (a font hotfix originally bundled was dropped during rebase because a parallel session shipped the equivalent as `8b7055a`).
 
 ## The CEO position
 
@@ -47,14 +58,16 @@
 - **Claude Code runbook:** `docs/orchestration/claude-code-runbook.md`
 - **Session rituals:** `docs/orchestration/session-rituals.md`
 
-## Active work — open tasks summary (verified 2026-04-24 18:00 UTC)
+## Active work — open tasks summary (verified 2026-04-25 ~08:35 UTC)
 
 | Status | Count |
 |---|---|
-| open (ceo owns) | 9 (down from 18 at session start due to closures) |
-| in_progress | 3 (CEO-031 Phase 2 remaining; CEO-043 Phase 1+ per-agent wiring; CEO-051) |
+| open | 23 |
+| in_progress | 3 |
 | blocked | 6 |
-| awaiting_founder | 11 |
+| awaiting_founder | 13 |
+| done | 48 |
+| cancelled | 2 |
 
 Live priority-sorted query: `SELECT * FROM ceo_orchestration_tasks WHERE status != 'done' ORDER BY priority, created_at;`
 
@@ -128,9 +141,12 @@ Branch `feat/remove-certified-tier` on penworth-store has a Vercel deploy in ERR
 
 ## Open threads I'm tracking
 
+- **CEO-095** (p1, store) — store ISR is a no-op because `lib/supabase/server.ts createClient()` reads cookies; the `revalidate=300` exports on /browse and /collections do nothing. Recommended: switch those two pages to `createServiceClient()`. Bounded ~30-60 min.
+- **CEO-096** (p2, store) — store performance measurement (Lighthouse + Speed Insights). Depends on CEO-095 landing first. Use `api.vercel.com/v13/...` REST with `VERCEL_API_TOKEN`, not the broken Vercel MCP layer.
 - **CEO-031 Phase 2** — restart-agent consumers for non-writing agents. Next session work.
 - **CEO-077 ERROR deploy** — Founder's commit. First thing to triage next session.
 - **CEO-070/CEO-071 cover generation** — surfaced diag traces; awaiting Founder's next click to pin upstream Ideogram error pattern.
+- **`feat/remove-certified-tier` deploy ERROR** on penworth-store (`sha=4cc87c2f`, flagged by previous session). Triage with `api.vercel.com/v13/deployments/...?teamId=...` to read `readyStateReason` and `seatBlock` fields — likely a `COMMIT_AUTHOR_REQUIRED` block given the recurrence pattern.
 
 ## Known production risks (current)
 
@@ -142,7 +158,7 @@ Branch `feat/remove-certified-tier` on penworth-store has a Vercel deploy in ERR
 1. The Founder has read an earlier session's chat history. Always re-state.
 2. A chat-to-chat handover pasted by the Founder is complete. Always verify against DB + repo.
 3. A task in the backlog hasn't been worked on by another session. Always check `last_update_note`.
-4. **NEW**: HTTP 503 "DNS cache overflow" (18 bytes) from curl in bash_tool is the Anthropic sandbox-egress TLS Inspection CA — not a real Vercel outage. Use Vercel MCP tools, not bash curl, when checking deploy state.
+4. **NEW (corrected 2026-04-25 evening)**: HTTP 503 "DNS cache overflow" (18 bytes) from curl in bash_tool is the Anthropic sandbox-egress TLS interception, NOT a real Vercel outage. Verify with a non-Vercel host (httpbin.org) and the cert issuer chain. **However, regular bash curl to `https://api.vercel.com/v13/...` with `Authorization: Bearer $VERCEL_API_TOKEN` works correctly** — verified this session as the working path for deploy state, error reason, and seatBlock fields. The Vercel MCP integration layer specifically returns 403 across multiple sessions and is the broken path; the REST API is the working path.
 5. **NEW**: The Vercel team ID in project instructions is duplicated — the "Tools" section has `team_6YlFO6rqSl9ouKa8UkeoUEwmW` (wrong, trailing W), the "Infrastructure" section has `team_6YlFO6rqSl9ouKa8UkeoUEwm` (correct). Use the correct one.
 
 ---
