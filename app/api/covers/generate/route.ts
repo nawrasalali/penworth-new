@@ -139,52 +139,54 @@ export async function POST(request: NextRequest) {
     await trace('subject_ok', `titleLen=${titleForPrompt.length} subjLen=${effectiveSubject.length} fromOutline=${!bookDescription?.trim() && !!derivedSubject}`, user.id, sessionId);
 
     if (coverType === 'front') {
-      // Per CEO-095, the prompt is reframed as editorial illustration /
-      // poster art and DELIBERATELY does not mention the book title or
-      // the words "book cover". Reasoning:
+      // Per CEO-098, the prompt is now driven by a designer-brief
+      // composer that picks a single motif, two colors, and an art
+      // reference based on book content. This replaces the prior
+      // "evoking themes" approach which gave Ideogram too much freedom
+      // and produced rainbow chaos with hallucinated text. Reasoning:
       //
-      // Ideogram is the one major image model that renders text
-      // reliably — that's its differentiator. When we previously fed
-      // it the full title + the phrase "book cover" + zone hints
-      // ("top third can carry a title"), the training prior overrode
-      // every no-text instruction we added. Result: clean renders of
-      // "The Rewired Self" plus gibberish subtitle/author lines like
-      // "MELE ISA BLU" because the model assumed text belonged there.
-      //
-      // The new framing treats the requested image as standalone art.
-      // The model never learns this is a book cover, never sees the
-      // title to render, and is told *positively* what to fill the
-      // top/bottom zones with (empty atmospheric background) rather
-      // than being told what *not* to put there.
+      // A real cover designer makes 5 decisions before tooling: archetype,
+      // single brief, single motif, 2-color palette, art reference. The
+      // previous prompt asked Ideogram to make those decisions, which
+      // it can't — it averages its training data. The new prompt makes
+      // the decisions server-side and asks Ideogram to execute, not
+      // design. This sidesteps the "book cover = title + author name"
+      // training prior because the model never learns this is a book
+      // cover — it sees a museum-poster brief instead.
       const userStyle = (prompt ?? '').trim();
       // Strip the founder's well-meaning "no words / no text" hints
       // from the style chip — paradoxically they reinforce text by
       // putting the word "text" in the prompt (LLMs and diffusion
       // models alike attend to negation poorly). The negative_prompt
-      // field is the right place for these; the body should only
-      // describe what we DO want.
+      // field is the right place for those.
       const cleanedStyle = userStyle
         .replace(/\bno (words|text|typography|letters|writing|fonts)[^.]*\.?/gi, '')
         .replace(/\bonly[^.]*allowed\.?/gi, '')
         .trim();
-      const subjectLine = effectiveSubject
-        ? `evoking these themes: ${effectiveSubject}`
-        : 'with strong evocative imagery';
-      const styleLine = cleanedStyle
-        ? `Style approach: ${cleanedStyle}.`
-        : 'Style approach: refined, sophisticated, recognisably premium editorial.';
+
+      const brief = composeDesignerBrief(titleForPrompt, effectiveSubject);
+      await trace('brief_composed', `preset=${brief.presetTag}`, user.id, sessionId);
+
+      const styleModifier = cleanedStyle
+        ? `\n\nAdditional style direction: ${cleanedStyle}.`
+        : '';
+
       ideogramPrompt =
-        `A premium editorial illustration ${subjectLine}. Suitable for a ` +
-        `magazine cover spread, art print, or gallery poster. ${styleLine}\n\n` +
-        `Composition: a single strong central motif, symmetrically framed, ` +
-        `occupying the middle 55% of the frame vertically. The top 30% of the ` +
-        `frame is pure empty atmospheric background — solid color, soft gradient, ` +
-        `or quiet untextured surface, with no detail and no marks of any kind. ` +
-        `The bottom 18% of the frame is the same — empty, quiet, untextured ` +
-        `background. High contrast between the focal motif and the surrounding ` +
-        `emptiness. Vertical 2:3 aspect ratio. Avoid stock-photo aesthetics ` +
-        `(no food, no fruit, no generic landscapes); the image must feel ` +
-        `specific and intentional.`;
+        `A limited-edition museum exhibition poster. ` +
+        `Single subject: ${brief.motif}.\n\n` +
+        `Color palette: exactly two colors. Background is solid ` +
+        `${brief.primaryColor}. The subject is rendered in ` +
+        `${brief.accentColor}. No third color, no rainbow, no decorative ` +
+        `flourishes outside the central subject.\n\n` +
+        `Composition: the subject sits in the middle 55% of the frame, ` +
+        `centered, occupying that vertical slice cleanly. The top 30% of ` +
+        `the frame is the same ${brief.primaryColor} as the rest of the ` +
+        `background — pure, untouched, no detail, no marks of any kind. ` +
+        `The bottom 18% of the frame is the same — pure ` +
+        `${brief.primaryColor}, untouched. High contrast between the ` +
+        `subject and the surrounding emptiness. Symmetrical balance. ` +
+        `Vertical 2:3 aspect ratio.\n\n` +
+        `Visual reference: ${brief.artReference}.${styleModifier}`;
       // Final guard. Kept SHORT and POSITIVE. The previous version
       // repeated "typography" and "overlay" multiple times — every
       // mention of those words is a text cue to the model. The
@@ -236,11 +238,19 @@ export async function POST(request: NextRequest) {
           // Belt-and-braces: explicit negative prompt enumerating the
           // text-like outputs Ideogram is most likely to fabricate.
           // Ideogram V_2 honors this even when style_type=DESIGN.
+          // CEO-098 expansion: include non-Latin scripts. Earlier
+          // regenerations smuggled text in via Greek/Cyrillic-looking
+          // glyphs even when "letters" was already in the list —
+          // explicit script-class names override the ambiguity.
           negative_prompt:
             'text, words, letters, typography, lettering, fonts, ' +
             'title text, author name, captions, subtitles, watermarks, ' +
             'logos, brand marks, signatures, written language, ' +
-            'characters, alphabets, numerals, glyphs, calligraphy',
+            'characters, alphabets, numerals, glyphs, calligraphy, ' +
+            'Latin script, Cyrillic script, Greek letters, ' +
+            'Chinese characters, Japanese characters, Korean characters, ' +
+            'Arabic script, Hebrew script, ' +
+            'rainbow palette, multiple competing colors, busy decoration',
           // DESIGN produces stylized graphic-design output that reads as
           // a book cover. REALISTIC nudges Ideogram toward stock
           // photography — which is how a book about AI ended up with
@@ -393,6 +403,195 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Designer-brief composer (CEO-098 / CEO-097 follow-up).
+ *
+ * A real cover designer makes five decisions before they touch any
+ * tool: archetype, one-sentence brief, single symbolic motif, two-color
+ * palette, art reference. The previous prompt asked Ideogram to make
+ * those decisions, which it can't — it just averages its training data.
+ * Result: rainbow chaos with hallucinated text.
+ *
+ * This composer makes the decisions server-side, keyword-matched
+ * against the book's title + outline data, and renders an Ideogram
+ * prompt that reads like a designer brief to an executor. Ideogram's
+ * job becomes "render this single described image", not "design a
+ * book cover" — the latter triggers the title+author prior.
+ *
+ * The matching is intentionally simple in v1 (keyword lookup tables).
+ * Future iteration can replace `pickMotif` etc. with a single LLM call
+ * to Anthropic given the outline JSON; current shape preserves that
+ * upgrade path.
+ */
+interface DesignerBrief {
+  motif: string;
+  primaryColor: string;
+  accentColor: string;
+  artReference: string;
+  /**
+   * For diagnostics only — recorded so we can correlate which brief
+   * preset produced which output when reviewing _cover_diag_trace.
+   */
+  presetTag: string;
+}
+
+function pickMotif(bookTitle: string, subject: string): { motif: string; tag: string } {
+  const t = `${bookTitle} ${subject}`.toLowerCase();
+
+  // AI / cognition / mind
+  if (/\b(ai|artificial intelligence|brain|mind|cogniti|think|neural|conscious|memory|attention)/.test(t)) {
+    return {
+      motif:
+        'a single human silhouette in profile, the inside of the skull dissolving ' +
+        'into fine traced lines that drift outward like smoke or ink in water — ' +
+        'half organic, half machine-circuit',
+      tag: 'ai-cognition',
+    };
+  }
+
+  // Business / leadership / strategy / success
+  if (/\b(business|leader|success|strategy|wealth|founder|company|entrepreneur|capital)/.test(t)) {
+    return {
+      motif:
+        'a single bold geometric form rising from below a flat horizon line, ' +
+        'casting a long quiet shadow — restrained, monumental, modernist',
+      tag: 'business',
+    };
+  }
+
+  // Memoir / personal / family / journey
+  if (/\b(memoir|life|journey|family|mother|father|growing|home|childhood|story of)/.test(t)) {
+    return {
+      motif:
+        'a single weathered everyday object resting on a flat surface — ' +
+        'a folded letter, a worn key, an open palm, a single chair at a window — ' +
+        'isolated and deliberate, like a still-life by Morandi',
+      tag: 'memoir',
+    };
+  }
+
+  // Self-help / wellness / habit / focus
+  if (/\b(habit|focus|wellness|health|mindful|meditat|productiv|calm|sleep|stress|peace)/.test(t)) {
+    return {
+      motif:
+        'a single tree or single small plant, isolated against open sky, ' +
+        'rendered with restrained natural lines — the kind of image that feels ' +
+        'patient and deliberate',
+      tag: 'wellness',
+    };
+  }
+
+  // Mystery / dark / secret
+  if (/\b(mystery|secret|dark|shadow|hidden|silence|night|lost)/.test(t)) {
+    return {
+      motif:
+        'a single closed door at the end of a long hallway, soft directional light ' +
+        'from one side, deep shadow on the other — quiet suspense, no figure',
+      tag: 'mystery',
+    };
+  }
+
+  // History / ancient / war
+  if (/\b(history|ancient|war|empire|civilization|century|age of)/.test(t)) {
+    return {
+      motif:
+        'a single classical column or fragment of broken stone against a quiet sky, ' +
+        'rendered in flat planes — monumental but reduced, like a museum poster',
+      tag: 'history',
+    };
+  }
+
+  // Default — abstract sculptural form
+  return {
+    motif:
+      'a single abstract sculptural form — a smooth folded ribbon, a draped cloth, ' +
+      'a hovering geometric solid — centered against open negative space',
+    tag: 'default-abstract',
+  };
+}
+
+function pickPalette(bookTitle: string, subject: string): { primary: string; accent: string; tag: string } {
+  const t = `${bookTitle} ${subject}`.toLowerCase();
+
+  // AI/cognition palette: high-contrast intellectual, navy + amber
+  if (/\b(ai|artificial intelligence|brain|mind|cogniti|think|neural|conscious)/.test(t)) {
+    return {
+      primary: 'deep navy ink, untextured, flat, almost black-blue',
+      accent: 'warm amber, with a subtle gradient toward gold at the edges',
+      tag: 'navy-amber',
+    };
+  }
+
+  // Business: charcoal + electric blue
+  if (/\b(business|leader|success|strategy|wealth|founder|company|entrepreneur)/.test(t)) {
+    return {
+      primary: 'deep charcoal, flat and uniform',
+      accent: 'electric ultramarine blue with a single highlight',
+      tag: 'charcoal-blue',
+    };
+  }
+
+  // Memoir: bone white + ochre
+  if (/\b(memoir|life|journey|family|mother|father|growing|home|childhood)/.test(t)) {
+    return {
+      primary: 'warm bone white with the faintest paper grain',
+      accent: 'burnt ochre, restrained, like aged photograph',
+      tag: 'bone-ochre',
+    };
+  }
+
+  // Wellness: forest green + cream
+  if (/\b(habit|focus|wellness|health|mindful|meditat|productiv|calm|sleep)/.test(t)) {
+    return {
+      primary: 'soft forest green, slightly desaturated, even tone',
+      accent: 'warm cream',
+      tag: 'forest-cream',
+    };
+  }
+
+  // Mystery: deep teal + bone
+  if (/\b(mystery|secret|dark|shadow|hidden|silence|night)/.test(t)) {
+    return {
+      primary: 'deep teal-black, almost the color of wet ink',
+      accent: 'bone white, used sparingly as a single highlight',
+      tag: 'teal-bone',
+    };
+  }
+
+  // History: terracotta + parchment
+  if (/\b(history|ancient|war|empire|civilization|century)/.test(t)) {
+    return {
+      primary: 'parchment cream with a subtle warm undertone',
+      accent: 'terracotta red, restrained',
+      tag: 'parchment-terracotta',
+    };
+  }
+
+  // Default — burgundy + cream (a safe, premium combination)
+  return {
+    primary: 'deep burgundy, flat and uniform',
+    accent: 'warm cream, used sparingly',
+    tag: 'default-burgundy',
+  };
+}
+
+const ART_REFERENCE_CONCEPT =
+  'in the visual language of contemporary editorial illustration — Olly Moss, ' +
+  'Christoph Niemann, Noma Bar — flat shapes, restrained palette, one strong ' +
+  'idea, executed with confidence';
+
+function composeDesignerBrief(bookTitle: string, subject: string): DesignerBrief {
+  const motif = pickMotif(bookTitle, subject);
+  const palette = pickPalette(bookTitle, subject);
+  return {
+    motif: motif.motif,
+    primaryColor: palette.primary,
+    accentColor: palette.accent,
+    artReference: ART_REFERENCE_CONCEPT,
+    presetTag: `${motif.tag}|${palette.tag}`,
+  };
 }
 
 /**
