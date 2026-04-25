@@ -230,16 +230,70 @@ export async function POST(request: NextRequest) {
     }
 
     const ideogramData = await ideogramResponse.json();
-    const imageUrl = ideogramData.data?.[0]?.url;
+    const ephemeralUrl: string | undefined = ideogramData.data?.[0]?.url;
 
-    if (!imageUrl) {
+    if (!ephemeralUrl) {
       await trace('ideogram_no_image', JSON.stringify(ideogramData).slice(0, 500), user.id, sessionId);
       return NextResponse.json(
         { error: 'No image generated' },
         { status: 500 }
       );
     }
-    await trace('ideogram_ok', `url=${imageUrl.slice(0, 200)}`, user.id, sessionId);
+    await trace('ideogram_ok', `url=${ephemeralUrl.slice(0, 200)}`, user.id, sessionId);
+
+    // CEO-073: Ideogram image URLs expire in ~10 hours. We must mirror
+    // the bytes into our own `covers` storage bucket and persist the
+    // public URL of OUR copy. Otherwise every cover the user generates
+    // 404s by tomorrow — including covers on already-published books.
+    //
+    // The covers bucket RLS requires (storage.foldername(name))[1] =
+    // auth.uid()::text on INSERT. We satisfy that with the `{userId}/`
+    // prefix, mirroring the layout we use for author headshots.
+    let imageUrl = ephemeralUrl;
+    try {
+      await trace('mirror_fetch_start', null as any, user.id, sessionId);
+      const imgResp = await fetch(ephemeralUrl);
+      if (!imgResp.ok) {
+        throw new Error(`fetch ideogram image: HTTP ${imgResp.status}`);
+      }
+      const contentType = imgResp.headers.get('content-type') || 'image/png';
+      const ext = contentType.includes('jpeg') ? 'jpg'
+                : contentType.includes('webp') ? 'webp'
+                : 'png';
+      const bytes = await imgResp.arrayBuffer();
+      const storagePath = `${user.id}/covers/${sessionId}-${coverType}.${ext}`;
+
+      const { error: uploadErr } = await supabase
+        .storage
+        .from('covers')
+        .upload(storagePath, bytes, {
+          contentType,
+          upsert: true,
+          cacheControl: '31536000',
+        });
+
+      if (uploadErr) {
+        throw new Error(`storage upload: ${uploadErr.message}`);
+      }
+
+      const { data: { publicUrl } } = supabase
+        .storage
+        .from('covers')
+        .getPublicUrl(storagePath);
+
+      // Cache-buster so the UI repaints immediately on regenerate
+      // even though the storage path is deterministic.
+      imageUrl = `${publicUrl}?v=${Date.now()}`;
+      await trace('mirror_ok', imageUrl.slice(0, 200), user.id, sessionId);
+    } catch (mirrorErr: any) {
+      // Mirror failure is not fatal — the user still gets a working
+      // cover for ~10 hours. We log so we can fix root cause later
+      // (likely RLS or a transient Ideogram CDN hiccup) and keep
+      // imageUrl pointing at the ephemeral URL. Better degraded than
+      // failed.
+      await trace('mirror_fail', String(mirrorErr?.message ?? mirrorErr).slice(0, 500), user.id, sessionId);
+      console.error('[covers/generate] mirror to bucket failed; falling back to ephemeral URL:', mirrorErr);
+    }
 
     // Update session with new cover URL
     const updateField = coverType === 'front' 
