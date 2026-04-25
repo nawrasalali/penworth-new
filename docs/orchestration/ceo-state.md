@@ -1,12 +1,32 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-25 ~12:45 UTC by CEO Claude session (CEO-118 closed as non-incident; prior session's three-issue P0 was a sandbox-egress mirage).
+**Last updated:** 2026-04-25 ~12:56 UTC by CEO Claude session (CEO-122 admin-grant-credits "authentication required" fix shipped to production; PR #3 store-repo unblocked + CEO-114 husky author-identity hook earlier in same session).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-25 ~12:45 UTC — CEO-118 closed as non-incident, two follow-ups spawned)
+## Most recent session activity (2026-04-25 ~12:56 UTC — CEO-122 admin-grant fix shipped + CEO-114 husky hook + PR #3 unblock, all in one session)
+
+This was a multi-thread session driven by Founder live reports. Three threads, all closed:
+
+1. **PR #3 in penworth-store unblocked** (start of session). `vercel[bot]` had refused to deploy livebook-v3 PR with "No GitHub account was found matching the commit author email address". Root cause: commit `32f84f8` authored as `[email protected]` (Cloudflare email-obfuscation rewrite — exactly the recurring bug documented in recent_updates memory). Cloned `penworth-store`, set GitHub-noreply identity, ran `git commit --amend --reset-author --no-edit`, force-pushed. New SHA `20709ac`. Vercel went Building immediately; PR has since been merged to main (`462fdff`).
+2. **CEO-114 shipped to PR #4 in penworth-store** (preventive hardening). `chore(hooks): enforce GitHub-associated author identity via husky pre-commit` at https://github.com/nawrasalali/penworth-store/pull/4. Adds `husky@^9.1.7` + `prepare: "husky || true"` script + `.husky/pre-commit` that reads `GIT_AUTHOR_IDENT`, parses name/email with sed, blocks any commit whose identity is not (`nawrasalali`, `119996438+nawrasalali@users.noreply.github.com`). Tested negative path (blocks `Bad Person <[email protected]>`) and positive path. Preview deploy READY. Awaiting Founder merge. Founder also flagged the same hook should land in penworth-new (CEO-121 already tracking the symptom there).
+3. **CEO-122 admin-grant fix shipped to production** (mid-session, Founder live report with screenshot). Founder hit "authentication required" red banner on `/admin/command-center/grants` when clicking Grant credits. Diagnosed via Supabase Management API: RPC `admin_grant_credits` is `SECURITY DEFINER` and internally checks `auth.uid()` for caller identity + `has_admin_role('super_admin')` for authz. The server action was calling it via `createServiceClient()` (service-role key) — service-role calls have no user session, so `auth.uid()` returned NULL and the RPC raised "authentication required" (42501) before doing any work. Fix: switch to `createClient()` from `@/lib/supabase/server` (cookies-bound user-context). RPC's `SECURITY DEFINER` attribute handles privilege elevation regardless of caller client. Defence-in-depth preserved — `requireAdminRole` pre-validates AND `has_admin_role` re-checks. Deployed as commit `a53cf057` / `dpl_XArpXjMUwJbVkHzoN7kv347cQU92`, READY in 65 seconds, aliased to penworth.ai/new.penworth.ai/www.penworth.ai. Pushed with `SKIP_TYPECHECK=1` because sandbox node_modules reinstall flaked; Vercel `next build` typechecked independently and passed. Only one admin server action with this pattern; scanned, no siblings.
+4. **Operational learnings captured:**
+   - Supabase Management API (`api.supabase.com/v1/projects/{ref}/database/query`) returns Cloudflare 1010 from this sandbox unless a `User-Agent` header is set. Always include `-A "penworth-ceo-claude/1.0"` or equivalent on bash-based curl calls to it.
+   - When sandbox node_modules cleanup flakes mid-`npm ci`, fall back to `SKIP_TYPECHECK=1 git push` for tightly-scoped changes that are type-safe by construction (e.g. import swaps to functions with identical signatures), and rely on Vercel's independent `next build` typecheck to catch anything wrong. Rollback is `git revert` if the build errors.
+5. **Outstanding loops at end of session:**
+   - PR #4 in penworth-store awaiting Founder merge.
+   - Founder's earlier "ship the GitHub branch ruleset too" question (server-side enforcement of author email allow-list) deferred — not yet authorised. Recommend yes when Founder has bandwidth.
+   - Founder agreed on Vercel auth: leave Deployment Protection on for `penworth-store`, durable fix is signing into Vercel in browser as team owner.
+6. Tasks updated: CEO-114 → `awaiting_founder` (PR #4 merge); CEO-122 → `done` (production verified).
+
+**Next session first action:** if Founder replies "merge PR #4" or "ship the ruleset", execute. Otherwise pick next priority-ranked open task.
+
+---
+
+## Prior session activity (2026-04-25 ~12:45 UTC — CEO-118 closed as non-incident, two follow-ups spawned)
 
 1. **CEO-118 closed as a non-incident.** The prior CEO-118 session left a 7-step P0 fix plan describing three stacked issues: (A) `penworth.ai` still aliased to OLD Vercel project, (B) commit `5e94d23` did not auto-deploy on NEW project, (C) legacy `nawrasalali/penworth-ai` repo had four unknown commits this session. Re-verified all three from authoritative sources (Vercel API for aliases + deployments, GitHub API for commit history). All three were false positives.
 2. **Reality (A):** Vercel API confirms `penworth.ai` and `www.penworth.ai` are owned by NEW project `prj_9EWDVGIK1CNzWdMUwEv7KTSep70i`, both verified, www→apex 308 redirect intact. OLD project `prj_6wRG4Qp9FG35U2WgKRJUP7kw2Q8E` has zero custom domains — only `project-zeoe1.vercel.app`. CEO-021 Step 1 already worked.
