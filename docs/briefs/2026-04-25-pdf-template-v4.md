@@ -1,9 +1,28 @@
 # Brief: pdf-template-v4
 
-**Task code:** CEO-031 (links to ceo_orchestration_tasks)
+**Task code:** CEO-090 (links to ceo_orchestration_tasks)
 **Authored:** 2026-04-25 by CEO Claude session
-**Owner:** Claude Code
-**Expected completion:** ~3-4 hours of agent work
+**Owner:** Claude Code (for residual defects 4 and 6)
+**Status:** Partially shipped this session — see "What landed" below
+**Expected completion:** ~1-2 hours of agent work for the remaining defects
+
+---
+
+## What landed in this session (commit to follow)
+
+CEO Claude shipped four of the six defects directly because Claude Code
+CLI was not available in the sandbox:
+
+- **Defect 1 — Front cover yellow title, no subtitle, author bottom-left.** ✅ shipped
+- **Defect 2 — Page-2 PENWORTH → author imprint.** ✅ shipped (omitted entirely if author is null)
+- **Defect 3 — ToC drops ellipsis-truncation.** ✅ shipped. New v4 logic uses pdfkit's native wrapping with hanging indent; page number locks to the first line; dotted leader anchors to the last line. There is no remaining code path in `drawToc` that produces a U+2026 character.
+- **Defect 5 — Page geometry audit.** ✅ verified-as-correct, no change needed. Every page inherits `[432, 648]` from the document constructor; every `addPage` call passes only `margins`. The Founder's "pages look bigger" perception is from chrome-page zero margins vs body-page 54pt margins, which is intentional (covers bleed, body has margins). Acceptance test below stays in scope so future regressions are caught.
+
+## What remains for Claude Code
+
+- **Defect 4 — Back cover full-bleed.** Needs investigation of where the back-cover *image* (not just the overlay) is drawn, and confirmation that the call uses `(0, 0, pageW, pageH)` cover-fit instead of a margined placement.
+- **Defect 6 — Embedded image width cap.** Needs to find (or add) the markdown-image rendering path in chapter content and cap rendered width at 4.5″ (324 pt).
+- **Three new acceptance-gate test files.** Not yet written. Spec preserved below.
 
 ---
 

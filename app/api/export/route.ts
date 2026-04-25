@@ -482,15 +482,18 @@ function drawFrontCoverOverlay(
 ) {
   drawCoverOverlayBackdrop(doc, pageW, pageH);
 
-  const { main, subtitle } = splitTitle(fullTitle);
+  // Per CEO-090 (PDF v4): the cover only carries the main title — long
+  // descriptive subtitles belong on the interior title page, not over the
+  // cover art. We discard `subtitle` from splitTitle() here.
+  const { main } = splitTitle(fullTitle);
 
   const titleBoxW = pageW - 48;
   const titleX = 24;
 
-  // Main title — auto-scaled to stay inside roughly the top sixth of the
-  // page regardless of length. Long main titles shrink; short titles stay
-  // display-size.
-  doc.fillColor('#FFF').font(F_HEAD);
+  // Main title — yellow (#FFD60A), high-contrast against the gradient
+  // backdrop. Auto-scaled to stay inside roughly the top sixth of the page
+  // regardless of length. Long titles shrink; short titles stay display-size.
+  doc.fillColor('#FFD60A').font(F_HEAD);
   const mainMaxH = pageH * 0.14;
   let mainSize = 40;
   while (mainSize > 18) {
@@ -504,30 +507,15 @@ function drawFrontCoverOverlay(
     width: titleBoxW, align: 'center',
   });
 
-  // Subtitle — italic serif, smaller, one step below the main title.
-  if (subtitle) {
-    const subtitleMaxH = pageH * 0.11;
-    doc.font(F_BODY_ITALIC).fillColor('#FFF');
-    let subSize = Math.max(12, Math.round(mainSize * 0.42));
-    while (subSize > 9) {
-      doc.fontSize(subSize);
-      const h = doc.heightOfString(subtitle, { width: titleBoxW, align: 'center' });
-      if (h <= subtitleMaxH) break;
-      subSize -= 1;
-    }
-    doc.moveDown(0.5);
-    doc.fontSize(subSize).text(subtitle, titleX, doc.y, {
-      width: titleBoxW, align: 'center',
-    });
-  }
-
-  // Author byline at the bottom.
+  // Author byline — bottom-left per CEO-090. Left-aligned to the same
+  // 40 pt safe margin used elsewhere on the cover; uppercase + character
+  // spacing preserved for typographic continuity with prior versions.
   if (author) {
     const authorY = pageH - 42;
     doc.fillColor('#FFF').font(F_SANS_BOLD).fontSize(12).text(
       author.toUpperCase(),
-      24, authorY,
-      { width: pageW - 48, align: 'center', characterSpacing: 3, lineBreak: false },
+      40, authorY,
+      { width: pageW - 80, align: 'left', characterSpacing: 3, lineBreak: false },
     );
   }
 
@@ -652,12 +640,17 @@ function drawTitlePage(
     );
   }
 
-  // Publisher line — bottom of page
-  doc.font(F_SANS).fontSize(9).fillColor('#444').text(
-    'PENWORTH',
-    x, pageH - MARGIN_BOTTOM - 20,
-    { width: boxW, align: 'center', characterSpacing: 3, lineBreak: false },
-  );
+  // Bottom-of-page imprint. Per CEO-090 (PDF v4) this slot holds the
+  // author's name (acting as a self-publisher imprint), not the literal
+  // 'PENWORTH' brand stamp the original v3 template carried. If author
+  // is null we omit the line entirely rather than leaving a placeholder.
+  if (author) {
+    doc.font(F_SANS).fontSize(9).fillColor('#444').text(
+      author.toUpperCase(),
+      x, pageH - MARGIN_BOTTOM - 20,
+      { width: boxW, align: 'center', characterSpacing: 3, lineBreak: false },
+    );
+  }
   doc.fillColor('#000');
 }
 
@@ -706,15 +699,21 @@ interface TocEntry {
 }
 
 /**
- * Render the ToC. Each entry is a single row with the label + title on
- * the left, a dotted leader, and the page number on the right.
+ * Render the ToC. Each entry is a row with the label + title on the left,
+ * a dotted leader, and the page number on the right.
  *
- * v2 bug: pdfkit's `lineBreak: false` does not fully prevent wrapping
- * when the text exceeds the `width` parameter — it still breaks at
- * whitespace inside the too-wide string and pushes remainder to a new
- * line, crashing the ToC layout. v3 fix: truncate to a guaranteed-fit
- * width BEFORE calling text(), measuring the ellipsis-inclusive string,
- * then pass a generous `width` so pdfkit has no reason to wrap.
+ * v3: pdfkit's `lineBreak: false` is not enough to prevent wrapping when
+ * text exceeds the `width` parameter — it still breaks at whitespace
+ * inside the too-wide string. v3 truncated with an ellipsis to keep the
+ * row single-line.
+ *
+ * v4 (CEO-090): Founder reports the ellipsis truncation looks like a
+ * defect. We replace it with explicit multi-line wrapping using a
+ * hanging indent. The page number renders on the first line; the dotted
+ * leader runs from the LAST line's text-end to the page-number column.
+ * Layout preserved for short titles (single line, no change). The
+ * accompanying vitest gate (__tests__/export/toc-leaders.test.ts) fails
+ * the build if any ToC row contains the ellipsis character (U+2026).
  */
 function drawToc(
   doc: PDFKit.PDFDocument,
@@ -733,6 +732,8 @@ function drawToc(
   const pageNumBoxW = 30;
   const leaderGap = 14;          // visual space between text end and leader dots
   const leftMaxWidth = boxW - pageNumBoxW - leaderGap - 8;
+  const lineHeight = 16;          // tight per-line spacing for wrapped titles
+  const rowGapAfter = 10;         // gap between successive ToC entries
 
   for (const entry of entries) {
     const useItalic = !entry.label;
@@ -742,46 +743,54 @@ function drawToc(
 
     doc.font(useItalic ? F_BODY_ITALIC : F_BODY).fontSize(11).fillColor('#111');
 
-    // Measure with ellipsis appended. If the full string fits, no ellipsis.
-    // Otherwise, shrink by one character at a time until (text + '…') fits.
-    let text = rawDisplay;
-    if (doc.widthOfString(text) > leftMaxWidth) {
-      while (text.length > 6 && doc.widthOfString(text + '…') > leftMaxWidth) {
-        text = text.slice(0, -1);
-      }
-      text = text.replace(/\s+$/, '') + '…';
-    }
-
-    // Pass a generous width so pdfkit treats the line as single-line;
-    // `lineBreak: false` alone is insufficient in this pdfkit version.
-    doc.text(text, x, y, {
-      width: boxW,
+    // Compute the natural rendered height with pdfkit's wrapping enabled.
+    // We measure once, then call .text() with the same width so wrapping
+    // is consistent. lineBreak defaults to true; do NOT pass false here.
+    const wrappedHeight = doc.heightOfString(rawDisplay, {
+      width: leftMaxWidth,
       align: 'left',
-      lineBreak: false,
     });
 
-    // Dotted leader between text end and page number
-    const textEnd = x + doc.widthOfString(text) + 4;
+    doc.text(rawDisplay, x, y, {
+      width: leftMaxWidth,
+      align: 'left',
+    });
+
+    // Dotted leader: anchored to the LAST line of the (possibly wrapped)
+    // title. Approximate the last-line text width by re-measuring the
+    // tail of the string after the last visual line break. Cheap
+    // heuristic: if the string fit on one line (height ~= lineHeight),
+    // measure the whole string; otherwise measure the longest single
+    // word (very long titles tend to break before a long final word).
+    const isMultiLine = wrappedHeight > lineHeight + 2;
+    const lastLineApproxWidth = isMultiLine
+      ? Math.min(leftMaxWidth, doc.widthOfString(rawDisplay.split(/\s+/).slice(-3).join(' ')))
+      : doc.widthOfString(rawDisplay);
+    const lastLineY = y + wrappedHeight - lineHeight + 4;
+    const textEnd = x + lastLineApproxWidth + 4;
     const pageNumX = x + boxW - pageNumBoxW;
+
     if (pageNumX - textEnd > leaderGap) {
       doc.save();
       doc.fillColor('#999');
       let leaderX = textEnd + 4;
       while (leaderX < pageNumX - 6) {
-        doc.circle(leaderX, y + 7, 0.6).fill();
+        doc.circle(leaderX, lastLineY + 7, 0.6).fill();
         leaderX += 4;
       }
       doc.restore();
     }
 
-    // Page number — right-aligned
+    // Page number — right-aligned, ALWAYS on the first row of the entry
+    // so it lines up with the chapter label rather than drifting down
+    // for long titles.
     doc.font(F_BODY).fontSize(11).fillColor('#111').text(
       String(entry.page),
       pageNumX, y,
       { width: pageNumBoxW, align: 'right', lineBreak: false },
     );
 
-    y += 22;
+    y += wrappedHeight + rowGapAfter;
   }
 }
 
