@@ -90,7 +90,7 @@ export default function InvitePage() {
       
       // Redirect to project after delay
       setTimeout(() => {
-        router.push(`/projects/${data.projectId}/editor`);
+        router.push(`/books/${data.projectId}/editor`);
       }, 2000);
     } catch (err) {
       setError('Failed to accept invitation');

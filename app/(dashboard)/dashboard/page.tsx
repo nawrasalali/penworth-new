@@ -132,7 +132,7 @@ export default async function DashboardPage() {
               {t(PLAN_NAME_KEYS[plan], locale)} {t('dashboard.planSuffix', locale)}
             </div>
           </Link>
-          <Link href="/projects/new">
+          <Link href="/books/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               {t('dashboard.newProject', locale)}
@@ -234,7 +234,7 @@ export default async function DashboardPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>{t('dashboard.recentProjects', locale)}</CardTitle>
-              <Link href="/projects">
+              <Link href="/books">
                 <Button variant="ghost" size="sm">
                   {t('dashboard.viewAll', locale)}
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -249,7 +249,7 @@ export default async function DashboardPage() {
                 {recentProjects.map((project) => (
                   <Link
                     key={project.id}
-                    href={`/projects/${project.id}/editor`}
+                    href={`/books/${project.id}/editor`}
                     className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -275,7 +275,7 @@ export default async function DashboardPage() {
                 <p className="mt-4 text-sm text-muted-foreground">
                   {t('dashboard.noProjects', locale)}
                 </p>
-                <Link href="/projects/new">
+                <Link href="/books/new">
                   <Button className="mt-4" size="sm">
                     <Plus className="mr-2 h-4 w-4" />
                     {t('dashboard.createProject', locale)}
@@ -297,7 +297,7 @@ export default async function DashboardPage() {
               {quickStartTemplates.map((template) => (
                 <Link
                   key={template.type}
-                  href={`/projects/new?type=${template.type}`}
+                  href={`/books/new?type=${template.type}`}
                   className="flex flex-col items-center p-4 rounded-lg border hover:bg-muted/50 hover:border-primary/50 transition-colors text-center"
                 >
                   <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-2">

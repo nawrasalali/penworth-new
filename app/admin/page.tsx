@@ -459,7 +459,7 @@ export default async function AdminPage() {
             {(recentProjects ?? []).map((p) => (
               <Link
                 key={p.id}
-                href={`/projects/${p.id}/editor`}
+                href={`/books/${p.id}/editor`}
                 className="flex items-center justify-between gap-3 rounded-lg border bg-background px-3 py-2 hover:border-primary transition-colors"
               >
                 <div className="min-w-0">

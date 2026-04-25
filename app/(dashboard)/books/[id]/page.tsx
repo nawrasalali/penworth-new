@@ -78,7 +78,7 @@ export default async function ProjectDetailPage(
       {/* Header */}
       <div className="mb-8">
         <Link
-          href="/projects"
+          href="/books"
           className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -112,7 +112,7 @@ export default async function ProjectDetailPage(
           </div>
 
           <div className="flex items-center gap-2">
-            <Link href={`/projects/${project.id}/editor`}>
+            <Link href={`/books/${project.id}/editor`}>
               <Button>
                 <Edit className="mr-2 h-4 w-4" />
                 Open Editor
@@ -132,7 +132,7 @@ export default async function ProjectDetailPage(
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Chapters</CardTitle>
-                <Link href={`/projects/${project.id}/editor?new=true`}>
+                <Link href={`/books/${project.id}/editor?new=true`}>
                   <Button size="sm">
                     <Plus className="mr-2 h-4 w-4" />
                     Add Chapter
@@ -146,7 +146,7 @@ export default async function ProjectDetailPage(
                   {chapters.map((chapter: any, index: number) => (
                     <Link
                       key={chapter.id}
-                      href={`/projects/${project.id}/editor?chapter=${chapter.id}`}
+                      href={`/books/${project.id}/editor?chapter=${chapter.id}`}
                       className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                     >
                       <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
@@ -171,7 +171,7 @@ export default async function ProjectDetailPage(
                   <p className="text-sm text-muted-foreground mb-4">
                     No chapters yet. Start writing by adding your first chapter.
                   </p>
-                  <Link href={`/projects/${project.id}/editor?new=true`}>
+                  <Link href={`/books/${project.id}/editor?new=true`}>
                     <Button size="sm">
                       <Plus className="mr-2 h-4 w-4" />
                       Add First Chapter
@@ -191,19 +191,19 @@ export default async function ProjectDetailPage(
               <CardTitle className="text-base">AI Assistant</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Link href={`/projects/${project.id}/editor?agent=interview`}>
+              <Link href={`/books/${project.id}/editor?agent=interview`}>
                 <Button variant="outline" className="w-full justify-start">
                   <Play className="mr-2 h-4 w-4" />
                   Start Interview
                 </Button>
               </Link>
-              <Link href={`/projects/${project.id}/editor?agent=outline`}>
+              <Link href={`/books/${project.id}/editor?agent=outline`}>
                 <Button variant="outline" className="w-full justify-start">
                   <FileText className="mr-2 h-4 w-4" />
                   Generate Outline
                 </Button>
               </Link>
-              <Link href={`/projects/${project.id}/editor?agent=research`}>
+              <Link href={`/books/${project.id}/editor?agent=research`}>
                 <Button variant="outline" className="w-full justify-start">
                   <FileText className="mr-2 h-4 w-4" />
                   Research Mode

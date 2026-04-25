@@ -55,8 +55,24 @@ const nextConfig = {
   async redirects() {
     return [
       // Marketplace → Publish rebrand. Keep old detail links working.
-      { source: '/marketplace', destination: '/publish', permanent: false },
-      { source: '/marketplace/:path*', destination: '/publish/store/:path*', permanent: false },
+      // /publish itself now redirects to /books (see below) so the marketplace
+      // detail-route fallback still ends up in the right place via /publish/store/:path*
+      // → /publish → /books cascade. Source path retained until external referrers stop.
+      { source: '/marketplace', destination: '/books', permanent: false },
+      { source: '/marketplace/:path*', destination: '/books', permanent: false },
+
+      // CEO-084 / CEO-085: My Books unification + sidebar restructure.
+      //   /projects     → /books               (route rename, dashboard primary surface)
+      //   /publish      → /books               (publish page retired; CTA lives on My Books drafts)
+      //   /guild        → /referrals           (Guild folds into Referrals as upgrade pitch)
+      // /guild/:path*   intentionally NOT redirected — application flow, voice interview,
+      // Academy, dashboard, financials all stay reachable at their existing URLs. Only the
+      // top-level /guild landing redirects; sub-routes load normally.
+      { source: '/projects', destination: '/books', permanent: true },
+      { source: '/projects/:path*', destination: '/books/:path*', permanent: true },
+      { source: '/publish', destination: '/books', permanent: true },
+      { source: '/publish/:path*', destination: '/books', permanent: true },
+      { source: '/guild', destination: '/referrals', permanent: true },
     ];
   },
 }
