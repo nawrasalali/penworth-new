@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { isSupportedLang } from '@/lib/lang-routing';
 import { LEGAL_DOCUMENTS, LEGAL_DOCUMENT_KEYS, type LegalDocumentKey } from '@/lib/legal/documents';
 import { createReferralOnSignup } from '@/lib/guild/commissions';
+import { applyAuthorReferral } from '@/lib/referrals/apply';
 
 /**
  * Best-effort recording of legal consent for a user who just completed auth.
@@ -78,6 +79,38 @@ async function attachGuildReferralIfAny(userId: string) {
   }
 }
 
+/**
+ * Reads the penworth_author_ref cookie and applies an author (non-Guild)
+ * referral code to the new user. No-op if cookie missing, code invalid,
+ * or user already has a referrer. Cookie cleared after attempt.
+ */
+async function attachAuthorReferralIfAny(userId: string) {
+  try {
+    const cookieStore = await cookies();
+    const refCookie = cookieStore.get('penworth_author_ref');
+    if (!refCookie?.value) return;
+
+    const code = decodeURIComponent(refCookie.value).trim().toUpperCase();
+    if (!code || code.startsWith('GUILD-')) return;
+
+    const admin = createServiceClient();
+    const result = await applyAuthorReferral(admin, userId, code);
+    if (!result.ok) {
+      console.log(
+        `[auth/callback] author referral attach skipped: ${result.reason}`,
+      );
+    }
+
+    cookieStore.set('penworth_author_ref', '', {
+      path: '/',
+      maxAge: 0,
+      sameSite: 'lax',
+    });
+  } catch (err) {
+    console.error('[auth/callback] Author referral attach failed:', err);
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
@@ -102,6 +135,7 @@ export async function GET(request: Request) {
 
       await recordConsentIfFirstTime(request, supabase, data.user.id);
       await attachGuildReferralIfAny(data.user.id);
+      await attachAuthorReferralIfAny(data.user.id);
 
       return NextResponse.redirect(`${origin}${redirect}`);
     }
@@ -126,6 +160,7 @@ export async function GET(request: Request) {
 
       await recordConsentIfFirstTime(request, supabase, user.id);
       await attachGuildReferralIfAny(user.id);
+      await attachAuthorReferralIfAny(user.id);
 
       return NextResponse.redirect(`${origin}${redirect}`);
     }

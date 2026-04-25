@@ -1,17 +1,19 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { BookOpen, Check } from 'lucide-react';
+import { BookOpen, Check, Gift } from 'lucide-react';
 import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 import { mapAuthError } from '@/lib/auth/error-map';
+import AuthorRefCapture from '@/components/AuthorRefCapture';
 
 function SignupForm() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -26,6 +28,19 @@ function SignupForm() {
   if (lang && lang !== 'en') qs.set('lang', lang);
   const callbackQuery = qs.toString() ? `?${qs.toString()}` : '';
 
+  // Prefill referral code from ?ref= URL param. Guild-prefixed codes
+  // are handled by GuildRefCapture (cookie path) and not shown in this
+  // input — the user does not need to see a Guild code to apply it.
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (!ref) return;
+    const normalized = ref.trim().toUpperCase();
+    if (normalized.startsWith('GUILD-')) return;
+    if (/^[A-Z0-9]{6,12}$/.test(normalized)) {
+      setReferralCode(normalized);
+    }
+  }, [searchParams]);
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -34,6 +49,31 @@ function SignupForm() {
     try {
       const supabase = createClient();
 
+      const trimmedCode = referralCode.trim().toUpperCase();
+      const validCode =
+        trimmedCode &&
+        !trimmedCode.startsWith('GUILD-') &&
+        /^[A-Z0-9]{6,12}$/.test(trimmedCode)
+          ? trimmedCode
+          : null;
+
+      // Persist the code in cookie + localStorage so /auth/callback can
+      // apply it after email confirmation, even if the user came in
+      // without ?ref= and typed it manually.
+      if (validCode) {
+        try {
+          const maxAgeSeconds = 60 * 60 * 24 * 30;
+          const host = window.location.hostname;
+          const domainAttr = host.endsWith('penworth.ai')
+            ? '; domain=.penworth.ai; secure'
+            : '';
+          document.cookie = `penworth_author_ref=${encodeURIComponent(validCode)}; path=/; max-age=${maxAgeSeconds}; samesite=lax${domainAttr}`;
+          localStorage.setItem('penworth_author_ref', validCode);
+        } catch {
+          // Best effort — auth callback also accepts metadata fallback
+        }
+      }
+
       const { data: signUpData, error } = await supabase.auth.signUp({
         email,
         password,
@@ -41,6 +81,7 @@ function SignupForm() {
           data: {
             full_name: fullName,
             preferred_language: lang,
+            ...(validCode ? { referral_code: validCode } : {}),
           },
           emailRedirectTo: `${window.location.origin}/auth/callback${callbackQuery}`,
         },
@@ -100,6 +141,7 @@ function SignupForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white dark:bg-neutral-950 px-4 py-12">
+      <AuthorRefCapture />
       <div className="w-full max-w-md">
         {/* Logo */}
         <Link href="/" className="flex items-center justify-center gap-2.5 mb-8">
@@ -175,6 +217,36 @@ function SignupForm() {
                 className="w-full rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
               />
               <p className="text-xs text-neutral-500 mt-1.5">{t('auth.passwordMin', locale)}</p>
+            </div>
+
+            {/* Optional referral code — autofills from ?ref=, but visible
+                so users can paste a code a friend texted them. */}
+            <div>
+              <label
+                htmlFor="referralCode"
+                className="block text-sm font-medium mb-2 flex items-center gap-2"
+              >
+                <Gift className="h-3.5 w-3.5 text-amber-500" />
+                Referral code
+                <span className="text-xs text-neutral-500 font-normal">
+                  (optional, +100 credits)
+                </span>
+              </label>
+              <input
+                id="referralCode"
+                type="text"
+                value={referralCode}
+                onChange={(e) =>
+                  setReferralCode(e.target.value.toUpperCase().slice(0, 12))
+                }
+                placeholder="e.g. ABC12345"
+                autoComplete="off"
+                className="w-full rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-3 text-sm font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all uppercase"
+              />
+              <p className="text-xs text-neutral-500 mt-1.5">
+                Were you invited by a Penworth author? Enter their code to
+                claim 100 welcome credits.
+              </p>
             </div>
 
             <button
