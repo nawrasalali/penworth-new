@@ -24,6 +24,7 @@ export type StringKey =
   | 'nav.commandCenter' | 'nav.organization' | 'nav.members'
   | 'nav.newProject' | 'nav.signOut' | 'nav.userFallback' | 'nav.openMenu' | 'nav.closeMenu'
   | 'nav.guild' | 'nav.guildSubtitle'
+  | 'nav.store' | 'nav.storeSubtitle'
   // Dashboard home — Guild promo card
   | 'dashboard.guildCardTitle' | 'dashboard.guildCardBody' | 'dashboard.guildCardCta'
   // Footer
@@ -381,6 +382,8 @@ const en: Bundle = {
   'nav.userFallback': 'User',
   'nav.guild': 'Guild',
   'nav.guildSubtitle': 'Earn 20–40% commission',
+  'nav.store': 'Store',
+  'nav.storeSubtitle': 'Browse the catalogue',
   'dashboard.guildCardTitle': 'Love Penworth? Get paid to share it',
   'dashboard.guildCardBody': 'Join the Penworth Guild and earn 20–40% commission for every author you bring in. Lifetime revenue share. No cap.',
   'dashboard.guildCardCta': 'Join the Guild',

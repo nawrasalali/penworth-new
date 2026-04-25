@@ -53,7 +53,6 @@ type NavItem = {
 const mainNav: NavItem[] = [
   { href: '/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
   { href: '/projects', icon: FolderOpen, labelKey: 'nav.myProjects' },
-  { href: '/publish', icon: Store, labelKey: 'nav.publish' },
 ];
 
 const orgNav: NavItem[] = [
@@ -238,25 +237,10 @@ export function Sidebar({ user, organization, locale = 'en' }: SidebarProps) {
             })}
           </div>
 
-          {/* Guild — external link to the partner program */}
-          <div className="pt-3">
-            <a
-              href="https://guild.penworth.ai"
-              rel="noopener noreferrer"
-              className="group flex items-start gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 text-foreground"
-            >
-              <Handshake className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-500 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span>{t('nav.guild', locale)}</span>
-                  <ExternalLink className="h-3 w-3 text-muted-foreground/70 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <div className="text-[11px] font-normal text-muted-foreground leading-tight mt-0.5">
-                  {t('nav.guildSubtitle', locale)}
-                </div>
-              </div>
-            </a>
-          </div>
+          {/* Guild + Store moved to the bottom section per Founder
+              decision 2026-04-25. They sit just above the Command Center
+              so they're discoverable but don't dominate the top of the
+              nav. See bottom block below. */}
 
           {/* Organization Section */}
           {organization && (
@@ -301,6 +285,45 @@ export function Sidebar({ user, organization, locale = 'en' }: SidebarProps) {
 
         {/* Bottom Navigation */}
         <div className="border-t p-3 space-y-1">
+          {/* Ecosystem cards — Guild and Store. Sit above the Command
+              Center per Founder decision 2026-04-25. Distinct card styling
+              (border + tinted bg) signals these are external sub-brands
+              rather than internal app pages, while still feeling at home
+              in the nav. */}
+          <a
+            href="https://guild.penworth.ai"
+            rel="noopener noreferrer"
+            className="group flex items-start gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 text-foreground"
+          >
+            <Handshake className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span>{t('nav.guild', locale)}</span>
+                <ExternalLink className="h-3 w-3 text-muted-foreground/70 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <div className="text-[11px] font-normal text-muted-foreground leading-tight mt-0.5">
+                {t('nav.guildSubtitle', locale)}
+              </div>
+            </div>
+          </a>
+
+          <a
+            href="https://store.penworth.ai"
+            rel="noopener noreferrer"
+            className="group flex items-start gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors border border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-foreground"
+          >
+            <Store className="h-4 w-4 mt-0.5 text-blue-600 dark:text-blue-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span>{t('nav.store', locale)}</span>
+                <ExternalLink className="h-3 w-3 text-muted-foreground/70 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <div className="text-[11px] font-normal text-muted-foreground leading-tight mt-0.5">
+                {t('nav.storeSubtitle', locale)}
+              </div>
+            </div>
+          </a>
+
           {user.is_admin && (
             <Link
               href="/admin"
