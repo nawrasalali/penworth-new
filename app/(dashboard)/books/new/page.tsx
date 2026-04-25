@@ -191,7 +191,7 @@ function NewProjectContent() {
       }
 
       // Jump straight into the Validate agent — skip the detail page entirely.
-      router.push(`/projects/${json.data.id}/editor`);
+      router.push(`/books/${json.data.id}/editor`);
     } catch (err) {
       console.error(err);
       toast.error('Failed to create project. Please try again.');

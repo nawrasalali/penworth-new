@@ -252,7 +252,7 @@ function UnifiedLeftPanel({
       {/* Footer — back to project */}
       <div className="p-2 border-t shrink-0">
         <Link
-          href={`/projects/${project?.id}`}
+          href={`/books/${project?.id}`}
           className="flex items-center gap-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1"
         >
           <Home className="h-3 w-3" />
@@ -1381,7 +1381,7 @@ function EditorContentNew() {
       {/* Top Header Bar */}
       <div className="h-12 border-b flex items-center justify-between px-4 bg-card">
         <div className="flex items-center gap-2">
-          <Link href="/projects" className="text-muted-foreground hover:text-foreground">
+          <Link href="/books" className="text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <span className="text-sm font-medium truncate max-w-[200px]">

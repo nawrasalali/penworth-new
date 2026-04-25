@@ -129,7 +129,7 @@ function GrantTile({
       <div className="mt-auto pt-3 text-sm">
         {status === 'unused' && (
           <Link
-            href="/projects/new"
+            href="/books/new"
             className="text-[#d4af37] hover:underline"
           >
             Start writing →
@@ -137,7 +137,7 @@ function GrantTile({
         )}
         {status === 'used' && projectId && (
           <Link
-            href={`/projects/${projectId}`}
+            href={`/books/${projectId}`}
             className="text-green-400 hover:underline"
           >
             {t('grants.viewProjectLink', locale)}

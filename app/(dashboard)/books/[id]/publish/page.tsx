@@ -220,7 +220,7 @@ function PublishingPageContent() {
       <div className="border-b">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <Link 
-            href={`/projects/${projectId}/editor`} 
+            href={`/books/${projectId}/editor`} 
             className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -392,7 +392,7 @@ function PublishingPageContent() {
         <div className="mt-8 text-center">
           <Button
             variant="outline"
-            onClick={() => router.push(`/projects/${projectId}`)}
+            onClick={() => router.push(`/books/${projectId}`)}
           >
             ← Back to Project
           </Button>

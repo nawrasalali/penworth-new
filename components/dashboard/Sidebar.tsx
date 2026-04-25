@@ -5,9 +5,8 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
-  FolderOpen,
+  BookOpen,
   Users,
-  Store,
   Settings,
   HelpCircle,
   LogOut,
@@ -17,8 +16,6 @@ import {
   CreditCard,
   Gift,
   ShieldCheck,
-  Handshake,
-  ExternalLink,
   Menu,
   X,
 } from 'lucide-react';
@@ -52,8 +49,7 @@ type NavItem = {
 
 const mainNav: NavItem[] = [
   { href: '/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
-  { href: '/projects', icon: FolderOpen, labelKey: 'nav.myProjects' },
-  { href: '/publish', icon: Store, labelKey: 'nav.publish' },
+  { href: '/books', icon: BookOpen, labelKey: 'nav.myBooks' },
 ];
 
 const orgNav: NavItem[] = [
@@ -207,7 +203,7 @@ export function Sidebar({ user, organization, locale = 'en' }: SidebarProps) {
 
         {/* New Project Button */}
         <div className="p-4">
-          <Link href="/projects/new">
+          <Link href="/books/new">
             <Button className="w-full justify-start">
               <Plus className="mr-2 h-4 w-4" />
               {t('nav.newProject', locale)}
@@ -236,26 +232,6 @@ export function Sidebar({ user, organization, locale = 'en' }: SidebarProps) {
                 </Link>
               );
             })}
-          </div>
-
-          {/* Guild — external link to the partner program */}
-          <div className="pt-3">
-            <a
-              href="https://guild.penworth.ai"
-              rel="noopener noreferrer"
-              className="group flex items-start gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 text-foreground"
-            >
-              <Handshake className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-500 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span>{t('nav.guild', locale)}</span>
-                  <ExternalLink className="h-3 w-3 text-muted-foreground/70 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <div className="text-[11px] font-normal text-muted-foreground leading-tight mt-0.5">
-                  {t('nav.guildSubtitle', locale)}
-                </div>
-              </div>
-            </a>
           </div>
 
           {/* Organization Section */}
