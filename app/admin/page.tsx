@@ -7,11 +7,13 @@ import {
   FileText,
   Coins,
   Cpu,
+  Send,
   TrendingUp,
   ShieldCheck,
   BookOpen,
   AlertTriangle,
   Scale,
+  ExternalLink,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -202,11 +204,19 @@ export default async function AdminPage() {
               <DollarSign className="h-3.5 w-3.5" /> Guild payouts
             </Link>
             <Link
-              href="/admin/computer"
+              href="/admin/command-center/grants"
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted whitespace-nowrap"
             >
-              <Cpu className="h-3.5 w-3.5" /> Computer sessions
+              <Send className="h-3.5 w-3.5" /> Send credits
             </Link>
+            <a
+              href="https://store.penworth.ai/admin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted whitespace-nowrap"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> Store Admin
+            </a>
             <Link
               href="/admin/compliance"
               className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted whitespace-nowrap ${

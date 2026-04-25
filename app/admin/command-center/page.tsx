@@ -12,6 +12,7 @@ import {
   Users,
   ListTodo,
   Settings,
+  ExternalLink,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -119,6 +120,17 @@ export default async function CommandCenterPage() {
               <Coins className="h-4 w-4" />
               <span className="text-sm font-semibold">Grant credits</span>
             </Link>
+          )}
+          {session.adminRole === 'super_admin' && (
+            <a
+              href="https://store.penworth.ai/admin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted whitespace-nowrap"
+            >
+              <ExternalLink className="h-4 w-4" />
+              <span className="text-sm font-semibold">Store Admin</span>
+            </a>
           )}
           <Link
             href="/admin/command-center/alerts"

@@ -8,7 +8,7 @@ type Result =
   | { ok: false; error: string }
   | null;
 
-export function GrantForm() {
+export function GrantForm({ defaultEmail }: { defaultEmail?: string } = {}) {
   const [result, setResult] = useState<Result>(null);
   const [pending, startTransition] = useTransition();
 
@@ -37,6 +37,7 @@ export function GrantForm() {
             type="email"
             required
             autoComplete="off"
+            defaultValue={defaultEmail ?? ''}
             placeholder="thomas@example.com"
             className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
