@@ -1,24 +1,36 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-25 ~12:10 UTC by CEO Claude session (PR #3 store-repo unblock + CEO-114 husky author-identity hook shipped to PR #4).
+**Last updated:** 2026-04-25 ~12:15 UTC by CEO Claude session (CEO-115 voice-interview pipeline live on Cartesia; Founder unblocked for first Guild interview test).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-25 ~12:10 UTC — PR #3 unblock + CEO-114 husky author-identity hook)
+## Most recent session activity (2026-04-25 ~12:15 UTC — CEO-115 voice-interview Cartesia swap shipped)
+
+1. **CEO-115 closed** — guild voice-interview pipeline now runs entirely on Cartesia (Ink-Whisper STT + Sonic-3 TTS). Single-file commit `7dec203` swapping `lib/ai/guild-interviewer.ts`. Production smoke-test against Founder's Arabic test application (`0945e125-5d1e-47de-888e-527e18750a06`) returned HTTP 200 + 284KB Arabic mp3 from Sonic-3; interview row `2752e61e-1a60-42f1-9c32-b26b0e72e38b` created. Founder ready to walk full UI test at `https://new.penworth.ai/guild/interview/schedule?application_id=0945e125-5d1e-47de-888e-527e18750a06`.
+2. **Root cause why the pipeline was dead:** `OPENAI_API_KEY` was never set on writer Vercel. The original code called OpenAI Whisper + OpenAI TTS. The first call to `/api/guild/interview/start` would 500 on `synthesizeSpeech` before returning the opening question to the browser. Discovered via Vercel env-var enumeration during the diagnostic phase.
+3. **Why Cartesia and not OpenAI:** the Founder already has a Cartesia key in project secrets, and Cartesia replaces both ends of the voice loop (`/stt` for transcription, `/tts/bytes` for synthesis). `sonic-3` covers 42+ languages including Arabic, Bengali, Indonesian, Vietnamese — the older `sonic-2` and `sonic-multilingual` reject Arabic with explicit `400 model does not support language` (verified live; the Cartesia docs language enum is stale and only lists 15 languages, but `sonic-3` actually accepts more).
+4. **Voice choice:** Katie (`f786b574-daa5-4673-aa0c-cbe3e8534c02`) — Cartesia's recommended default for voice agents, "stable and realistic". Output mp3 44.1kHz 128kbps. Confirmed Arabic round-trip: TTS returns 117KB for ~7s of speech, Ink-Whisper transcribes it back faithfully (harakat dropped as expected).
+5. **Vercel env-var trap (new lesson):** initial auto-deploy `dpl_2eCKBykxnRtaYbiamuuGBSpbLtgE` READY but returned `Cartesia TTS failed: 401` because `CARTESIA_API_KEY` was added mid-build. Manual redeploy `dpl_DqpPf5gxnb1fJGzytiWA8FS5VJNi` of the same commit picked up the env. Pattern: when adding a new env var that gates a runtime call on a freshly-pushed commit, always trigger an explicit redeploy after the env var is set, do not rely on the auto-deploy.
+6. **Commit-message error (low-stakes):** the commit message says `(CEO-110)` but CEO-110 is the unrelated ambient-music-library task. Real code is **CEO-115** — fix-forward via this state note and the row's `last_update_note`, not by amending pushed history.
+7. **Spawned follow-ups:** CEO-116 (verify all 11 Penworth locales on sonic-3, particularly bn/id/vi/zh — p2), CEO-117 (smoke-test the browser MediaRecorder webm path through `/api/guild/interview/turn` — p1, will be hit naturally on Founder's test).
+8. Handover note: `docs/orchestration/handovers/2026-04-25-ceo115-cartesia-swap.md`.
+
+**Next session first action:** if Founder reports the test passed, mark CEO-117 done with the actual test interview's row id. If Founder reports a defect, the most likely failure surface is the webm→Ink-Whisper transcription path (test only covered mp3 round-trip); fix in `transcribeAudio()`.
+
+---
+
+## Prior session activity (2026-04-25 ~12:10 UTC — PR #3 unblock + CEO-114 husky author-identity hook)
 
 1. **PR #3 in penworth-store unblocked** — `vercel[bot]` had refused to deploy the livebook-v3 PR with "No GitHub account was found matching the commit author email address". Root cause was commit `32f84f8` authored as `[email protected]` (Cloudflare email-obfuscation rewrite, exactly the mechanism documented in the recent_updates memory). Cloned `penworth-store`, set the GitHub-noreply identity, ran `git commit --amend --reset-author --no-edit`, force-pushed. New SHA `20709ac`. Vercel went Building immediately; PR has since been merged to main (`462fdff`).
 2. **CEO-114 shipped to PR #4** — `chore(hooks): enforce GitHub-associated author identity via husky pre-commit` at https://github.com/nawrasalali/penworth-store/pull/4. Adds `husky@^9.1.7` + `prepare: "husky || true"` script + `.husky/pre-commit` that reads `GIT_AUTHOR_IDENT`, parses name/email with sed, blocks any commit whose identity is not (`nawrasalali`, `119996438+nawrasalali@users.noreply.github.com`). Tested negative path (blocks `Bad Person <[email protected]>`) and positive path (own commit landed clean). PR #4 preview deploy READY — proves `prepare: "husky || true"` doesn't break Vercel's prod-mode install.
 3. **Limitation flagged to Founder** — hook is local-only and bypassable with `--no-verify` or by committing before running `npm install`. Durable answer is a GitHub branch ruleset on the author email allow-list. Awaiting Founder go before shipping.
 4. **Operational learning captured** — Supabase Management API (`api.supabase.com/v1/projects/{ref}/database/query`) returns Cloudflare 1010 from this sandbox unless a `User-Agent` header is set. Trivial fix once known; future Supabase ops from bash should always include `-A "penworth-ceo-claude/1.0"` or equivalent.
 5. Task row CEO-114 inserted in `ceo_orchestration_tasks` with `status='awaiting_founder'`, `priority='p2'`, `category='infra'`, full PR + commit + acceptance test details in metadata. No handover note this session — work was small enough.
-
-**Next session first action:** if Founder replies "merge PR #4", squash-merge via GitHub API, mark CEO-114 done. If Founder says "ship the GitHub branch ruleset too", spawn that as CEO-115. Otherwise pick next priority-ranked open task from the queue.
-
 ---
 
-## Prior session activity (2026-04-25 ~11:15 UTC — CEO-096 baseline + 2s-lag thread closed)
+## Earlier session activity (2026-04-25 ~11:15 UTC — CEO-096 baseline + 2s-lag thread closed)
 
 1. **CEO-096 closed** — store performance baseline captured for `/`, `/collections`, `/audiobooks`, `/browse`, `/book/the-new-rich-4bd4acc1`. Tool: lighthouse 12.x via Puppeteer-bundled Chromium (PageSpeed Insights API quota is now zero for unauthenticated callers; Lighthouse-via-Puppeteer is the working substitute).
 2. **The 2s-lag thread is closed at every level** — row, master goal (CEO-082 umbrella), and customer-visible. Verified two ways: (a) edge cache headers — `cache-control` changed from `private, no-cache, no-store` to `public, max-age=0, must-revalidate`, `x-vercel-cache` returns HIT after first prime on every cacheable surface; (b) Lighthouse — homepage warm-cache TTFB 83ms (down from the original 2s symptom), `/collections` 179ms, `/audiobooks` 616ms, `/book/[slug]` 355ms. `/browse` stays dynamic by design (827ms TTFB, has searchParams; CEO-095 data-layer cache mitigates).
@@ -26,11 +38,9 @@
 4. **CEO-101 anomaly flagged** — task row title says "Remove locale-cookie read from i18n/request.ts" but `last_update_note` is about a livebook auto-trigger migration. Looks like a task-code collision (same pattern in `recent_updates` memory). The actual i18n locale-cookie fix already shipped via CEO-092 (`eff9fe0`). Recommend a row cleanup pass; not done this session because it crosses session ownership.
 5. Handover note: `docs/orchestration/handovers/2026-04-25-ceo096-baseline.md`.
 
-**Next session first action:** the perf thread is fully closed. Pick up the next priority-ranked open task. If Founder asks about TBT or LCP follow-ups, those are separate tickets to spawn — don't auto-start them; not on the critical path.
-
 ---
 
-## Earlier session activity (2026-04-25 ~09:35 UTC — CEO-084 + CEO-085 shipped to PR)
+## Earliest tracked session this day (2026-04-25 ~09:35 UTC — CEO-084 + CEO-085 shipped to PR)
 
 1. **PR #4 open** at https://github.com/nawrasalali/penworth-new/pull/4 — `feat(nav,books,referrals): My Books unification + sidebar restructure + Guild fold into Referrals`. Branch `feat/my-books-and-sidebar-restructure`, head SHA `87b50e0`. Vercel preview READY at https://penworth-at58vtnyz-nawraselali-2147s-projects.vercel.app.
 2. **Implementation complete across all eight brief sections.** Sidebar slim-down (mainNav = Dashboard + My Books, orange Guild block deleted), `/projects → /books` route rename via `git mv` with history preserved, `/publish` retired with 308 redirects, new two-card My Books page (Drafting + Published, classified by `store_listings` per CEO-077's contract), three-section Referrals page (Section 1 ReferralDashboard reused, Section 2 deliberately omitted because parallel commit `227941f` already moved that pitch INTO ReferralDashboard, Section 3 Guild quick-links for active members only). i18n: `nav.myBooks` + 24 new keys across all 11 locales; `nav.publish` and `nav.marketplace` removed. Four orphaned components deleted.
