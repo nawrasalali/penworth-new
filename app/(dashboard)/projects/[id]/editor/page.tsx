@@ -1421,6 +1421,7 @@ function EditorContentNew() {
         onOpenChange={setPublishModalOpen}
         projectId={projectId}
         defaultTitle={session?.book_title || project?.title}
+        defaultAuthorName={session?.author_name || authorInfo?.name}
         defaultContentType={project?.content_type}
         onSuccess={handlePublishSuccess}
       />

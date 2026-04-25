@@ -8,9 +8,6 @@ import { t, type Locale } from '@/lib/i18n/strings';
 import {
   FileText,
   Eye,
-  Download,
-  Share2,
-  Users,
   Coins,
   Clock,
   BookOpen,
@@ -263,50 +260,12 @@ export function DocumentPreview({
         </div>
       )}
 
-      {/* Quick Actions */}
-      <div className="mt-auto">
-        <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-          {t('preview.quickActions', locale)}
-        </h3>
-
-        <div className="space-y-1.5">
-          {onExportDraft && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full h-8 text-xs justify-start"
-              onClick={onExportDraft}
-            >
-              <Download className="mr-1.5 h-3 w-3" />
-              {t('preview.exportDraft', locale)}
-            </Button>
-          )}
-
-          {onSharePreview && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full h-8 text-xs justify-start"
-              onClick={onSharePreview}
-            >
-              <Share2 className="mr-1.5 h-3 w-3" />
-              {t('preview.sharePreview', locale)}
-            </Button>
-          )}
-
-          {onInviteCollaborator && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full h-8 text-xs justify-start"
-              onClick={onInviteCollaborator}
-            >
-              <Users className="mr-1.5 h-3 w-3" />
-              {t('preview.inviteCollab', locale)}
-            </Button>
-          )}
-        </div>
-      </div>
+      {/* Quick Actions intentionally removed per CEO-029 (2026-04-25) —
+          the in-pipeline preview panel should focus on progress + cost
+          signal, not duplicate the publishing screen's CTAs. The props
+          (onExportDraft, onSharePreview, onInviteCollaborator) are still
+          accepted for backward compatibility with call sites but are no
+          longer rendered. */}
       </div>
     </div>
   );

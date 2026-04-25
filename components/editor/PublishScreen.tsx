@@ -12,7 +12,6 @@ import {
   Upload,
   RefreshCw,
   Eye,
-  Download,
   Rocket,
   User,
   ImageIcon,
@@ -560,15 +559,13 @@ export function PublishScreen({
             </p>
           </div>
 
-          {/* Secondary — preview + download for author review or external use */}
+          {/* Secondary — preview only. Per CEO-029 the Download button
+              was removed: it duplicated browser PDF-viewer save and was
+              flagged as low-value clutter on the launch screen. */}
           <div className="flex flex-wrap justify-center gap-2">
             <Button variant="outline" size="sm" onClick={onViewPDF}>
               <Eye className="mr-2 h-3.5 w-3.5" />
               {t('pubScreen.preview.viewPdf', locale)}
-            </Button>
-            <Button variant="outline" size="sm" onClick={onDownload}>
-              <Download className="mr-2 h-3.5 w-3.5" />
-              {t('pubScreen.preview.download', locale)}
             </Button>
           </div>
 

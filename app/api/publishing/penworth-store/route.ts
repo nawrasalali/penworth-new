@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     tags,
     format,
     licenseType,
+    authorName: authorNameOverride,
   } = body as {
     projectId?: string;
     priceCents?: number;
@@ -67,25 +68,61 @@ export async function POST(request: NextRequest) {
     tags?: string[];
     format?: string;
     licenseType?: string;
+    authorName?: string;
   };
 
   if (!projectId) {
     return NextResponse.json({ error: 'projectId required' }, { status: 400 });
   }
 
-  // Verify ownership and load project with chapters
+  // Load the project. We rely on Row-Level Security on `projects` to enforce
+  // SELECT access (own / org / public). The previous implementation added a
+  // redundant `.eq('user_id', user.id)` filter on top of RLS, which broke
+  // legitimate publishes when:
+  //   - user_id was NULL on legacy rows (column allows NULL; ON DELETE SET NULL)
+  //   - the project belonged to an org and the publisher was an org editor
+  //   - the publisher was a super_admin acting via admin policies
+  // We replace the filter with an explicit authorization check below.
   const { data: project, error: projectErr } = await supabase
     .from('projects')
     .select(`
-      id, user_id, title, description, content_type, status, language,
+      id, user_id, org_id, title, description, content_type, status, language,
       chapters(id, title, content, word_count, status, order_index)
     `)
     .eq('id', projectId)
-    .eq('user_id', user.id)
     .single();
 
   if (projectErr || !project) {
     return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+  }
+
+  // Authorize: owner, org editor/admin/owner, or NULL-user_id legacy row
+  // (which we self-heal below so subsequent ownership checks pass).
+  const userIsOwner = project.user_id === user.id;
+  const userIsLegacyNullOwner = project.user_id === null;
+  let userIsOrgEditor = false;
+  if (!userIsOwner && project.org_id) {
+    const { data: membership } = await supabase
+      .from('org_members')
+      .select('role')
+      .eq('org_id', project.org_id)
+      .eq('user_id', user.id)
+      .in('role', ['owner', 'admin', 'editor'])
+      .maybeSingle();
+    userIsOrgEditor = !!membership;
+  }
+
+  if (!userIsOwner && !userIsOrgEditor && !userIsLegacyNullOwner) {
+    return NextResponse.json(
+      { error: 'You are not the author of this project' },
+      { status: 403 },
+    );
+  }
+
+  // Self-heal: claim the row for the current user so future ownership
+  // checks pass and the user appears in their own dashboard.
+  if (userIsLegacyNullOwner) {
+    await supabase.from('projects').update({ user_id: user.id }).eq('id', projectId);
   }
 
   const completeChapters = (project.chapters || []).filter(
@@ -98,13 +135,32 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Load the session for cover + author info
+  // Load the session for cover + author info. Same RLS-trust pattern as
+  // the projects load above — drop the redundant `.eq('user_id', user.id)`.
   const { data: session } = await supabase
     .from('interview_sessions')
-    .select('id, author_name, about_author, front_cover_url, back_cover_url, book_title')
+    .select('id, user_id, author_name, about_author, front_cover_url, back_cover_url, book_title')
     .eq('project_id', projectId)
-    .eq('user_id', user.id)
     .single();
+
+  // If the publisher supplied an author display name override (any script,
+  // any language), persist it back to the session so the listing description
+  // and any future cover regenerations reflect the author's chosen rendering.
+  const trimmedAuthorName = (authorNameOverride || '').trim();
+  const effectiveAuthorName =
+    trimmedAuthorName ||
+    session?.author_name ||
+    'Penworth author';
+  if (
+    session?.id &&
+    trimmedAuthorName &&
+    trimmedAuthorName !== session.author_name
+  ) {
+    await supabase
+      .from('interview_sessions')
+      .update({ author_name: trimmedAuthorName })
+      .eq('id', session.id);
+  }
 
   // Look up the Penworth platform row (used by project_publications)
   const { data: platform, error: platformErr } = await supabase
@@ -144,11 +200,30 @@ export async function POST(request: NextRequest) {
   const listingDescription =
     description ||
     project.description ||
-    `A ${project.content_type} by ${session?.author_name || 'Penworth author'}`;
+    `A ${project.content_type} by ${effectiveAuthorName}`;
   const coverUrl = session?.front_cover_url || null;
   const listingFormat =
     format && ['ebook', 'audiobook', 'cinematic'].includes(format) ? format : 'ebook';
   const readMinutes = totalWords > 0 ? Math.max(1, Math.ceil(totalWords / 250)) : null;
+
+  // Categories: if the caller didn't pick any, infer from content_type so the
+  // listing is still browsable. Mirrors the modal's defaultCategoriesFor() so
+  // the back-end is the single source of truth and the modal can drop the
+  // category-picker UI without breaking the listing taxonomy.
+  const inferredCategories = ((): string[] => {
+    if (Array.isArray(categories) && categories.length > 0) {
+      return categories.slice(0, 10);
+    }
+    const c = (project.content_type || '').toLowerCase();
+    if (c.includes('memoir')) return ['memoir'];
+    if (c.includes('fiction') && !c.includes('non')) return ['fiction'];
+    if (c.includes('poetry')) return ['poetry'];
+    if (c.includes('self') && c.includes('help')) return ['self-help', 'non-fiction'];
+    if (c.includes('business')) return ['business', 'non-fiction'];
+    if (c.includes('biograph')) return ['biography', 'non-fiction'];
+    if (c.includes('non')) return ['non-fiction'];
+    return ['non-fiction'];
+  })();
 
   // ---------- UPSERT store_listings (Store authoritative catalogue) ----------
   // Match by author_id + metadata.project_id. No FK to projects; Store is
@@ -192,7 +267,7 @@ export async function POST(request: NextRequest) {
     status: 'live',
     published_at: new Date().toISOString(),
     subscription_eligible: true,
-    categories: Array.isArray(categories) ? categories.slice(0, 10) : [],
+    categories: inferredCategories,
     tags: Array.isArray(tags) ? tags.slice(0, 20) : [],
     metadata: {
       project_id: projectId,
