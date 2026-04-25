@@ -209,7 +209,73 @@ export async function POST(request: NextRequest) {
     description ||
     project.description ||
     `A ${project.content_type} by ${effectiveAuthorName}`;
-  const coverUrl = session?.front_cover_url || null;
+
+  // Cover URL: defend against ephemeral Ideogram URLs reaching store_listings.
+  // CEO-073 added bucket persistence in the cover-generation path going forward,
+  // but covers generated before that fix landed (or any cover-generation that
+  // hit the persistence-failed fallback path) still carry an ephemeral
+  // ideogram.ai URL with a finite `exp=` query param. Once expired, the
+  // store thumbnail 404s and the book looks broken on /browse.
+  //
+  // CEO-091 fix: at publish time, if the cover URL is on the ideogram
+  // ephemeral CDN, fetch the bytes and mirror to our `covers` bucket
+  // (same path layout as covers/generate). On success, persist BOTH the
+  // store_listings.cover_image_url AND the session.front_cover_url so the
+  // next publish doesn't re-mirror unnecessarily. On failure, fall through
+  // with the ephemeral URL — same fail-soft policy as covers/generate.
+  let coverUrl: string | null = session?.front_cover_url || null;
+  const isEphemeralCover =
+    typeof coverUrl === 'string' &&
+    coverUrl.includes('ideogram.ai/api/images/ephemeral');
+  if (isEphemeralCover && coverUrl) {
+    try {
+      const imgResp = await fetch(coverUrl);
+      if (imgResp.ok) {
+        const contentType = imgResp.headers.get('content-type') || 'image/png';
+        const ext = contentType.includes('jpeg') ? 'jpg'
+                  : contentType.includes('webp') ? 'webp'
+                  : 'png';
+        const bytes = await imgResp.arrayBuffer();
+        const storagePath = `${user.id}/covers/${session?.id || projectId}-front-publish.${ext}`;
+        const { error: uploadErr } = await supabase
+          .storage
+          .from('covers')
+          .upload(storagePath, bytes, {
+            contentType,
+            upsert: true,
+            cacheControl: '31536000',
+          });
+        if (!uploadErr) {
+          const { data: { publicUrl } } = supabase
+            .storage
+            .from('covers')
+            .getPublicUrl(storagePath);
+          coverUrl = `${publicUrl}?v=${Date.now()}`;
+          if (session?.id) {
+            await supabase
+              .from('interview_sessions')
+              .update({ front_cover_url: coverUrl })
+              .eq('id', session.id);
+          }
+        } else {
+          console.error('[penworth-store/publish] cover bucket mirror upload failed:', uploadErr.message);
+        }
+      } else {
+        // The ephemeral URL has already expired and returns a 4xx. There
+        // is nothing to mirror — the cover is gone at the source. We
+        // proceed with the dead URL so the publish itself succeeds; the
+        // Founder will need to regenerate the cover. Logged so we can
+        // distinguish this case from transient fetch failures.
+        console.warn(
+          '[penworth-store/publish] ephemeral cover URL already expired',
+          { sessionId: session?.id, status: imgResp.status },
+        );
+      }
+    } catch (mirrorErr) {
+      console.error('[penworth-store/publish] cover persistence failed; falling back to ephemeral URL:', mirrorErr);
+    }
+  }
+
   const listingFormat =
     format && ['ebook', 'audiobook', 'cinematic'].includes(format) ? format : 'ebook';
   const readMinutes = totalWords > 0 ? Math.max(1, Math.ceil(totalWords / 250)) : null;
@@ -316,6 +382,65 @@ export async function POST(request: NextRequest) {
   }
 
   const storeUrl = `${STORE_ORIGIN}/book/${slug}`;
+
+  // ---------- SYNC store_chapters (the reader's source of truth) ----------
+  // The reader app at store.penworth.ai/read/[slug] reads chapter content
+  // from store_chapters, NOT from the writer's `chapters` table. Until
+  // CEO-091 the publish endpoint never wrote to store_chapters, so every
+  // published book showed "This book hasn't been finalised yet" no matter
+  // how many chapters were marked complete.
+  //
+  // Strategy: delete-then-insert keyed on listing_id. Idempotent on
+  // re-publish. The first chapter is marked is_sample=true so anonymous
+  // visitors can read a preview (and so the book page itself can render
+  // without a purchase). All others require purchase or subscription per
+  // RLS on store_chapters.
+  const orderedChapters = [...completeChapters].sort(
+    (a: { order_index: number }, b: { order_index: number }) =>
+      a.order_index - b.order_index,
+  );
+  if (orderedChapters.length > 0) {
+    // Wipe any prior chapters for this listing so the re-publish path
+    // doesn't accumulate stale rows when the writer reorders or removes
+    // chapters between publishes.
+    await supabase
+      .from('store_chapters')
+      .delete()
+      .eq('listing_id', storeListingId);
+
+    type WriterChapter = {
+      title: string | null;
+      content: string | null;
+      word_count: number | null;
+    };
+    const chapterRows = orderedChapters.map((c: WriterChapter, idx: number) => {
+      const wordCount = c.word_count ?? 0;
+      return {
+        listing_id: storeListingId,
+        chapter_index: idx + 1,
+        title: c.title ?? null,
+        content_markdown: c.content ?? '',
+        word_count: wordCount,
+        estimated_minutes: wordCount > 0 ? Math.max(1, Math.ceil(wordCount / 250)) : null,
+        is_sample: idx === 0,
+      };
+    });
+
+    const { error: chapterInsertErr } = await supabase
+      .from('store_chapters')
+      .insert(chapterRows);
+
+    if (chapterInsertErr) {
+      // Don't fail the whole publish on chapter-sync failure — the
+      // listing is already live, marketplace_listings will follow, and
+      // the Founder can retry. But surface loudly so we notice the
+      // store is in a partial state.
+      console.error(
+        '[penworth-store/publish] store_chapters insert failed; reader will show "not finalised":',
+        chapterInsertErr.message,
+      );
+    }
+  }
 
   // ---------- UPSERT marketplace_listings (legacy /marketplace/[id]) ----------
   const { data: existingListing } = await supabase
