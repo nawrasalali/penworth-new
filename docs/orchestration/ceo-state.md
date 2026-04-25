@@ -1,12 +1,39 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-25 ~12:56 UTC by CEO Claude session (CEO-122 admin-grant-credits "authentication required" fix shipped to production; PR #3 store-repo unblocked + CEO-114 husky author-identity hook earlier in same session).
+**Last updated:** 2026-04-25 ~13:10 UTC by CEO Claude session (queue housekeeping pass — CEO-016 scope question raised, CEO-021 phantom regression retracted, CEO-121 closed as standard pattern, two memory rules refined).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-25 ~12:56 UTC — CEO-122 admin-grant fix shipped + CEO-114 husky hook + PR #3 unblock, all in one session)
+## Most recent session activity (2026-04-25 ~13:10 UTC — queue housekeeping after CEO-118 close-out)
+
+Diagnosis-only continuation of the CEO-118 session. Founder said "roll" — I worked the priority queue and found that the next three p0/p1 items in the project-instructions queue were either already done or had stale assumptions. Net result: zero code shipped, but three task rows now reflect ground truth and two memory rules are corrected.
+
+1. **CEO-021 phantom regression retracted.** The "REGRESSION DETECTED 2026-04-25" appendix on CEO-021's note was the same sandbox-egress mirage that drove CEO-118. Vercel API confirms penworth.ai/www are owned by NEW project; OLD has zero custom domains. Appended a retraction note to the row; status stays `done`.
+2. **CEO-005 Recipients CRUD UI** — verified this was already shipped 2026-04-24 (commit `45e2b80`). The project instructions claiming it as p1 to-do are stale. No action.
+3. **CEO-016 Mentor Agent UI → awaiting_founder.** Audited code + DB before writing UI. The brief (authored 2026-04-20) targets a monthly-PD model (`guild_pd_sessions`, `guild_growth_plans`, voice + PDF) — both DB tables exist but are 0-row, no API routes, no UI. Meanwhile a parallel weekly-checkin model has been built (`guild_weekly_checkins` table, `lib/guild/agents/mentor.ts` (110 lines), routes `/api/guild/agents/mentor/{start,continue,end}`, `app/guild/dashboard/agents/mentor/{page.tsx, MentorChat.tsx}`) — also 0-row, never run E2E. Founder needs to choose: ship monthly-PD per brief (heavier — voice + PDF runtime needs E2E first), ship the simpler weekly-checkin (smaller — finish wiring + one E2E), or both. Recommendation: weekly-checkin. Question parked on the row.
+4. **CEO-121 closed as not-an-anomaly.** Investigated commit `52282d6a` ("feat(help): world-class redesign", `ceo@penworth.ai` author). It's a legitimate 725-line help-page redesign aligned with the 2026-04-25 referral rewire. Survey of last 200 commits on penworth-new main: SIX author emails in active production use (`119996438+nawrasalali@users.noreply.github.com`, `ceo-claude@penworth.ai`, `ceo@penworth.ai`, `claude@anthropic.com`, `founder@penworth.ai`, `nawras@penworth.ai`). All deploy cleanly. The "Vercel rejects non-noreply" rule was over-generalized from `penworth-store` burns — it does NOT apply to `penworth-new`. CEO-114's husky hook is store-only.
+5. **Memory rules refined:**
+   - Sandbox-egress rule (#1) widened from "503 cert-chain check" to "any GET body ≤18 bytes is a stub; HEAD works; cross-verify via Vercel/GitHub JSON APIs". Misfire #3 now logged.
+   - Git-identity rule (#3) scoped to `penworth-store` ONLY. Don't burn cycles "fixing" non-noreply commits on `penworth-new`.
+6. **Tasks created/closed this pass:**
+   - `CEO-118` → done (non-incident, see prior session entry)
+   - `CEO-120` → awaiting_founder (legacy repo + OLD Vercel project cleanup, p3, needs go for Vercel DELETE)
+   - `CEO-121` → done (rogue committer was standard pattern)
+   - `CEO-016` → awaiting_founder (mentor architecture choice)
+   - `CEO-021` → done (retraction note appended)
+
+**What the Founder needs to decide next:**
+- **CEO-016**: ship monthly-PD per brief, ship weekly-checkin (recommended), or both?
+- **CEO-120**: green-light DELETE of OLD Vercel project `prj_6wRG4Qp9FG35U2WgKRJUP7kw2Q8E` and archive of `nawrasalali/penworth-ai` GitHub repo? (Both reversible.)
+- **PR #4 on penworth-store** (CEO-114 husky hook) still awaiting merge from the 12:56 UTC session.
+
+**Next session first action:** if Founder picks a CEO-016 path, execute. Otherwise pick the highest-priority `open` task that has not been audited this day — likely CEO-019 (load test) or CEO-020 (DR drill), both of which need a runbook authored from scratch.
+
+---
+
+## Prior session activity (2026-04-25 ~12:56 UTC — CEO-122 admin-grant fix shipped + CEO-114 husky hook + PR #3 unblock, all in one session)
 
 This was a multi-thread session driven by Founder live reports. Three threads, all closed:
 
