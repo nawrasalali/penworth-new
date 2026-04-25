@@ -1,26 +1,26 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-24 18:00 UTC (equivalent 2026-04-25 03:30 ACST Adelaide) by CEO Claude session (CEO-031 Phase 1 + unstick)
+**Last updated:** 2026-04-25 08:10 UTC by CEO Claude session (CEO-REF-01 referral rewire + Guild paid-author policy)
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Production health — verified 2026-04-24 18:00 UTC
+## Production health — verified 2026-04-25 08:10 UTC
 
 | Signal | State |
 |---|---|
-| Supabase migrations applied | 126+ (latest: `ceo031_detector_exclude_publishing_and_stuck_current_only`) |
-| Latest main commit (writer) | `909a0207` — feat(publish): Store-first one-click publish with pre-publish modal — **BUILD ERROR** (Founder's in-flight work) |
-| Prior main commit (writer) | `f72c015` — fix(pipeline-health): don't resolve chronic-stuck incidents (this session) — READY, current production |
-| Writer Vercel latest READY | `f72c015` |
+| Supabase migrations applied | 127 (latest: `028_guild_paid_author_policy` this session) |
+| Latest main commit (writer) | `227941f` — feat(referrals): signup wiring + dashboard rewrite (this session) |
+| Prior main commit (writer) | `c2df108` — feat(referrals,guild): rewire economics + paid-author policy (this session) |
+| Writer Vercel latest READY | `227941f` |
 | Store latest production deploy | `8fe2330` (CEO-076 livebook v2) — READY |
-| Stuck sessions right now | **0** (was 1 this morning; Founder's "The Rewired Self" manually unstuck — see CEO-031) |
+| Stuck sessions right now | 0 |
 | Open incidents | 0 |
 | Webhooks failed 24h | 0 |
-| Unacked alerts | 0 (was 2 at session start — acked) |
+| Unacked alerts | 0 |
 | Guild applications pending | 0 |
-| Guild active members | 1 (Founder, Fellow tier) |
+| Guild active members | 1 (Founder, Fellow tier, fee_starts 2026-07-17 = pre_grace under new policy) |
 | Store live listings | 1 ("The New Rich") |
 
 ## Founder context
