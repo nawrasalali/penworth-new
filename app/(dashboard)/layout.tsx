@@ -26,15 +26,6 @@ export default async function DashboardLayout({
     .eq('id', user.id)
     .single();
 
-  // Fetch user's organization (if any)
-  const { data: membership } = await supabase
-    .from('org_members')
-    .select('organizations(*)')
-    .eq('user_id', user.id)
-    .single();
-
-  const organization = membership?.organizations as any;
-
   const userData = {
     id: user.id,
     email: user.email || '',
@@ -64,7 +55,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-background" dir={dir} lang={locale}>
-      <Sidebar user={userData} organization={organization} locale={locale} />
+      <Sidebar user={userData} locale={locale} />
       {/* Main content padding:
             - On mobile (<md): no left/right padding since the sidebar slides
               off-screen. Top padding of 12 (= 48px, = h-12) reserves space

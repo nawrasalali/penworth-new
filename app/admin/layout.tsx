@@ -42,7 +42,7 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar user={userData} organization={null} />
+      <Sidebar user={userData} />
       <main className="pl-64">
         <div className="min-h-screen">{children}</div>
       </main>

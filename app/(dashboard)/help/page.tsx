@@ -141,22 +141,18 @@ const faqs = [
     ],
   },
   {
-    category: 'Teams & Guild',
+    category: 'Guild & Referrals',
     icon: Users,
     color: 'text-rose-600 dark:text-rose-400',
     bg: 'bg-rose-500/10',
     questions: [
       {
-        q: 'Can I invite collaborators?',
-        a: 'Yes. Invite co-authors or editors by email — they receive an invitation to join your project with reviewer or editor permissions.',
-      },
-      {
-        q: "What's the difference between reviewer and editor?",
-        a: 'Reviewers can read and comment. Editors can also make direct edits to the manuscript.',
-      },
-      {
         q: 'What is the Penworth Guild?',
         a: 'The Guild is our partner programme. Members earn 20–40% recurring cash commission for 12 months on every paid subscription they refer. Guild requires application and a voice interview. Apprentices receive 3 free books on join, and must remain on Pro or Max from month four ("walk the talk"). See guild.penworth.ai.',
+      },
+      {
+        q: 'How do I apply for the Guild?',
+        a: 'Visit guild.penworth.ai and submit an application. The process includes a short voice interview so we can get to know you. Approved applicants receive an Apprentice tier slot and onboarding to the Academy. Applications are reviewed in batches; expect a response within a few days.',
       },
       {
         q: 'How is the Guild different from referrals?',
