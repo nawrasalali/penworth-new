@@ -1,12 +1,27 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-25 ~12:15 UTC by CEO Claude session (CEO-115 voice-interview pipeline live on Cartesia; Founder unblocked for first Guild interview test).
+**Last updated:** 2026-04-25 ~12:45 UTC by CEO Claude session (CEO-118 closed as non-incident; prior session's three-issue P0 was a sandbox-egress mirage).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-25 ~12:15 UTC — CEO-115 voice-interview Cartesia swap shipped)
+## Most recent session activity (2026-04-25 ~12:45 UTC — CEO-118 closed as non-incident, two follow-ups spawned)
+
+1. **CEO-118 closed as a non-incident.** The prior CEO-118 session left a 7-step P0 fix plan describing three stacked issues: (A) `penworth.ai` still aliased to OLD Vercel project, (B) commit `5e94d23` did not auto-deploy on NEW project, (C) legacy `nawrasalali/penworth-ai` repo had four unknown commits this session. Re-verified all three from authoritative sources (Vercel API for aliases + deployments, GitHub API for commit history). All three were false positives.
+2. **Reality (A):** Vercel API confirms `penworth.ai` and `www.penworth.ai` are owned by NEW project `prj_9EWDVGIK1CNzWdMUwEv7KTSep70i`, both verified, www→apex 308 redirect intact. OLD project `prj_6wRG4Qp9FG35U2WgKRJUP7kw2Q8E` has zero custom domains — only `project-zeoe1.vercel.app`. CEO-021 Step 1 already worked.
+3. **Reality (B):** Commit `5e94d23` (Send credits + Store Admin) deployed successfully as `dpl_CPNBtLBJf3jKCo` to production at 2026-04-25 12:04:31 UTC. Auto-deploy is healthy. Current production is `dpl_FhsjxjHZKFuQvj9Ut3sujnL3TotC` at sha `3fbbc67f` — a docs-only commit on top.
+4. **Reality (C):** `nawrasalali/penworth-ai` legacy repo's last commit is 2026-04-12 17:34 UTC, 13 days dormant. No fresh pushes this session. The previous session imagined the four pushes from sandbox-egress noise.
+5. **Root cause of the misdiagnosis** is the same Anthropic sandbox-egress TLS-inspection trap that misfired CEO-028 twice. Sandbox `curl -I` HEAD requests return real Vercel headers; sandbox `curl` GET bodies return an 18-byte "DNS cache overflow" stub. The prior session ran GETs against `penworth.ai/`, got the 18-byte stub, interpreted the empty body as evidence the wrong project was serving, and built a fictional crisis. Memory rule updated to widen the diagnostic from "TLS cert chain check" to "any GET body ≤18 bytes is a stub — never act on it; always cross-verify via Vercel/GitHub JSON APIs". This is misfire #3.
+6. **One real anomaly captured separately as CEO-121 (p3, open):** commit `52282d6a55` on `penworth-new` main (2026-04-25 11:12:56 UTC, "feat(help): world-class redesign") was authored under `ceo@penworth.ai` with no associated GitHub login. Violates the noreply-email memory rule but Vercel accepted it and it deployed. Yellow flag, not red — needs investigation but not blocking.
+7. **CEO-120 (p3, awaiting_founder)** spawned for the legitimate cleanup loose end: archive the dormant `nawrasalali/penworth-ai` GitHub repo (reversible) and delete OLD Vercel project `prj_6wRG4Qp9FG35U2WgKRJUP7kw2Q8E` (recoverable from same GitHub repo). Founder green-light needed for the destructive Vercel DELETE.
+8. **No code shipped this session** — diagnosis-only resume. The two follow-ups are queued in `ceo_orchestration_tasks`.
+
+**Next session first action:** if any task arrives that requires fetching a live web page body, route via Vercel/GitHub API or `web_fetch` (different egress path), never via bash `curl <url>` for HTML.
+
+---
+
+## Prior session activity (2026-04-25 ~12:15 UTC — CEO-115 voice-interview Cartesia swap shipped)
 
 1. **CEO-115 closed** — guild voice-interview pipeline now runs entirely on Cartesia (Ink-Whisper STT + Sonic-3 TTS). Single-file commit `7dec203` swapping `lib/ai/guild-interviewer.ts`. Production smoke-test against Founder's Arabic test application (`0945e125-5d1e-47de-888e-527e18750a06`) returned HTTP 200 + 284KB Arabic mp3 from Sonic-3; interview row `2752e61e-1a60-42f1-9c32-b26b0e72e38b` created. Founder ready to walk full UI test at `https://new.penworth.ai/guild/interview/schedule?application_id=0945e125-5d1e-47de-888e-527e18750a06`.
 2. **Root cause why the pipeline was dead:** `OPENAI_API_KEY` was never set on writer Vercel. The original code called OpenAI Whisper + OpenAI TTS. The first call to `/api/guild/interview/start` would 500 on `synthesizeSpeech` before returning the opening question to the browser. Discovered via Vercel env-var enumeration during the diagnostic phase.
