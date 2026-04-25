@@ -1,8 +1,21 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-25 ~09:30 UTC by CEO Claude session (CEO-REF-01 phase 2 — migration 029 Apprentice grant rewire shipped)
+**Last updated:** 2026-04-25 ~09:35 UTC by CEO Claude session (CEO-084 + CEO-085 shipped to PR #4 — awaiting Founder smoke-test). Earlier this session: CEO-REF-01 phase 2 — migration 029 Apprentice grant rewire shipped.
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
+
+---
+
+## Most recent session activity (2026-04-25 ~09:35 UTC — CEO-084 + CEO-085 shipped to PR)
+
+1. **PR #4 open** at https://github.com/nawrasalali/penworth-new/pull/4 — `feat(nav,books,referrals): My Books unification + sidebar restructure + Guild fold into Referrals`. Branch `feat/my-books-and-sidebar-restructure`, head SHA `87b50e0`. Vercel preview READY at https://penworth-at58vtnyz-nawraselali-2147s-projects.vercel.app.
+2. **Implementation complete across all eight brief sections.** Sidebar slim-down (mainNav = Dashboard + My Books, orange Guild block deleted), `/projects → /books` route rename via `git mv` with history preserved, `/publish` retired with 308 redirects, new two-card My Books page (Drafting + Published, classified by `store_listings` per CEO-077's contract), three-section Referrals page (Section 1 ReferralDashboard reused, Section 2 deliberately omitted because parallel commit `227941f` already moved that pitch INTO ReferralDashboard, Section 3 Guild quick-links for active members only). i18n: `nav.myBooks` + 24 new keys across all 11 locales; `nav.publish` and `nav.marketplace` removed. Four orphaned components deleted.
+3. **Acceptance tests run on preview this session — all green.** Static (1, 3, 4, 5, 16): typecheck clean via pre-push hook, zero "My Projects"/myProjects in user-visible code, zero `href="/projects` anywhere, no dead lucide imports. Redirects (6, 7, 8, 9): `/projects → /books`, `/publish → /books`, `/guild → /referrals`, `/guild/dashboard` loads normally (auth-bounce). Pages compile cleanly: `/books`, `/referrals`, `/dashboard` all 307→/login through middleware (zero 500s).
+4. **CEO-084 and CEO-085 set to `awaiting_founder`** with PR + preview URLs in `last_update_note`. Authenticated smoke tests (10, 11, 12, 13, 17, 18) require Founder click-through — that is the remaining merge gate.
+5. **Three rebases during the session** (main moved 5+2+2 commits from parallel sessions). One conflict resolved: `components/guild/ShowcaseGrantsCard.tsx` — took main's UX intent (no content_type prefill on grant CTA) with my path rename (`/books/new`).
+6. Handover note: `docs/orchestration/handovers/2026-04-25-ceo084-085-shipped.md`.
+
+**Next session first action:** if Founder replies "merge PR #4", squash-merge via GitHub API, confirm production deploy READY for new SHA, mark CEO-084/085 `done` with merge SHA. If Founder flags defects, push fix commit on the same branch (no force-push without telling Founder), wait for new preview READY, re-request Founder smoke.
 
 ---
 
@@ -11,9 +24,10 @@
 | Signal | State |
 |---|---|
 | Supabase migrations applied | 128 (latest: `029_apprentice_grant_3_books_any_type`) |
-| Latest main commit (writer) | `250c520` — feat(covers): designer-brief composer + museum-poster framing (parallel session CEO-098) |
-| Most recent of my commits | `2fbc02d` — feat(guild): apprentice grant 5-categories → 3 of any kind |
-| Writer Vercel latest READY | `250c520` and `2fbc02d` both READY |
+| Latest main commit (writer) | `320ebde` — fix(covers): strip framing nouns from prompt + remove title overlay |
+| Prior notable main commit | `250c520` — feat(covers): designer-brief composer + museum-poster framing (CEO-098) |
+| Writer Vercel latest READY | `250c520` and `2fbc02d` both READY (preview for `87b50e0` also READY) |
+| Writer open PR | **#4** (CEO-084/085) — preview READY, awaiting Founder smoke-test |
 | Store latest production deploy | `63bbda7` (CEO-082 force-dynamic on /book/[slug]) — READY as `dpl_CSrnEcHAy1HDnc7g7XPWb4pdegCS` |
 | Stuck sessions right now | 0 |
 | Open incidents | 0 |
