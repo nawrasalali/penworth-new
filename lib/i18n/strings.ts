@@ -59,10 +59,12 @@ export type StringKey =
   | 'action.moveToBin' | 'action.restore' | 'action.deleteForever'
   | 'action.cancel' | 'action.deleting'
   | 'action.save' | 'action.saving' | 'action.saved'
+  | 'action.unpublish'
   // Confirm modal
   | 'confirm.title' | 'confirm.cannotUndo' | 'confirm.bodyPrefix' | 'confirm.bodySuffix'
   // Toasts
   | 'toast.movedToBin' | 'toast.restored' | 'toast.deletedPermanently'
+  | 'toast.unpublished' | 'toast.unpublishFailed'
   // Relative time
   | 'time.justNow' | 'time.deletedPrefix'
   // Settings
@@ -439,6 +441,7 @@ const en: Bundle = {
   'action.moveToBin': 'Move to recycle bin',
   'action.restore': 'Restore',
   'action.deleteForever': 'Delete forever',
+  'action.unpublish': 'Unpublish',
   'action.cancel': 'Cancel',
   'action.deleting': 'Deleting…',
 
@@ -450,6 +453,8 @@ const en: Bundle = {
   'toast.movedToBin': 'Moved to the recycle bin',
   'toast.restored': 'Restored',
   'toast.deletedPermanently': 'Permanently deleted',
+  'toast.unpublished': 'Removed from the Store',
+  'toast.unpublishFailed': 'Could not unpublish',
 
   'time.justNow': 'just now',
   'time.deletedPrefix': 'Deleted',
@@ -1015,6 +1020,7 @@ const ar: Bundle = {
   'action.moveToBin': 'نقل إلى سلة المحذوفات',
   'action.restore': 'استعادة',
   'action.deleteForever': 'حذف نهائي',
+  'action.unpublish': 'إلغاء النشر',
   'action.cancel': 'إلغاء',
   'action.deleting': 'جارٍ الحذف…',
 
@@ -1026,6 +1032,8 @@ const ar: Bundle = {
   'toast.movedToBin': 'تم النقل إلى سلة المحذوفات',
   'toast.restored': 'تمت الاستعادة',
   'toast.deletedPermanently': 'تم الحذف نهائيًا',
+  'toast.unpublished': 'تمت إزالته من المتجر',
+  'toast.unpublishFailed': 'تعذّر إلغاء النشر',
 
   'time.justNow': 'الآن',
   'time.deletedPrefix': 'حُذف',
@@ -1591,6 +1599,7 @@ const es: Bundle = {
   'action.moveToBin': 'Mover a la papelera',
   'action.restore': 'Restaurar',
   'action.deleteForever': 'Eliminar para siempre',
+  'action.unpublish': 'Despublicar',
   'action.cancel': 'Cancelar',
   'action.deleting': 'Eliminando…',
 
@@ -1602,6 +1611,8 @@ const es: Bundle = {
   'toast.movedToBin': 'Movido a la papelera',
   'toast.restored': 'Restaurado',
   'toast.deletedPermanently': 'Eliminado permanentemente',
+  'toast.unpublished': 'Eliminado de la tienda',
+  'toast.unpublishFailed': 'No se pudo despublicar',
 
   'time.justNow': 'ahora',
   'time.deletedPrefix': 'Eliminado',
@@ -2167,6 +2178,7 @@ const fr: Bundle = {
   'action.moveToBin': 'Mettre à la corbeille',
   'action.restore': 'Restaurer',
   'action.deleteForever': 'Supprimer définitivement',
+  'action.unpublish': 'Dépublier',
   'action.cancel': 'Annuler',
   'action.deleting': 'Suppression…',
 
@@ -2178,6 +2190,8 @@ const fr: Bundle = {
   'toast.movedToBin': 'Déplacé dans la corbeille',
   'toast.restored': 'Restauré',
   'toast.deletedPermanently': 'Supprimé définitivement',
+  'toast.unpublished': 'Retiré de la boutique',
+  'toast.unpublishFailed': 'Impossible de dépublier',
 
   'time.justNow': "à l'instant",
   'time.deletedPrefix': 'Supprimé',
@@ -2743,6 +2757,7 @@ const pt: Bundle = {
   'action.moveToBin': 'Mover para a lixeira',
   'action.restore': 'Restaurar',
   'action.deleteForever': 'Excluir permanentemente',
+  'action.unpublish': 'Despublicar',
   'action.cancel': 'Cancelar',
   'action.deleting': 'Excluindo…',
 
@@ -2754,6 +2769,8 @@ const pt: Bundle = {
   'toast.movedToBin': 'Movido para a lixeira',
   'toast.restored': 'Restaurado',
   'toast.deletedPermanently': 'Excluído permanentemente',
+  'toast.unpublished': 'Removido da loja',
+  'toast.unpublishFailed': 'Não foi possível despublicar',
 
   'time.justNow': 'agora mesmo',
   'time.deletedPrefix': 'Excluído',
@@ -3319,6 +3336,7 @@ const ru: Bundle = {
   'action.moveToBin': 'Переместить в корзину',
   'action.restore': 'Восстановить',
   'action.deleteForever': 'Удалить навсегда',
+  'action.unpublish': 'Снять с публикации',
   'action.cancel': 'Отмена',
   'action.deleting': 'Удаление…',
 
@@ -3330,6 +3348,8 @@ const ru: Bundle = {
   'toast.movedToBin': 'Перемещено в корзину',
   'toast.restored': 'Восстановлено',
   'toast.deletedPermanently': 'Удалено навсегда',
+  'toast.unpublished': 'Удалено из магазина',
+  'toast.unpublishFailed': 'Не удалось снять с публикации',
 
   'time.justNow': 'только что',
   'time.deletedPrefix': 'Удалено',
@@ -3895,6 +3915,7 @@ const zh: Bundle = {
   'action.moveToBin': '移至回收站',
   'action.restore': '恢复',
   'action.deleteForever': '永久删除',
+  'action.unpublish': '取消发布',
   'action.cancel': '取消',
   'action.deleting': '正在删除…',
 
@@ -3906,6 +3927,8 @@ const zh: Bundle = {
   'toast.movedToBin': '已移至回收站',
   'toast.restored': '已恢复',
   'toast.deletedPermanently': '已永久删除',
+  'toast.unpublished': '已从商店下架',
+  'toast.unpublishFailed': '取消发布失败',
 
   'time.justNow': '刚刚',
   'time.deletedPrefix': '已删除',
@@ -4471,6 +4494,7 @@ const bn: Bundle = {
   'action.moveToBin': 'রিসাইকেল বিনে সরান',
   'action.restore': 'পুনরুদ্ধার',
   'action.deleteForever': 'চিরতরে মুছুন',
+  'action.unpublish': 'প্রকাশনা প্রত্যাহার করুন',
   'action.cancel': 'বাতিল',
   'action.deleting': 'মুছে ফেলা হচ্ছে…',
 
@@ -4482,6 +4506,8 @@ const bn: Bundle = {
   'toast.movedToBin': 'রিসাইকেল বিনে সরানো হয়েছে',
   'toast.restored': 'পুনরুদ্ধার করা হয়েছে',
   'toast.deletedPermanently': 'স্থায়ীভাবে মুছে ফেলা হয়েছে',
+  'toast.unpublished': 'স্টোর থেকে সরানো হয়েছে',
+  'toast.unpublishFailed': 'প্রকাশনা প্রত্যাহার করা যায়নি',
 
   'time.justNow': 'এইমাত্র',
   'time.deletedPrefix': 'মুছে ফেলা',
@@ -5047,6 +5073,7 @@ const hi: Bundle = {
   'action.moveToBin': 'रीसायकल बिन में ले जाएँ',
   'action.restore': 'पुनर्स्थापित करें',
   'action.deleteForever': 'हमेशा के लिए हटाएँ',
+  'action.unpublish': 'अप्रकाशित करें',
   'action.cancel': 'रद्द करें',
   'action.deleting': 'हटाया जा रहा है…',
 
@@ -5058,6 +5085,8 @@ const hi: Bundle = {
   'toast.movedToBin': 'रीसायकल बिन में ले जाया गया',
   'toast.restored': 'पुनर्स्थापित किया गया',
   'toast.deletedPermanently': 'स्थायी रूप से हटा दिया गया',
+  'toast.unpublished': 'स्टोर से हटाया गया',
+  'toast.unpublishFailed': 'अप्रकाशित नहीं किया जा सका',
 
   'time.justNow': 'अभी-अभी',
   'time.deletedPrefix': 'हटाया गया',
@@ -5623,6 +5652,7 @@ const id: Bundle = {
   'action.moveToBin': 'Pindahkan ke tempat sampah',
   'action.restore': 'Pulihkan',
   'action.deleteForever': 'Hapus selamanya',
+  'action.unpublish': 'Batalkan publikasi',
   'action.cancel': 'Batal',
   'action.deleting': 'Menghapus…',
 
@@ -5634,6 +5664,8 @@ const id: Bundle = {
   'toast.movedToBin': 'Dipindahkan ke tempat sampah',
   'toast.restored': 'Dipulihkan',
   'toast.deletedPermanently': 'Dihapus permanen',
+  'toast.unpublished': 'Dihapus dari toko',
+  'toast.unpublishFailed': 'Tidak dapat membatalkan publikasi',
 
   'time.justNow': 'baru saja',
   'time.deletedPrefix': 'Dihapus',
@@ -6199,6 +6231,7 @@ const vi: Bundle = {
   'action.moveToBin': 'Chuyển vào thùng rác',
   'action.restore': 'Khôi phục',
   'action.deleteForever': 'Xóa vĩnh viễn',
+  'action.unpublish': 'Hủy xuất bản',
   'action.cancel': 'Hủy',
   'action.deleting': 'Đang xóa…',
 
@@ -6210,6 +6243,8 @@ const vi: Bundle = {
   'toast.movedToBin': 'Đã chuyển vào thùng rác',
   'toast.restored': 'Đã khôi phục',
   'toast.deletedPermanently': 'Đã xóa vĩnh viễn',
+  'toast.unpublished': 'Đã gỡ khỏi cửa hàng',
+  'toast.unpublishFailed': 'Không thể hủy xuất bản',
 
   'time.justNow': 'vừa xong',
   'time.deletedPrefix': 'Đã xóa',
