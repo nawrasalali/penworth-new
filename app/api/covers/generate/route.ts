@@ -205,7 +205,22 @@ export async function POST(request: NextRequest) {
           prompt: ideogramPrompt,
           aspect_ratio: 'ASPECT_2_3', // Book cover ratio
           model: 'V_2',
-          magic_prompt_option: 'AUTO',
+          // OFF (not AUTO). With AUTO, Ideogram silently rewrites the
+          // prompt and reliably reintroduces title/author typography on
+          // anything it classifies as a book cover — even when our
+          // explicit instructions forbid text. CEO-092 root cause for
+          // the "A JI ER WAREA" gibberish on The Rewired Self front
+          // cover. Keeping it OFF means Ideogram respects our prompt
+          // verbatim, including the no-text directive.
+          magic_prompt_option: 'OFF',
+          // Belt-and-braces: explicit negative prompt enumerating the
+          // text-like outputs Ideogram is most likely to fabricate.
+          // Ideogram V_2 honors this even when style_type=DESIGN.
+          negative_prompt:
+            'text, words, letters, typography, lettering, fonts, ' +
+            'title text, author name, captions, subtitles, watermarks, ' +
+            'logos, brand marks, signatures, written language, ' +
+            'characters, alphabets, numerals, glyphs, calligraphy',
           // DESIGN produces stylized graphic-design output that reads as
           // a book cover. REALISTIC nudges Ideogram toward stock
           // photography — which is how a book about AI ended up with

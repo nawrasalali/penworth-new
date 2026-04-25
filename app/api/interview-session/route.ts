@@ -312,6 +312,64 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ session: updatedSession });
     }
 
+    // CEO-092: Jump to a previously-completed (or currently-active)
+    // agent stage. Used by the editor's clickable AgentPipeline so the
+    // founder can return to Cover or Publishing for cover regeneration
+    // or re-publishing without losing pipeline state. Forward jumps
+    // (into 'waiting' stages) are rejected — those stages have
+    // preconditions that may not be met yet.
+    if (action === 'jump') {
+      const target = data?.target as AgentName | undefined;
+      if (!target || !agentOrder.includes(target)) {
+        return NextResponse.json({ error: 'Invalid jump target' }, { status: 400 });
+      }
+
+      const targetStatus = (session.agent_status as Record<string, string> | null)?.[target];
+      if (targetStatus !== 'completed' && targetStatus !== 'active') {
+        return NextResponse.json(
+          { error: 'Cannot jump to a stage that has not been reached' },
+          { status: 400 },
+        );
+      }
+
+      // Re-mark the target as the active stage but DO NOT downgrade
+      // any later 'completed' stages to 'waiting'. Pipeline progress is
+      // sticky — jumping back to Cover does not erase a completed
+      // Publishing run; on returning to Publishing the founder will
+      // simply see the existing artifacts and can update / re-publish.
+      const newStatus: Record<string, string> = { ...(session.agent_status as object) };
+      // Demote whatever WAS active to 'completed' so the UI doesn't
+      // show two amber indicators after the jump.
+      if (session.current_agent && newStatus[session.current_agent] === 'active') {
+        newStatus[session.current_agent] = 'completed';
+      }
+      newStatus[target] = 'active';
+
+      const { data: updatedSession, error } = await supabase
+        .from('interview_sessions')
+        .update({
+          current_agent: target,
+          agent_status: newStatus,
+          updated_at: new Date().toISOString(),
+          agent_heartbeat_at: new Date().toISOString(),
+          agent_started_at: new Date().toISOString(),
+          pipeline_status: 'active',
+          failure_count: 0,
+          last_failure_reason: null,
+          last_failure_at: null,
+        })
+        .eq('id', sessionId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error jumping session stage:', error);
+        return NextResponse.json({ error: 'Failed to jump stage' }, { status: 500 });
+      }
+
+      return NextResponse.json({ session: updatedSession });
+    }
+
     if (action === 'save') {
       // Just save current state without advancing
       const updateData: Record<string, any> = {

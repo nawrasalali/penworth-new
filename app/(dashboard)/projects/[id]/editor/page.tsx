@@ -116,6 +116,7 @@ function UnifiedLeftPanel({
   agentStatus,
   activeMessages,
   onNavigateHome,
+  onAgentClick,
   locale = 'en',
 }: {
   project: Project | null;
@@ -124,6 +125,7 @@ function UnifiedLeftPanel({
   agentStatus: AgentStatusMap;
   activeMessages?: { line1: string; line2: string };
   onNavigateHome: () => void;
+  onAgentClick?: (agent: AgentName) => void;
   locale?: Locale;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -243,6 +245,7 @@ function UnifiedLeftPanel({
           activeMessages={activeMessages}
           locale={locale}
           embedded
+          onAgentClick={onAgentClick}
         />
       </div>
 
@@ -1172,6 +1175,35 @@ function EditorContentNew() {
     }
   };
 
+  // Per CEO-092: founder needs to jump back to a previously-completed
+  // pipeline stage (most importantly Cover and Publishing) without
+  // having to redo the rest of the pipeline. UI-side this is gated by
+  // AgentPipeline's isClickable rule (active or completed only); the
+  // back-end /api/interview-session 'jump' action is the safety net.
+  // We also do not navigate to the same stage we are already on —
+  // protects against accidental double-clicks during cover regen.
+  const jumpToAgent = async (target: AgentName) => {
+    if (!session) return;
+    if (target === currentAgent) return;
+    const status = agentStatus[target];
+    if (status !== 'completed' && status !== 'active') return;
+
+    const response = await fetch('/api/interview-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: session.id,
+        action: 'jump',
+        data: { target },
+      }),
+    });
+
+    const result = await response.json();
+    if (result.session) {
+      setSession(result.session);
+    }
+  };
+
   // Calculate stats
   const wordCount = chapters.reduce((sum, ch) => sum + (ch.word_count || 0), 0);
   const pageCount = Math.ceil(wordCount / 250);
@@ -1385,6 +1417,7 @@ function EditorContentNew() {
           agentStatus={agentStatus}
           activeMessages={getActiveMessage()}
           onNavigateHome={() => router.push('/projects')}
+          onAgentClick={jumpToAgent}
           locale={locale}
         />
 

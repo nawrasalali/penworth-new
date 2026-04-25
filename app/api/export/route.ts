@@ -531,9 +531,17 @@ function drawBackCoverOverlay(
 ) {
   if (!blurb && !author) return;
 
+  // Per CEO-092 the overlay extends from y=22% all the way to the
+  // bottom edge of the page. The previous version stopped at y=94%
+  // pageH, leaving a 6% strip at the bottom where the bare cover image
+  // showed through — which the founder read (correctly) as the back
+  // cover not being properly bled to the bottom edge. Underlying image
+  // is drawFullBleedImage(0, 0, pageW, pageH) so the image itself is
+  // edge-to-edge; this fix is purely about overlay coverage.
   doc.save();
   doc.fillOpacity(0.6);
-  doc.rect(0, pageH * 0.22, pageW, pageH * 0.72).fill('#000');
+  const overlayTop = pageH * 0.22;
+  doc.rect(0, overlayTop, pageW, pageH - overlayTop).fill('#000');
   doc.restore();
   doc.fillOpacity(1);
 
@@ -640,17 +648,11 @@ function drawTitlePage(
     );
   }
 
-  // Bottom-of-page imprint. Per CEO-090 (PDF v4) this slot holds the
-  // author's name (acting as a self-publisher imprint), not the literal
-  // 'PENWORTH' brand stamp the original v3 template carried. If author
-  // is null we omit the line entirely rather than leaving a placeholder.
-  if (author) {
-    doc.font(F_SANS).fontSize(9).fillColor('#444').text(
-      author.toUpperCase(),
-      x, pageH - MARGIN_BOTTOM - 20,
-      { width: boxW, align: 'center', characterSpacing: 3, lineBreak: false },
-    );
-  }
+  // No bottom-of-page imprint. The mid-page "by {author}" line already
+  // serves as the author imprint; a second author line at the bottom of
+  // the title page (which CEO-090's first cut added in place of the
+  // 'PENWORTH' brand stamp) duplicates the byline and reads as a
+  // layout defect. Per CEO-092, the slot is left empty.
   doc.fillColor('#000');
 }
 
@@ -1014,19 +1016,19 @@ async function generatePDF(
       // positioned draws (overlays, blurbs, author bios) can't trigger
       // pdfkit's text-overflow heuristic — which was the source of the
       // "heaps of empty pages" after the back cover.
-      doc.addPage({ margins: CHROME_MARGINS });
+      doc.addPage({ size: [TRIM_W, TRIM_H], layout: 'portrait', margins: CHROME_MARGINS });
       drawTitlePage(doc, title, author, pageW, pageH);
       pageRole.set(currentPage(), { kind: 'chrome' });
 
       // 3. Copyright
-      doc.addPage({ margins: CHROME_MARGINS });
+      doc.addPage({ size: [TRIM_W, TRIM_H], layout: 'portrait', margins: CHROME_MARGINS });
       drawCopyrightPage(doc, title, author, pageW, pageH);
       pageRole.set(currentPage(), { kind: 'chrome' });
 
       // 4. Table of contents placeholder — filled after the body so
       //    the page numbers reflect the ACTUAL displayed page numbers
       //    in the printed footer, not the absolute PDF page indices.
-      doc.addPage({ margins: CHROME_MARGINS });
+      doc.addPage({ size: [TRIM_W, TRIM_H], layout: 'portrait', margins: CHROME_MARGINS });
       const tocPageIdx = currentPage();
       pageRole.set(tocPageIdx, { kind: 'chrome' });
 
@@ -1046,13 +1048,13 @@ async function generatePDF(
         const displayTitle = clean || chapter.title;
 
         // Chapter opener
-        doc.addPage();
+        doc.addPage({ size: [TRIM_W, TRIM_H], layout: 'portrait' });
         drawChapterOpener(doc, label, displayTitle, pageW, pageH);
         const openerAbs = currentPage();
         pageRole.set(openerAbs, { kind: 'opener' });
 
         // Body
-        doc.addPage();
+        doc.addPage({ size: [TRIM_W, TRIM_H], layout: 'portrait' });
         const bodyStart = currentPage();
         const runningHeader = (label
           ? `${label} · ${displayTitle}`
@@ -1101,13 +1103,13 @@ async function generatePDF(
       const hasUsefulAuthorData =
         (bioLen >= 40) || !!authorPhoto || (!!extras.authorName && bioLen > 0);
       if (hasUsefulAuthorData) {
-        doc.addPage({ margins: CHROME_MARGINS });
+        doc.addPage({ size: [TRIM_W, TRIM_H], layout: 'portrait', margins: CHROME_MARGINS });
         drawAboutAuthor(doc, extras.authorName, extras.aboutAuthor, authorPhoto, pageW, pageH);
         pageRole.set(currentPage(), { kind: 'chrome' });
       }
 
       // 7. Back cover
-      doc.addPage({ margins: CHROME_MARGINS });
+      doc.addPage({ size: [TRIM_W, TRIM_H], layout: 'portrait', margins: CHROME_MARGINS });
       if (backCover) {
         drawFullBleedImage(doc, backCover, pageW, pageH);
         drawBackCoverOverlay(doc, extras.blurb, extras.authorName, pageW, pageH);

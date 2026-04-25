@@ -16,6 +16,16 @@ interface AgentPipelineProps {
    * Used by the merged Project+Agents sidebar on the editor page.
    */
   embedded?: boolean;
+  /**
+   * Optional click handler that lets the user jump back to a previous
+   * (completed) stage. Per CEO-092 the founder needs to be able to return
+   * to the Cover and Publishing stages after they've completed — for
+   * cover regeneration or re-publishing — without having to redo the
+   * whole pipeline. Stages that are 'waiting' (i.e. ahead of the current
+   * stage) remain non-interactive: jumping forward into not-yet-run
+   * stages is unsafe because their preconditions may not be met.
+   */
+  onAgentClick?: (agent: AgentName) => void;
 }
 
 export function AgentPipeline({
@@ -24,6 +34,7 @@ export function AgentPipeline({
   activeMessages,
   locale = 'en',
   embedded = false,
+  onAgentClick,
 }: AgentPipelineProps) {
   const list = (
     <div className="space-y-1">
@@ -32,13 +43,33 @@ export function AgentPipeline({
         const isActive = status === 'active';
         const isCompleted = status === 'completed';
         const isWaiting = status === 'waiting';
+        // Clickable iff the parent wired a handler AND the stage has
+        // already been reached (active or completed). Waiting stages
+        // stay disabled-by-affordance.
+        const isClickable = !!onAgentClick && (isActive || isCompleted);
         const labels = getAgentLabels(agent.id, locale);
+
+        const handleClick = () => {
+          if (isClickable) onAgentClick!(agent.id);
+        };
 
         return (
           <div
             key={agent.id}
+            role={isClickable ? 'button' : undefined}
+            tabIndex={isClickable ? 0 : -1}
+            onClick={handleClick}
+            onKeyDown={(e) => {
+              if (!isClickable) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleClick();
+              }
+            }}
             className={cn(
               'rounded-md px-2 py-1.5 transition-colors duration-200 relative',
+              isClickable && 'cursor-pointer hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60',
+              !isClickable && isWaiting && 'cursor-default',
               /* Ambient active state: soft amber background at low opacity
                  (not the 20% alert-red-ish tone we had before), with a
                  border that slowly breathes 50%↔100% over 3s. Border only,
