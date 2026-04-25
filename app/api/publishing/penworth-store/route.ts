@@ -562,6 +562,69 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // ---------- KICK OFF LIVEBOOK GENERATION (fire-and-forget) ----------
+  // On first publish, ask the store-side admin-generate-livebook edge function
+  // to render a Livebook for this listing. We do not await: TTS + HTML
+  // assembly takes 30-90 seconds and the publish response should be snappy.
+  // The author can manually re-trigger via the Livebook admin tools if the
+  // background job fails — error surface is logs + null livebook_generated_at
+  // on the store_listings row, which the Command Center surfaces.
+  //
+  // voice_kind is hardcoded to default_male here. CEO-058 (voice pool +
+  // automatic matching) will replace this with a per-book voice pick once
+  // the pool is hydrated and the matching RPC is wired in.
+  //
+  // Auth model: the edge function bypasses JWT and accepts a shared secret
+  // in x-admin-secret. ADMIN_SECRET must be set on the writer Vercel project.
+  // If missing, we skip silently in production but log loudly so the gap is
+  // visible in observability.
+  let livebookGenerationStarted = false;
+  if (isFirstPublish) {
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret) {
+      console.error(
+        '[penworth-store/publish] ADMIN_SECRET not set — skipping livebook generation kickoff for listing',
+        storeListingId,
+      );
+    } else {
+      const livebookUrl =
+        'https://lodupspxdvadamrqvkje.supabase.co/functions/v1/admin-generate-livebook';
+      // Fire-and-forget. We intentionally do NOT await this fetch — the
+      // edge function takes 30-90s to complete TTS + HTML assembly, and we
+      // want the publish response back to the writer in <1s. The .catch is
+      // there so an unhandled rejection doesn't crash the Vercel function.
+      void fetch(livebookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-secret': adminSecret,
+        },
+        body: JSON.stringify({
+          listing_id: storeListingId,
+          voice_kind: 'default_male',
+        }),
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            console.error(
+              '[penworth-store/publish] Livebook trigger non-OK',
+              res.status,
+              (await res.text()).slice(0, 200),
+            );
+          } else {
+            console.log(
+              '[penworth-store/publish] Livebook generation kicked off for listing',
+              storeListingId,
+            );
+          }
+        })
+        .catch((err) => {
+          console.error('[penworth-store/publish] Livebook trigger fetch failed:', err);
+        });
+      livebookGenerationStarted = true;
+    }
+  }
+
   return NextResponse.json({
     success: true,
     storeUrl,
@@ -571,6 +634,7 @@ export async function POST(request: NextRequest) {
     listingId,
     slug,
     platform: 'penworth',
+    livebookGenerationStarted,
     stats: {
       totalWords,
       chapterCount,
