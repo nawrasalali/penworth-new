@@ -172,9 +172,17 @@ export async function POST(request: NextRequest) {
         : '';
 
       ideogramPrompt =
-        `A limited-edition museum exhibition poster. ` +
-        `Single subject: ${brief.motif}.\n\n` +
-        `Color palette: exactly two colors. Background is solid ` +
+        // Per CEO-099: NO framing language. Words like "museum
+        // exhibition", "limited-edition", "art print", "gallery poster"
+        // were getting rendered verbatim on the cover (the founder's
+        // last cover literally said "LIMITED-EDITION MUSEUM EXHIBITION"
+        // in stamped text). Ideogram's text-rendering capability does
+        // not distinguish framing language from labels — every framing
+        // phrase is at risk of being rendered. New approach: describe
+        // the image directly, no framing nouns.
+        `A single subject rendered in flat color planes, centered. ` +
+        `Subject: ${brief.motif}.\n\n` +
+        `Color palette: exactly two colors. The full background is solid ` +
         `${brief.primaryColor}. The subject is rendered in ` +
         `${brief.accentColor}. No third color, no rainbow, no decorative ` +
         `flourishes outside the central subject.\n\n` +
@@ -185,8 +193,7 @@ export async function POST(request: NextRequest) {
         `The bottom 18% of the frame is the same — pure ` +
         `${brief.primaryColor}, untouched. High contrast between the ` +
         `subject and the surrounding emptiness. Symmetrical balance. ` +
-        `Vertical 2:3 aspect ratio.\n\n` +
-        `Visual reference: ${brief.artReference}.${styleModifier}`;
+        `Vertical 2:3 aspect ratio.${styleModifier}`;
       // Final guard. Kept SHORT and POSITIVE. The previous version
       // repeated "typography" and "overlay" multiple times — every
       // mention of those words is a text cue to the model. The
@@ -578,9 +585,10 @@ function pickPalette(bookTitle: string, subject: string): { primary: string; acc
 }
 
 const ART_REFERENCE_CONCEPT =
-  'in the visual language of contemporary editorial illustration — Olly Moss, ' +
-  'Christoph Niemann, Noma Bar — flat shapes, restrained palette, one strong ' +
-  'idea, executed with confidence';
+  // Per CEO-099 — designer names removed. Ideogram has been observed
+  // to render proper nouns as labels on covers. Description-only.
+  'flat shapes, restrained palette, one strong central idea, executed ' +
+  'with confidence — graphic, not photographic';
 
 function composeDesignerBrief(bookTitle: string, subject: string): DesignerBrief {
   const motif = pickMotif(bookTitle, subject);
@@ -646,24 +654,24 @@ function buildDefaultFrontCoverPrompt(bookTitle: string, description?: string): 
   // a style direction; the title itself never reaches Ideogram.
   const lowerTitle = bookTitle.toLowerCase();
 
-  let styleGuide = 'Refined editorial illustration, premium publishing aesthetic, considered composition';
+  let styleGuide = 'Refined and premium aesthetic, considered composition';
 
   if (lowerTitle.includes('business') || lowerTitle.includes('success') || lowerTitle.includes('leadership')) {
-    styleGuide = 'Modern editorial illustration, clean minimalist design, sophisticated abstract geometric shapes, gradient colors, authoritative tone';
+    styleGuide = 'Modern, clean, minimalist with sophisticated abstract geometric shapes, gradient colors, authoritative tone';
   } else if (lowerTitle.includes('love') || lowerTitle.includes('heart') || lowerTitle.includes('romance')) {
-    styleGuide = 'Romantic editorial illustration, soft warm colors, dreamy atmosphere, emotional and inviting composition';
+    styleGuide = 'Romantic feel with soft warm colors, dreamy atmosphere, emotional and inviting composition';
   } else if (lowerTitle.includes('mystery') || lowerTitle.includes('dark') || lowerTitle.includes('secret')) {
-    styleGuide = 'Mystery-thriller editorial illustration, dark moody atmosphere, dramatic lighting, suspenseful composition, intriguing shadows';
+    styleGuide = 'Mystery-thriller feel with dark moody atmosphere, dramatic lighting, suspenseful composition, intriguing shadows';
   } else if (lowerTitle.includes('health') || lowerTitle.includes('wellness') || lowerTitle.includes('fitness')) {
-    styleGuide = 'Wellness editorial illustration, fresh vibrant colors, clean energetic design, inspiring tone';
+    styleGuide = 'Wellness feel with fresh vibrant colors, clean energetic design, inspiring tone';
   } else if (lowerTitle.includes('cook') || lowerTitle.includes('recipe') || lowerTitle.includes('food')) {
-    styleGuide = 'Food-magazine editorial illustration, appetizing styling, warm inviting colors, culinary elegance';
+    styleGuide = 'Food-magazine feel with appetizing styling, warm inviting colors, culinary elegance';
   } else if (lowerTitle.includes('child') || lowerTitle.includes('kid')) {
-    styleGuide = 'Children\'s editorial illustration, bright cheerful colors, playful and engaging';
+    styleGuide = 'Children\'s aesthetic with bright cheerful colors, playful and engaging';
   } else if (lowerTitle.includes('history') || lowerTitle.includes('war') || lowerTitle.includes('ancient')) {
-    styleGuide = 'Historical editorial illustration, classic elegant design, period-appropriate imagery, distinguished and scholarly';
+    styleGuide = 'Historical aesthetic with classic elegant design, period-appropriate imagery, distinguished and scholarly';
   } else if (lowerTitle.includes('tech') || lowerTitle.includes('ai') || lowerTitle.includes('digital')) {
-    styleGuide = 'Technology editorial illustration, futuristic sleek design, digital aesthetic, modern and innovative';
+    styleGuide = 'Technology aesthetic with futuristic sleek design, digital aesthetic, modern and innovative';
   }
 
   const subjectLine = description
@@ -671,16 +679,19 @@ function buildDefaultFrontCoverPrompt(bookTitle: string, description?: string): 
     : 'with strong evocative imagery';
 
   return (
-    `A premium editorial illustration ${subjectLine}. ${styleGuide}. ` +
-    `Suitable for a magazine cover spread, art print, or gallery poster.\n\n` +
-    `Composition: a single strong central motif, symmetrically framed, ` +
+    // Per CEO-099 — NO framing nouns. "editorial illustration",
+    // "magazine cover spread", "art print", "gallery poster" all got
+    // rendered as stamped labels on covers. Describe the image
+    // directly with no genre-name candidate text for Ideogram to
+    // render.
+    `A single subject in flat color planes, centered. ${subjectLine}. ${styleGuide}.\n\n` +
+    `Composition: a single central subject, symmetrically framed, ` +
     `occupying the middle 55% of the frame vertically. The top 30% of the ` +
     `frame is pure empty atmospheric background — solid color, soft gradient, ` +
     `or quiet untextured surface, with no detail and no marks of any kind. ` +
     `The bottom 18% of the frame is the same — empty, quiet, untextured ` +
-    `background. High contrast between the focal motif and the surrounding ` +
-    `emptiness. Vertical 2:3 aspect ratio. Avoid stock-photo aesthetics; the ` +
-    `image must feel specific and intentional.`
+    `background. High contrast between the subject and the surrounding ` +
+    `emptiness. Vertical 2:3 aspect ratio.`
   );
 }
 
@@ -731,7 +742,7 @@ function generateCoverSuggestions(title: string, contentType: string): string[] 
     'Cinematic with dramatic lighting',
     'Architectural and geometric',
     'Organic and nature-inspired',
-    'Hand-drawn editorial illustration style',
+    'Hand-drawn and illustrative',
     'Retro / vintage poster aesthetic',
     'Photographic with shallow depth of field',
   ];

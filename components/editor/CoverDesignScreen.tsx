@@ -134,17 +134,14 @@ export function CoverDesignScreen({
 
               {coverConfig.frontCoverUrl ? (
                 <div className="relative aspect-[2/3] bg-muted rounded-lg overflow-hidden mb-3">
+                  {/* Per CEO-099 the editor preview shows the cover
+                      image ALONE — no title overlay, no byline overlay.
+                      The PDF export adds typography during render
+                      (drawFrontCoverOverlay in app/api/export/route.ts).
+                      Stamping the title here distorted the author's
+                      judgment of the artwork and was misread as the
+                      cover itself having text on it. */}
                   <img src={coverConfig.frontCoverUrl} alt={t('cover.front', locale)} className="w-full h-full object-cover" />
-                  <div className="absolute inset-x-0 top-0 p-3 bg-gradient-to-b from-black/60 to-transparent">
-                    <div className="bg-black/40 backdrop-blur-sm px-2 py-1 rounded text-center">
-                      <h2 className="text-white font-bold text-base">{bookTitle}</h2>
-                    </div>
-                  </div>
-                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent">
-                    <div className="bg-black/40 backdrop-blur-sm px-2 py-1 rounded text-center">
-                      <p className="text-white text-xs">{t('cover.byByline', locale)} {authorInfo.name || t('cover.authorFallback', locale)}</p>
-                    </div>
-                  </div>
                 </div>
               ) : (
                 <div className="aspect-[2/3] bg-muted rounded-lg flex items-center justify-center mb-3">
