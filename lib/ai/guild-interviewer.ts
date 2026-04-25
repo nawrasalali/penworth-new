@@ -3,10 +3,10 @@ import Anthropic from '@anthropic-ai/sdk';
 /**
  * The Guild Voice Interview System
  *
- * Uses Claude Sonnet 4.5 as the conversation brain, OpenAI Whisper for
- * transcription, and OpenAI TTS for the interviewer's voice. The interview
- * runs as a series of turns — each turn is (audio input → transcript → AI
- * response → TTS audio). A full session is capped at 10 minutes.
+ * Uses Claude Sonnet 4.5 as the conversation brain, Cartesia Ink-Whisper for
+ * transcription, and Cartesia Sonic-3 for the interviewer's voice. The
+ * interview runs as a series of turns — each turn is (audio input → transcript
+ * → AI response → TTS audio). A full session is capped at 10 minutes.
  *
  * Ref: Penworth_Guild_Complete_Specification.md Section 6, Step 4.
  */
@@ -15,7 +15,15 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Using the current Sonnet tier (available in env)
 const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
-const OPENAI_API = 'https://api.openai.com/v1';
+
+// Cartesia API — used for both speech-to-text (Ink-Whisper) and text-to-speech
+// (Sonic-3). Sonic-3 covers 42+ languages including Arabic, Bengali, Indonesian
+// and Vietnamese (the older sonic-2/sonic-multilingual models do not).
+const CARTESIA_API = 'https://api.cartesia.ai';
+const CARTESIA_VERSION = '2025-04-16';
+// Default voice: Katie — multilingual, conversational, suited for voice agents
+// per Cartesia's own guidance. Stable across all Penworth locales.
+const CARTESIA_VOICE_ID = 'f786b574-daa5-4673-aa0c-cbe3e8534c02';
 
 /**
  * Extract the applicant's actual first name, skipping common title prefixes
@@ -247,22 +255,22 @@ export async function transcribeAudio(
   const formData = new FormData();
   const blob = new Blob([audioBuffer as any], { type: guessMimeType(filename) });
   formData.append('file', blob, filename);
-  formData.append('model', 'whisper-1');
+  formData.append('model', 'ink-whisper');
   formData.append('language', mapToWhisperLanguageCode(language));
-  formData.append('response_format', 'verbose_json');
 
-  const response = await fetch(`${OPENAI_API}/audio/transcriptions`, {
+  const response = await fetch(`${CARTESIA_API}/stt`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      Authorization: `Bearer ${process.env.CARTESIA_API_KEY}`,
+      'Cartesia-Version': CARTESIA_VERSION,
     },
     body: formData,
   });
 
   if (!response.ok) {
     const errText = await response.text();
-    console.error('[whisper] API error:', errText);
-    throw new Error(`Whisper transcription failed: ${response.status}`);
+    console.error('[ink-whisper] API error:', errText);
+    throw new Error(`Ink-Whisper transcription failed: ${response.status}`);
   }
 
   const data = (await response.json()) as { text: string; duration?: number };
@@ -273,34 +281,37 @@ export async function transcribeAudio(
 }
 
 // ---------------------------------------------------------------------------
-// OpenAI TTS (text → speech)
+// Cartesia Sonic-3 (text → speech)
 // ---------------------------------------------------------------------------
 
 export async function synthesizeSpeech(
   text: string,
   language: string,
 ): Promise<Buffer> {
-  // alloy = neutral, professional, multilingual (the whole point)
-  // Supports all of Penworth's 10 target languages out of the box
-  const response = await fetch(`${OPENAI_API}/audio/speech`, {
+  const response = await fetch(`${CARTESIA_API}/tts/bytes`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      Authorization: `Bearer ${process.env.CARTESIA_API_KEY}`,
+      'Cartesia-Version': CARTESIA_VERSION,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'tts-1',        // tts-1 (low-latency) vs tts-1-hd (higher quality, slower)
-      voice: 'alloy',
-      input: text,
-      response_format: 'mp3',
-      speed: 1.0,
+      model_id: 'sonic-3',
+      transcript: text,
+      voice: { mode: 'id', id: CARTESIA_VOICE_ID },
+      language: mapToWhisperLanguageCode(language),
+      output_format: {
+        container: 'mp3',
+        sample_rate: 44100,
+        bit_rate: 128000,
+      },
     }),
   });
 
   if (!response.ok) {
     const errText = await response.text();
-    console.error('[openai-tts] API error:', errText);
-    throw new Error(`OpenAI TTS failed: ${response.status}`);
+    console.error('[cartesia-tts] API error:', errText);
+    throw new Error(`Cartesia TTS failed: ${response.status}`);
   }
 
   const arrayBuffer = await response.arrayBuffer();
