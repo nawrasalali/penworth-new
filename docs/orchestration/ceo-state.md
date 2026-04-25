@@ -1,12 +1,12 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-25 08:10 UTC by CEO Claude session (CEO-REF-01 referral rewire + Guild paid-author policy)
+**Last updated:** 2026-04-25 ~08:20 UTC by CEO Claude session (CEO-094 livebooks-nav swap; PR #1 penworth-store)
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Production health — verified 2026-04-25 08:10 UTC
+## Production health — verified 2026-04-25 ~08:20 UTC
 
 | Signal | State |
 |---|---|
@@ -14,7 +14,7 @@
 | Latest main commit (writer) | `227941f` — feat(referrals): signup wiring + dashboard rewrite (this session) |
 | Prior main commit (writer) | `c2df108` — feat(referrals,guild): rewire economics + paid-author policy (this session) |
 | Writer Vercel latest READY | `227941f` |
-| Store latest production deploy | `8fe2330` (CEO-076 livebook v2) — READY |
+| Store latest production deploy | `668f31b2` (CEO-094 livebooks nav swap) — READY |
 | Stuck sessions right now | 0 |
 | Open incidents | 0 |
 | Webhooks failed 24h | 0 |
@@ -105,6 +105,26 @@ Task-state closures:
 3. CEO-063 → done
 4. CEO-059 → done
 5. CEO-076 → done
+
+### Continued — 2026-04-25 ~08:20 UTC (livebooks-nav session)
+
+Commits (penworth-store):
+1. `668f31b2` on main — CEO-094 top-nav swap For Authors → Livebooks (squash of PR #1, original branch SHA `d597cd9c`). Production deploy READY.
+
+Files touched in PR #1: 13 (`components/store/site-header.tsx`, `components/store/site-footer.tsx`, 9 locale files in `messages/`, new `app/livebooks/page.tsx`, new `lib/data/livebooks.ts`).
+
+Operational facts learned this session and saved to memory:
+1. Vercel git-identity rule: any commit reaching Vercel must be authored by `119996438+nawrasalali@users.noreply.github.com` / `nawrasalali`. Other identities (e.g. `ceo@penworth.ai`) get blocked at deploy with "GitHub could not associate the committer with a GitHub user". This bit prior CEO sessions (`0436013`, `1ef47c8`) and bit me again on the first push of PR #1.
+2. main can be force-pushed by parallel sessions or by the Founder mid-session. Always `git fetch origin main` and `git log origin/main..HEAD` before pushing/merging. PR #1 hit a stale-base merge conflict on `app/layout.tsx` that cost ~3 tool calls. Both rules now in `userMemories`.
+
+Bundled hotfix: `feat/livebooks-nav` originally carried a `next/font` Fraunces axes/weight hotfix (commit `ae4d8c6`). It was dropped during rebase because a parallel session had already shipped the equivalent fix to main as `8b7055a` while I was working. Final shape of PR #1 was a single nav-swap commit.
+
+Task-state closures:
+1. CEO-094 → done.
+
+### Flagged for next session — `feat/remove-certified-tier` deploy ERROR
+
+Branch `feat/remove-certified-tier` on penworth-store has a Vercel deploy in ERROR state (`sha=4cc87c2f`) as of 2026-04-25 ~08:15 UTC. Not opened by me. Likely belongs to a parallel session or unfinished prior work. Triage: pull build logs via Vercel API (deployment UID listed in `/v6/deployments?...`), classify as identity-block vs build-error, and either fix or close.
 
 ## Open threads I'm tracking
 
