@@ -91,7 +91,7 @@ export type StringKey =
   | 'publish.title' | 'publish.subtitle' | 'publish.noDocsTitle' | 'publish.noDocsBody'
   | 'publish.startFirstDoc'
   | 'publish.showcase.badge' | 'publish.showcase.hero'
-  | 'publish.showcase.subhero' | 'publish.showcase.seePricing'
+  | 'publish.showcase.subhero'
   | 'publish.showcase.marketplace' | 'publish.showcase.marketplaceTag'
   | 'publish.showcase.autoPublish' | 'publish.showcase.autoPublishTag'
   | 'publish.showcase.guidedKits' | 'publish.showcase.guidedKitsTag'
@@ -506,7 +506,6 @@ const en: Bundle = {
   'publish.showcase.badge': 'Publishing Preview',
   'publish.showcase.hero': 'Publish to 17 platforms. One click.',
   'publish.showcase.subhero': 'Finish your first book and you unlock every marketplace below — from Amazon KDP to your own direct-sales storefront — without filling out a single form yourself.',
-  'publish.showcase.seePricing': 'See pricing',
   'publish.showcase.marketplace': 'Penworth Marketplace',
   'publish.showcase.marketplaceTag': 'Free · Included with every book',
   'publish.showcase.autoPublish': 'Auto-publish',
@@ -1081,7 +1080,6 @@ const ar: Bundle = {
   'publish.showcase.badge': 'معاينة النشر',
   'publish.showcase.hero': 'انشر على 17 منصة. بنقرة واحدة.',
   'publish.showcase.subhero': 'أنهِ أول كتاب لك لتفتح كل متجر في الأسفل — من أمازون KDP إلى متجرك الخاص للبيع المباشر — دون أن تملأ نموذجًا واحدًا بنفسك.',
-  'publish.showcase.seePricing': 'عرض الأسعار',
   'publish.showcase.marketplace': 'متجر Penworth',
   'publish.showcase.marketplaceTag': 'مجاني · متضمَّن مع كل كتاب',
   'publish.showcase.autoPublish': 'النشر التلقائي',
@@ -1656,7 +1654,6 @@ const es: Bundle = {
   'publish.showcase.badge': 'Vista previa de publicación',
   'publish.showcase.hero': 'Publica en 17 plataformas. Un solo clic.',
   'publish.showcase.subhero': 'Termina tu primer libro y desbloquea todos los mercados de abajo — desde Amazon KDP hasta tu propia tienda directa — sin rellenar ni un formulario.',
-  'publish.showcase.seePricing': 'Ver precios',
   'publish.showcase.marketplace': 'Penworth Marketplace',
   'publish.showcase.marketplaceTag': 'Gratis · Incluido con cada libro',
   'publish.showcase.autoPublish': 'Publicación automática',
@@ -2231,7 +2228,6 @@ const fr: Bundle = {
   'publish.showcase.badge': 'Aperçu de publication',
   'publish.showcase.hero': 'Publiez sur 17 plateformes. En un clic.',
   'publish.showcase.subhero': 'Terminez votre premier livre et vous débloquez tous les marchés ci-dessous — d\'Amazon KDP à votre propre boutique en vente directe — sans remplir le moindre formulaire.',
-  'publish.showcase.seePricing': 'Voir les tarifs',
   'publish.showcase.marketplace': 'Marketplace Penworth',
   'publish.showcase.marketplaceTag': 'Gratuit · Inclus avec chaque livre',
   'publish.showcase.autoPublish': 'Publication automatique',
@@ -2806,7 +2802,6 @@ const pt: Bundle = {
   'publish.showcase.badge': 'Prévia de publicação',
   'publish.showcase.hero': 'Publique em 17 plataformas. Um clique.',
   'publish.showcase.subhero': 'Termine seu primeiro livro e desbloqueie todos os marketplaces abaixo — da Amazon KDP à sua própria loja de vendas diretas — sem preencher um único formulário.',
-  'publish.showcase.seePricing': 'Ver preços',
   'publish.showcase.marketplace': 'Penworth Marketplace',
   'publish.showcase.marketplaceTag': 'Grátis · Incluso em cada livro',
   'publish.showcase.autoPublish': 'Publicação automática',
@@ -3381,7 +3376,6 @@ const ru: Bundle = {
   'publish.showcase.badge': 'Превью публикации',
   'publish.showcase.hero': 'Публикуйте на 17 платформах. Одним кликом.',
   'publish.showcase.subhero': 'Закончите свою первую книгу — и получите доступ ко всем маркетплейсам ниже: от Amazon KDP до собственного магазина прямых продаж, не заполняя ни одной формы.',
-  'publish.showcase.seePricing': 'Посмотреть тарифы',
   'publish.showcase.marketplace': 'Маркетплейс Penworth',
   'publish.showcase.marketplaceTag': 'Бесплатно · Входит в каждую книгу',
   'publish.showcase.autoPublish': 'Автопубликация',
@@ -3956,7 +3950,6 @@ const zh: Bundle = {
   'publish.showcase.badge': '发布预览',
   'publish.showcase.hero': '一键发布到 17 个平台。',
   'publish.showcase.subhero': '完成您的第一份书籍,即可解锁下方所有市场 —— 从 Amazon KDP 到您自己的直销店铺 —— 无需填写任何表单。',
-  'publish.showcase.seePricing': '查看价格',
   'publish.showcase.marketplace': 'Penworth 商城',
   'publish.showcase.marketplaceTag': '免费 · 每本书都包含',
   'publish.showcase.autoPublish': '自动发布',
@@ -4531,7 +4524,6 @@ const bn: Bundle = {
   'publish.showcase.badge': 'প্রকাশের পূর্বরূপ',
   'publish.showcase.hero': '১৭টি প্ল্যাটফর্মে প্রকাশ করুন। এক ক্লিকে।',
   'publish.showcase.subhero': 'আপনার প্রথম বই শেষ করুন, আর নিচের প্রতিটি মার্কেটপ্লেস আনলক হয়ে যাবে — Amazon KDP থেকে আপনার নিজস্ব ডাইরেক্ট-সেলস দোকান পর্যন্ত — একটি ফর্মও পূরণ না করে।',
-  'publish.showcase.seePricing': 'মূল্য দেখুন',
   'publish.showcase.marketplace': 'Penworth মার্কেটপ্লেস',
   'publish.showcase.marketplaceTag': 'ফ্রি · প্রতিটি বইয়ের সাথে অন্তর্ভুক্ত',
   'publish.showcase.autoPublish': 'স্বয়ংক্রিয় প্রকাশ',
@@ -5106,7 +5098,6 @@ const hi: Bundle = {
   'publish.showcase.badge': 'प्रकाशन पूर्वावलोकन',
   'publish.showcase.hero': '17 प्लेटफ़ॉर्म पर प्रकाशित करें। एक क्लिक में।',
   'publish.showcase.subhero': 'अपनी पहली पुस्तक पूरी करें और नीचे दिए गए हर मार्केटप्लेस तक पहुँच पाएँ — Amazon KDP से लेकर अपनी सीधी बिक्री की दुकान तक — बिना कोई फ़ॉर्म भरे।',
-  'publish.showcase.seePricing': 'कीमत देखें',
   'publish.showcase.marketplace': 'Penworth मार्केटप्लेस',
   'publish.showcase.marketplaceTag': 'निःशुल्क · हर पुस्तक के साथ शामिल',
   'publish.showcase.autoPublish': 'स्वतः प्रकाशन',
@@ -5681,7 +5672,6 @@ const id: Bundle = {
   'publish.showcase.badge': 'Pratinjau penerbitan',
   'publish.showcase.hero': 'Terbitkan ke 17 platform. Satu klik.',
   'publish.showcase.subhero': 'Selesaikan buku pertama Anda dan buka seluruh marketplace di bawah — dari Amazon KDP hingga toko penjualan langsung Anda sendiri — tanpa mengisi satu pun formulir.',
-  'publish.showcase.seePricing': 'Lihat harga',
   'publish.showcase.marketplace': 'Penworth Marketplace',
   'publish.showcase.marketplaceTag': 'Gratis · Termasuk setiap buku',
   'publish.showcase.autoPublish': 'Publikasi otomatis',
@@ -6256,7 +6246,6 @@ const vi: Bundle = {
   'publish.showcase.badge': 'Xem trước xuất bản',
   'publish.showcase.hero': 'Xuất bản lên 17 nền tảng. Một cú nhấp.',
   'publish.showcase.subhero': 'Hoàn thành sách đầu tiên của bạn và mở khóa mọi sàn bên dưới — từ Amazon KDP đến cửa hàng bán trực tiếp của riêng bạn — mà không cần điền một biểu mẫu nào.',
-  'publish.showcase.seePricing': 'Xem giá',
   'publish.showcase.marketplace': 'Penworth Marketplace',
   'publish.showcase.marketplaceTag': 'Miễn phí · Đi kèm mọi sách',
   'publish.showcase.autoPublish': 'Xuất bản tự động',
