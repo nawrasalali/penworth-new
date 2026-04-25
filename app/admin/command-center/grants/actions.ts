@@ -1,7 +1,7 @@
 'use server';
 
 import { requireAdminRole } from '@/lib/admin/require-admin-role';
-import { createServiceClient } from '@/lib/supabase/service';
+import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
 /**
@@ -9,8 +9,17 @@ import { revalidatePath } from 'next/cache';
  * user_id. Wraps the admin_grant_credits RPC and re-validates the page
  * so the recent-grants table updates immediately after submit.
  *
- * Auth: requireAdminRole('super_admin') — reuses the same gate the page
- * uses, so a non-admin cannot invoke this action from a crafted request.
+ * Auth: requireAdminRole('super_admin') — pre-validates the caller is a
+ * super_admin so a non-admin cannot invoke this action from a crafted
+ * request.
+ *
+ * Client choice: user-context client (cookies-bound, anon-key) — NOT
+ * service-role. The RPC is SECURITY DEFINER and internally checks
+ * auth.uid() + has_admin_role('super_admin') for caller identity and
+ * audit trail (v_caller_id, v_caller_email in the ledger description).
+ * Calling via service-role makes auth.uid() NULL and raises
+ * "authentication required" 42501. The SECURITY DEFINER attribute on
+ * the RPC handles privilege elevation regardless of caller client.
  */
 export async function grantCreditsAction(formData: FormData) {
   await requireAdminRole('super_admin');
@@ -27,8 +36,8 @@ export async function grantCreditsAction(formData: FormData) {
     return { ok: false as const, error: 'Amount must be a positive integer.' };
   }
 
-  const admin = createServiceClient();
-  const { data, error } = await admin.rpc('admin_grant_credits', {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('admin_grant_credits', {
     p_target_email: email,
     p_amount: amount,
     p_reason: reason || null,
