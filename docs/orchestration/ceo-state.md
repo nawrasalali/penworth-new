@@ -1,12 +1,24 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-25 ~09:35 UTC by CEO Claude session (CEO-084 + CEO-085 shipped to PR #4 — awaiting Founder smoke-test). Earlier this session: CEO-REF-01 phase 2 — migration 029 Apprentice grant rewire shipped.
+**Last updated:** 2026-04-25 ~11:15 UTC by CEO Claude session (CEO-096 store performance baseline captured; 2s-lag thread closed at every level — row, master goal, customer-visible).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-25 ~09:35 UTC — CEO-084 + CEO-085 shipped to PR)
+## Most recent session activity (2026-04-25 ~11:15 UTC — CEO-096 baseline + 2s-lag thread closed)
+
+1. **CEO-096 closed** — store performance baseline captured for `/`, `/collections`, `/audiobooks`, `/browse`, `/book/the-new-rich-4bd4acc1`. Tool: lighthouse 12.x via Puppeteer-bundled Chromium (PageSpeed Insights API quota is now zero for unauthenticated callers; Lighthouse-via-Puppeteer is the working substitute).
+2. **The 2s-lag thread is closed at every level** — row, master goal (CEO-082 umbrella), and customer-visible. Verified two ways: (a) edge cache headers — `cache-control` changed from `private, no-cache, no-store` to `public, max-age=0, must-revalidate`, `x-vercel-cache` returns HIT after first prime on every cacheable surface; (b) Lighthouse — homepage warm-cache TTFB 83ms (down from the original 2s symptom), `/collections` 179ms, `/audiobooks` 616ms, `/book/[slug]` 355ms. `/browse` stays dynamic by design (827ms TTFB, has searchParams; CEO-095 data-layer cache mitigates).
+3. **What is NOT closed by CEO-096:** Lighthouse Performance scores 57-67 ("needs improvement" tier) driven by TBT 2.2-6.2s and LCP 2.8-4.1s. Both are independent of the 2s-lag thread (those were client-bundle main-thread work and cover-image priority, neither was the original symptom). Recommend separate tickets if launch traffic warrants; not on critical path now.
+4. **CEO-101 anomaly flagged** — task row title says "Remove locale-cookie read from i18n/request.ts" but `last_update_note` is about a livebook auto-trigger migration. Looks like a task-code collision (same pattern in `recent_updates` memory). The actual i18n locale-cookie fix already shipped via CEO-092 (`eff9fe0`). Recommend a row cleanup pass; not done this session because it crosses session ownership.
+5. Handover note: `docs/orchestration/handovers/2026-04-25-ceo096-baseline.md`.
+
+**Next session first action:** the perf thread is fully closed. Pick up the next priority-ranked open task. If Founder asks about TBT or LCP follow-ups, those are separate tickets to spawn — don't auto-start them; not on the critical path.
+
+---
+
+## Prior session activity (2026-04-25 ~09:35 UTC — CEO-084 + CEO-085 shipped to PR)
 
 1. **PR #4 open** at https://github.com/nawrasalali/penworth-new/pull/4 — `feat(nav,books,referrals): My Books unification + sidebar restructure + Guild fold into Referrals`. Branch `feat/my-books-and-sidebar-restructure`, head SHA `87b50e0`. Vercel preview READY at https://penworth-at58vtnyz-nawraselali-2147s-projects.vercel.app.
 2. **Implementation complete across all eight brief sections.** Sidebar slim-down (mainNav = Dashboard + My Books, orange Guild block deleted), `/projects → /books` route rename via `git mv` with history preserved, `/publish` retired with 308 redirects, new two-card My Books page (Drafting + Published, classified by `store_listings` per CEO-077's contract), three-section Referrals page (Section 1 ReferralDashboard reused, Section 2 deliberately omitted because parallel commit `227941f` already moved that pitch INTO ReferralDashboard, Section 3 Guild quick-links for active members only). i18n: `nav.myBooks` + 24 new keys across all 11 locales; `nav.publish` and `nav.marketplace` removed. Four orphaned components deleted.
