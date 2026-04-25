@@ -162,8 +162,7 @@ Branch `feat/remove-certified-tier` on penworth-store has a Vercel deploy in ERR
 
 ## Open threads I'm tracking
 
-- **CEO-101** (p2, store) — last blocker for store edge caching: `i18n/request.ts` reads `cookies()` for locale lookup, forcing every page that uses `getTranslations` (most of them) to render dynamic. After the chain CEO-082 → CEO-095 → CEO-098 → c345f2e, this is the remaining cookie read. Per the file's own comment the read is dead code in single-locale launch state. Bounded ~30 min for the simple fix (skip cookie, return DEFAULT_LOCALE, hide LanguageSwitcher).
-- **CEO-096** (p2, store) — performance measurement (Lighthouse + Speed Insights). Most meaningful AFTER CEO-101 lands. Use `api.vercel.com/v13/...` REST with `VERCEL_API_TOKEN`, not the broken Vercel MCP layer.
+- **CEO-096** (p2, store) — performance measurement (Lighthouse + Speed Insights). NOW UNBLOCKED AND MEANINGFUL: as of `eff9fe0` deploy `dpl_Fue1ZE66a6yh7yJLghyGSD5jDfG1` SHA `b52b608`, store edge caching is verified working in production (`/`, `/collections`, `/audiobooks` all serve `x-vercel-cache: HIT` on second hit, `cache-control: public`). Run Lighthouse + capture numbers to close out CEO-082's master goal at the customer-visible level.
 - **CEO-031 Phase 2** — restart-agent consumers for non-writing agents.
 - **CEO-077 ERROR deploy** — Founder's commit. Triage when convenient.
 - **CEO-070/CEO-071 cover generation** — surfaced diag traces; awaiting Founder's next click to pin upstream Ideogram error pattern.
