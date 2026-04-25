@@ -1,19 +1,19 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-25 ~09:00 UTC by CEO Claude session (CEO-095 close-out — store data-layer caching shipped, CEO-098 spawned for SiteHeader refactor)
+**Last updated:** 2026-04-25 ~09:30 UTC by CEO Claude session (CEO-REF-01 phase 2 — migration 029 Apprentice grant rewire shipped)
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Production health — verified 2026-04-25 ~08:35 UTC
+## Production health — verified 2026-04-25 ~09:30 UTC
 
 | Signal | State |
 |---|---|
-| Supabase migrations applied | 127 (latest: `028_guild_paid_author_policy`) |
-| Latest main commit (writer) | `227941f` — feat(referrals): signup wiring + dashboard rewrite |
-| Prior main commit (writer) | `c2df108` — feat(referrals,guild): rewire economics + paid-author policy |
-| Writer Vercel latest READY | `227941f` |
+| Supabase migrations applied | 128 (latest: `029_apprentice_grant_3_books_any_type`) |
+| Latest main commit (writer) | `250c520` — feat(covers): designer-brief composer + museum-poster framing (parallel session CEO-098) |
+| Most recent of my commits | `2fbc02d` — feat(guild): apprentice grant 5-categories → 3 of any kind |
+| Writer Vercel latest READY | `250c520` and `2fbc02d` both READY |
 | Store latest production deploy | `63bbda7` (CEO-082 force-dynamic on /book/[slug]) — READY as `dpl_CSrnEcHAy1HDnc7g7XPWb4pdegCS` |
 | Stuck sessions right now | 0 |
 | Open incidents | 0 |
@@ -54,6 +54,7 @@
 5. 2 stale alerts acknowledged.
 6. Ghost-incident loop verified extinguished: 0 new rows, 0 new alerts, 0 stuck sessions since unstick.
 7. Migration `028_guild_paid_author_policy` and commits `c2df108` + `227941f`: referral rewire (1000 credits referrer, 100 welcome, no cap; Guild upgrade banner at 3+ referrals; Guild monthly fee retired in favour of Pro/Max-after-90-days requirement).
+7a. Migration `029_apprentice_grant_3_books_any_type` and commit `2fbc02d`: Apprentice grant 5-categories → 3 of any kind. Trigger seeds 3 generic 'showcase' grants per new member (was 5 category-locked); RPC drops category match (consumes oldest unused). UI rewritten to "Three free books — your choice of type" with generic Free book #N tiles. Founder's 5 historical grants preserved for backward compat. Closes the gap flagged in 2026-04-25-0810-referral-rewire handover.
 8. Commit `668f31b2` on penworth-store/main (PR #1): CEO-094 top-nav swap For Authors → Livebooks. 13 files. Final shape: single nav-swap commit (a font hotfix originally bundled was dropped during rebase because a parallel session shipped the equivalent as `8b7055a`).
 
 ## The CEO position
