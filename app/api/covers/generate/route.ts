@@ -139,42 +139,62 @@ export async function POST(request: NextRequest) {
     await trace('subject_ok', `titleLen=${titleForPrompt.length} subjLen=${effectiveSubject.length} fromOutline=${!bookDescription?.trim() && !!derivedSubject}`, user.id, sessionId);
 
     if (coverType === 'front') {
-      // BUG FIX (CEO-072): when the user picked a suggestion chip (e.g.
-      // "Bold and eye-catching with vibrant colors"), the old code sent
-      // ONLY that style tag to Ideogram with no book context. With
-      // style_type=REALISTIC + magic_prompt=AUTO, Ideogram interpreted
-      // a style-only brief as stock food photography and produced a
-      // bowl of fruit for a book about AI. Fix: the book's title and
-      // subject ALWAYS ride in the prompt. The user's chosen prompt
-      // becomes the *style* directive layered on top.
+      // Per CEO-095, the prompt is reframed as editorial illustration /
+      // poster art and DELIBERATELY does not mention the book title or
+      // the words "book cover". Reasoning:
+      //
+      // Ideogram is the one major image model that renders text
+      // reliably — that's its differentiator. When we previously fed
+      // it the full title + the phrase "book cover" + zone hints
+      // ("top third can carry a title"), the training prior overrode
+      // every no-text instruction we added. Result: clean renders of
+      // "The Rewired Self" plus gibberish subtitle/author lines like
+      // "MELE ISA BLU" because the model assumed text belonged there.
+      //
+      // The new framing treats the requested image as standalone art.
+      // The model never learns this is a book cover, never sees the
+      // title to render, and is told *positively* what to fill the
+      // top/bottom zones with (empty atmospheric background) rather
+      // than being told what *not* to put there.
       const userStyle = (prompt ?? '').trim();
-      if (userStyle) {
-        const topicLine = effectiveSubject
-          ? `Book title: "${titleForPrompt}". Subject: ${effectiveSubject}.`
-          : `Book title: "${titleForPrompt}".`;
-        ideogramPrompt =
-          `${topicLine}\n\nVisual style: ${userStyle}.\n\n` +
-          `Create a book cover whose imagery directly evokes the book's subject. ` +
-          `Keep the style direction but never produce generic stock imagery (no food, no abstract fruit, ` +
-          `no unrelated photography). The cover must feel specific to this book.\n\n` +
-          `Composition: design this like a New York Times bestseller cover — a single strong central visual ` +
-          `motif, symmetrically framed, shot in the middle third of the canvas so the top third can carry a ` +
-          `large title and the bottom eighth can carry an author name. High contrast between the focal ` +
-          `subject and the background. The top and bottom edges should be visually quieter (darker, softer, ` +
-          `or simpler) than the center so overlaid typography reads cleanly. Avoid busy patterns near the ` +
-          `edges. 6x9 portrait orientation.`;
-      } else {
-        ideogramPrompt = buildDefaultFrontCoverPrompt(titleForPrompt, effectiveSubject);
-      }
-      // Text is overlaid in PDF/Store render — keep the image clean.
-      ideogramPrompt +=
-        '\n\nIMPORTANT: Do NOT include any text, words, letters, numerals, or typography anywhere in the ' +
-        'image. Title and author name will be added later as a typography overlay. To support that overlay, ' +
-        'leave the top 35% of the canvas visually quieter (darker background or uncluttered space) and the ' +
-        'bottom 18% cleaner than the center. No logos, no symbols that resemble letters.';
+      // Strip the founder's well-meaning "no words / no text" hints
+      // from the style chip — paradoxically they reinforce text by
+      // putting the word "text" in the prompt (LLMs and diffusion
+      // models alike attend to negation poorly). The negative_prompt
+      // field is the right place for these; the body should only
+      // describe what we DO want.
+      const cleanedStyle = userStyle
+        .replace(/\bno (words|text|typography|letters|writing|fonts)[^.]*\.?/gi, '')
+        .replace(/\bonly[^.]*allowed\.?/gi, '')
+        .trim();
+      const subjectLine = effectiveSubject
+        ? `evoking these themes: ${effectiveSubject}`
+        : 'with strong evocative imagery';
+      const styleLine = cleanedStyle
+        ? `Style approach: ${cleanedStyle}.`
+        : 'Style approach: refined, sophisticated, recognisably premium editorial.';
+      ideogramPrompt =
+        `A premium editorial illustration ${subjectLine}. Suitable for a ` +
+        `magazine cover spread, art print, or gallery poster. ${styleLine}\n\n` +
+        `Composition: a single strong central motif, symmetrically framed, ` +
+        `occupying the middle 55% of the frame vertically. The top 30% of the ` +
+        `frame is pure empty atmospheric background — solid color, soft gradient, ` +
+        `or quiet untextured surface, with no detail and no marks of any kind. ` +
+        `The bottom 18% of the frame is the same — empty, quiet, untextured ` +
+        `background. High contrast between the focal motif and the surrounding ` +
+        `emptiness. Vertical 2:3 aspect ratio. Avoid stock-photo aesthetics ` +
+        `(no food, no fruit, no generic landscapes); the image must feel ` +
+        `specific and intentional.`;
+      // Final guard. Kept SHORT and POSITIVE. The previous version
+      // repeated "typography" and "overlay" multiple times — every
+      // mention of those words is a text cue to the model. The
+      // negative_prompt field already enumerates the forbidden
+      // outputs; the prompt body only needs to lean on the
+      // positively-framed empty-zone description above.
+      ideogramPrompt += '\n\nThe image must contain zero written language.';
     } else {
       ideogramPrompt = buildBackCoverPrompt(titleForPrompt, effectiveSubject);
-      ideogramPrompt += '\n\nIMPORTANT: Do NOT include any text, words, letters, or typography in the image. Create a subtle, elegant background suitable for text overlay. Leave the center area relatively simple for description text.';
+      ideogramPrompt += '\n\nThe image must contain zero written language.';
     }
 
     // Explicit env guard. Previously a missing IDEOGRAM_API_KEY silently
@@ -278,7 +298,17 @@ export async function POST(request: NextRequest) {
       const bytes = await imgResp.arrayBuffer();
       const storagePath = `${user.id}/covers/${sessionId}-${coverType}.${ext}`;
 
-      const { error: uploadErr } = await supabase
+      // Service-role for the bucket upload, not the user-scoped client.
+      // _cover_diag_trace shows EVERY cover regen this week failed at
+      // mirror_fail with "new row violates row-level security policy"
+      // — the path's first foldername segment is user.id, satisfying
+      // the policy on paper, so the failure is in supabase-ssr's
+      // storage auth header propagation, not in policy. Service-role
+      // bypasses RLS by design and is the correct privilege level for
+      // this internal mirror operation: we already authenticated the
+      // user as session owner above. CEO-094.
+      const svcClient = createServiceClient();
+      const { error: uploadErr } = await svcClient
         .storage
         .from('covers')
         .upload(storagePath, bytes, {
@@ -291,7 +321,7 @@ export async function POST(request: NextRequest) {
         throw new Error(`storage upload: ${uploadErr.message}`);
       }
 
-      const { data: { publicUrl } } = supabase
+      const { data: { publicUrl } } = svcClient
         .storage
         .from('covers')
         .getPublicUrl(storagePath);
@@ -407,45 +437,72 @@ function deriveSubjectFromOutline(outlineData: unknown): string {
 }
 
 function buildDefaultFrontCoverPrompt(bookTitle: string, description?: string): string {
-  // Analyze the title to suggest appropriate imagery
+  // Per CEO-095 — same reframing as the user-style branch above. We
+  // do NOT mention the book title (Ideogram would render it then
+  // hallucinate a subtitle/author line in the empty zones below) and
+  // we do NOT call this a "book cover" (which triggers the model's
+  // title+author prior). The bookTitle parameter is kept in the
+  // signature for future use but is unused in the prompt body. Genre
+  // hints are derived from a lower-cased copy used purely to choose
+  // a style direction; the title itself never reaches Ideogram.
   const lowerTitle = bookTitle.toLowerCase();
 
-  let styleGuide = 'Professional book cover design, high-quality, elegant composition, suitable for publishing';
+  let styleGuide = 'Refined editorial illustration, premium publishing aesthetic, considered composition';
 
-  // Genre detection from title/description
   if (lowerTitle.includes('business') || lowerTitle.includes('success') || lowerTitle.includes('leadership')) {
-    styleGuide = 'Modern business book cover, clean minimalist design, professional corporate aesthetic, abstract geometric shapes, gradient colors, sophisticated and authoritative';
+    styleGuide = 'Modern editorial illustration, clean minimalist design, sophisticated abstract geometric shapes, gradient colors, authoritative tone';
   } else if (lowerTitle.includes('love') || lowerTitle.includes('heart') || lowerTitle.includes('romance')) {
-    styleGuide = 'Romantic book cover, soft warm colors, elegant typography space, dreamy atmosphere, emotional and inviting';
+    styleGuide = 'Romantic editorial illustration, soft warm colors, dreamy atmosphere, emotional and inviting composition';
   } else if (lowerTitle.includes('mystery') || lowerTitle.includes('dark') || lowerTitle.includes('secret')) {
-    styleGuide = 'Mystery thriller book cover, dark moody atmosphere, dramatic lighting, suspenseful composition, intriguing shadows';
+    styleGuide = 'Mystery-thriller editorial illustration, dark moody atmosphere, dramatic lighting, suspenseful composition, intriguing shadows';
   } else if (lowerTitle.includes('health') || lowerTitle.includes('wellness') || lowerTitle.includes('fitness')) {
-    styleGuide = 'Health and wellness book cover, fresh vibrant colors, clean energetic design, inspiring and uplifting';
+    styleGuide = 'Wellness editorial illustration, fresh vibrant colors, clean energetic design, inspiring tone';
   } else if (lowerTitle.includes('cook') || lowerTitle.includes('recipe') || lowerTitle.includes('food')) {
-    styleGuide = 'Cookbook cover, appetizing food photography style, warm inviting colors, culinary elegance';
+    styleGuide = 'Food-magazine editorial illustration, appetizing styling, warm inviting colors, culinary elegance';
   } else if (lowerTitle.includes('child') || lowerTitle.includes('kid')) {
-    styleGuide = 'Children\'s book cover, bright cheerful colors, playful illustration style, fun and engaging';
+    styleGuide = 'Children\'s editorial illustration, bright cheerful colors, playful and engaging';
   } else if (lowerTitle.includes('history') || lowerTitle.includes('war') || lowerTitle.includes('ancient')) {
-    styleGuide = 'Historical book cover, classic elegant design, period-appropriate imagery, distinguished and scholarly';
+    styleGuide = 'Historical editorial illustration, classic elegant design, period-appropriate imagery, distinguished and scholarly';
   } else if (lowerTitle.includes('tech') || lowerTitle.includes('ai') || lowerTitle.includes('digital')) {
-    styleGuide = 'Technology book cover, futuristic sleek design, digital aesthetic, modern and innovative';
+    styleGuide = 'Technology editorial illustration, futuristic sleek design, digital aesthetic, modern and innovative';
   }
 
+  const subjectLine = description
+    ? `evoking these themes: ${description}`
+    : 'with strong evocative imagery';
+
   return (
-    `${styleGuide}. The imagery should evoke the themes of "${bookTitle}". ` +
-    `${description ? `Context: ${description}. ` : ''}` +
-    `Composition: design this like a New York Times bestseller cover — a single strong central visual motif, ` +
-    `symmetrically framed, shot in the middle third of the canvas so the top third can carry a large title and ` +
-    `the bottom eighth can carry an author name. Use high contrast between the focal subject and the ` +
-    `background. The top and bottom edges should be visually quieter (darker, softer, or simpler) than the ` +
-    `center so overlaid typography reads cleanly. Avoid busy patterns near the edges. Target a commercial ` +
-    `trade-paperback aesthetic: refined, considered, recognizably a book — not a stock photograph, not an ` +
-    `illustration collage. 6x9 portrait orientation.`
+    `A premium editorial illustration ${subjectLine}. ${styleGuide}. ` +
+    `Suitable for a magazine cover spread, art print, or gallery poster.\n\n` +
+    `Composition: a single strong central motif, symmetrically framed, ` +
+    `occupying the middle 55% of the frame vertically. The top 30% of the ` +
+    `frame is pure empty atmospheric background — solid color, soft gradient, ` +
+    `or quiet untextured surface, with no detail and no marks of any kind. ` +
+    `The bottom 18% of the frame is the same — empty, quiet, untextured ` +
+    `background. High contrast between the focal motif and the surrounding ` +
+    `emptiness. Vertical 2:3 aspect ratio. Avoid stock-photo aesthetics; the ` +
+    `image must feel specific and intentional.`
   );
 }
 
 function buildBackCoverPrompt(bookTitle: string, description?: string): string {
-  return `Elegant book back cover background design for "${bookTitle}". Subtle, sophisticated pattern or gradient that complements a front cover. The design should be understated enough to allow text overlay for book description and author bio. Professional publishing quality, soft colors, minimal visual elements in the center area where text will be placed. ${description ? `Theme context: ${description}` : ''}`;
+  // Per CEO-095 — reframed away from "book back cover". The image is
+  // described as a standalone abstract background suitable for text
+  // overlay (we add the text in PDF render). bookTitle parameter is
+  // intentionally unused in the prompt body for the same reason as
+  // the front cover: putting the title in the prompt invites Ideogram
+  // to render it, which it does — alongside hallucinated companion
+  // text in the surrounding zones.
+  void bookTitle;
+  const subject = description ? ` Theme context: ${description}.` : '';
+  return (
+    `An elegant abstract background design — subtle, sophisticated, ` +
+    `understated. A soft gradient or quiet pattern that complements a ` +
+    `companion piece. The center 55% of the frame is calm and uncluttered ` +
+    `negative space, suitable for being viewed as the background to a ` +
+    `composition.${subject} ` +
+    `Vertical 2:3 aspect ratio. Refined publishing-quality aesthetic.`
+  );
 }
 
 // GET endpoint to fetch cover suggestions
@@ -461,12 +518,23 @@ export async function GET(request: NextRequest) {
 }
 
 function generateCoverSuggestions(title: string, contentType: string): string[] {
+  // Per CEO-095 the chip set is expanded from 5 to 10 base options
+  // (founder asked for 7+) and the previous "Elegant with subtle
+  // textures and clean typography space" chip is REMOVED — the word
+  // "typography" in the chip text propagates into the prompt body and
+  // actively biases Ideogram toward rendering text, the exact failure
+  // mode we are fighting.
   const baseSuggestions = [
-    'Professional and modern with abstract shapes',
-    'Elegant with subtle textures and clean typography space',
     'Bold and eye-catching with vibrant colors',
-    'Minimalist with focus on negative space',
-    'Warm and inviting with soft gradients',
+    'Professional and modern with abstract shapes',
+    'Minimalist with strong negative space',
+    'Surreal and dreamlike',
+    'Cinematic with dramatic lighting',
+    'Architectural and geometric',
+    'Organic and nature-inspired',
+    'Hand-drawn editorial illustration style',
+    'Retro / vintage poster aesthetic',
+    'Photographic with shallow depth of field',
   ];
 
   // Add genre-specific suggestions

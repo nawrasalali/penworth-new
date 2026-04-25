@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { creditReferralIfEligible } from '@/lib/referrals';
 
 // Inline slugify — used to be imported from lib/utils, but the repo has
@@ -237,7 +238,19 @@ export async function POST(request: NextRequest) {
                   : 'png';
         const bytes = await imgResp.arrayBuffer();
         const storagePath = `${user.id}/covers/${session?.id || projectId}-front-publish.${ext}`;
-        const { error: uploadErr } = await supabase
+        // Use service-role for the bucket upload. The user-scoped
+        // supabase-ssr client has been silently failing INSERT against
+        // storage.objects in production with "new row violates row-level
+        // security policy" — verified via _cover_diag_trace mirror_fail
+        // events on every cover regen 2026-04-25 and prior. RLS is
+        // satisfied on paper (path's first foldername segment equals
+        // user.id) so the failure is in supabase-ssr's storage auth
+        // header propagation, not in policy. Service-role bypasses RLS
+        // by design and is the correct privilege level for this internal
+        // operation — we already authorized the user as project owner
+        // above. CEO-094.
+        const svc = createServiceClient();
+        const { error: uploadErr } = await svc
           .storage
           .from('covers')
           .upload(storagePath, bytes, {
@@ -246,7 +259,7 @@ export async function POST(request: NextRequest) {
             cacheControl: '31536000',
           });
         if (!uploadErr) {
-          const { data: { publicUrl } } = supabase
+          const { data: { publicUrl } } = svc
             .storage
             .from('covers')
             .getPublicUrl(storagePath);
