@@ -368,7 +368,7 @@ function OnboardingCard({ member }: { member: any }) {
         <Task done={member.payout_method !== 'pending'}>
           Set up your payout method (Wise or USDT)
         </Task>
-        <Task>Write your first Penworth document (3 free, one per category)</Task>
+        <Task>Write your first book (3 free, your choice of type)</Task>
         <Task>Complete Module 1: How Penworth Works</Task>
         <Task>Complete Module 2: How the Guild Works</Task>
         <Task>Complete Module 3: Finding Your First 5</Task>

@@ -14,7 +14,7 @@ const TIERS = [
     advance: '5 active retained referrals',
     benefits: [
       'Full Guildmember dashboard',
-      'Three free Penworth documents (one per category)',
+      'Three free books — write any kind, on us, to walk the talk',
       'All seven AI support agents at Apprentice configuration',
       'Guild Academy core curriculum (three mandatory modules)',
       'Unique referral code and personalised link',

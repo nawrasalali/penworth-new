@@ -24,7 +24,19 @@ import { SupabaseClient } from '@supabase/supabase-js';
  * referrer's dashboard on next load.
  */
 
-export const REFERRAL_CREDIT_AWARD = 500;
+/**
+ * Credit award to the referrer when their referee publishes their first book.
+ *
+ * Set to 1,000 = exactly one Penworth document at standard pricing
+ * (CREDIT_COSTS.standardDocument in lib/plans.ts). The narrative is clean:
+ * "Refer a friend, write a free book."
+ *
+ * No lifetime cap. The publishing gate (referee must finish and publish a
+ * book) is the anti-abuse mechanism. Anyone hitting 3+ successful referrals
+ * is shown a Guild upgrade banner — sustained referrers should be earning
+ * cash commission, not credits. See ReferralDashboard.tsx.
+ */
+export const REFERRAL_CREDIT_AWARD = 1_000;
 
 export interface CreditReferralResult {
   credited: boolean;

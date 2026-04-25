@@ -374,7 +374,7 @@ function ProcessSection() {
     {
       n: '04',
       title: 'Welcome to the Guild',
-      body: 'You&apos;re an Apprentice. Three free Penworth documents to try the product yourself. Your referral code is live. Your seven AI agents begin work.',
+      body: 'You&apos;re an Apprentice. Three free books — pick any type, on us — so you walk the talk before you sell it. Your referral code is live. Your seven AI agents begin work. From month four, you stay on as a paying author yourself.',
     },
   ];
   return (

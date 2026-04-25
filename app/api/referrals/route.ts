@@ -165,13 +165,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Give welcome bonus credits to new user (50 credits)
-    const welcomeCredits = 50;
+    // Give welcome bonus credits to new user (100 credits — symbolic
+    // thank-you; not enough to write a full document, encouraging the
+    // referee to engage further by upgrading or topping up).
+    const welcomeCredits = 100;
     
+    // Read current balance and increment — overwriting would zero out
+    // any credits the user already had (e.g. from monthly free grant).
+    const { data: refereeProfile } = await supabase
+      .from('profiles')
+      .select('credits_balance, lifetime_credits_earned')
+      .eq('id', user.id)
+      .single();
+
+    const currentBalance = refereeProfile?.credits_balance || 0;
+    const currentLifetime = refereeProfile?.lifetime_credits_earned || 0;
+
     await supabase
       .from('profiles')
-      .update({ 
-        credits_balance: welcomeCredits,
+      .update({
+        credits_balance: currentBalance + welcomeCredits,
+        lifetime_credits_earned: currentLifetime + welcomeCredits,
       })
       .eq('id', user.id);
 

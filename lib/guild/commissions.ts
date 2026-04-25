@@ -702,7 +702,7 @@ export async function runMonthlyClose(
   // are excluded entirely (they can't earn commissions or be charged fees).
   const { data: members } = await admin
     .from('guild_members')
-    .select('id, tier, status, payout_method, payout_details_encrypted, account_fee_starts_at')
+    .select('id, user_id, tier, status, payout_method, payout_details_encrypted, account_fee_starts_at')
     .in('status', ['active', 'probation']);
 
   const results: MemberCloseResult[] = [];
@@ -782,6 +782,7 @@ async function closeMemberMonth(
   admin: SupabaseClient,
   member: {
     id: string;
+    user_id: string;
     tier: string;
     status: string;
     payout_method: string | null;
@@ -826,6 +827,10 @@ async function closeMemberMonth(
   );
 
   // ---- Stage 2: assess this month's account fee ----
+  // NOTE (migration 028): the legacy guild_compute_account_fee() now always
+  // returns 0, so this block is effectively a no-op. Kept to avoid breaking
+  // the close-row schema for historical guild_account_fees inspection.
+  // Membership compliance is now enforced via Stage 2.5 below.
   const feeAssessed = shouldAssessFee(member, now)
     ? Number(
         (
@@ -857,6 +862,41 @@ async function closeMemberMonth(
         amount_waived_usd: 0,
         status: 'pending',
       });
+    }
+  }
+
+  // ---- Stage 2.5: paid-author compliance check ----
+  // Per migration 028 / Founder decision 2026-04-25: Guildmembers must be
+  // paying authors themselves (Pro or Max plan) once they pass their 90-day
+  // grace window. This replaces the old monthly Guild fee. Authentic
+  // ("walk the talk") and aligns Guild incentives with Penworth's core
+  // revenue product.
+  //
+  // Behaviour:
+  //   - 'compliant'   → no-op
+  //   - 'pre_grace'   → no-op (still in 90-day window)
+  //   - 'non_paying'  → flip status='probation' (auto-lift triggers when
+  //                     they upgrade; existing trg_guild_auto_lift_probation
+  //                     handles the unflip on payment)
+  //   - 'no_profile'  → log loudly; orphan record needs ops attention
+  if (member.status === 'active') {
+    const { data: paidAuthorStatus } = await admin.rpc(
+      'guild_assess_paid_author_status',
+      { p_user_id: member.user_id },
+    );
+
+    if (paidAuthorStatus === 'non_paying') {
+      console.log(
+        `[guild.close] member ${member.id} is past grace and not on a paid plan; moving to probation`,
+      );
+      await admin
+        .from('guild_members')
+        .update({ status: 'probation' })
+        .eq('id', member.id);
+    } else if (paidAuthorStatus === 'no_profile') {
+      console.error(
+        `[guild.close] member ${member.id} has no matching profile row; surfacing for ops`,
+      );
     }
   }
 
