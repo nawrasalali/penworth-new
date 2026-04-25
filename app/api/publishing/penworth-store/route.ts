@@ -83,10 +83,18 @@ export async function POST(request: NextRequest) {
   //   - the project belonged to an org and the publisher was an org editor
   //   - the publisher was a super_admin acting via admin policies
   // We replace the filter with an explicit authorization check below.
+  //
+  // NOTE: this SELECT used to also list `language`, but the projects table
+  // has no `language` column (i18n is tracked on interview_sessions /
+  // publishing_metadata, not at the project level). PostgREST silently
+  // converts the unknown-column error into a generic projectErr, which
+  // surfaced to authors as "Project not found" — the actual cause behind
+  // CEO-089's first round of fixes failing to land. Drop `language` from
+  // the SELECT and default the listing language at the use-site below.
   const { data: project, error: projectErr } = await supabase
     .from('projects')
     .select(`
-      id, user_id, org_id, title, description, content_type, status, language,
+      id, user_id, org_id, title, description, content_type, status,
       chapters(id, title, content, word_count, status, order_index)
     `)
     .eq('id', projectId)
@@ -256,7 +264,7 @@ export async function POST(request: NextRequest) {
     subtitle: subtitle || null,
     author_id: user.id,
     description: listingDescription,
-    language: project.language || 'en',
+    language: 'en',
     format: listingFormat,
     cover_image_url: coverUrl,
     word_count: totalWords,
