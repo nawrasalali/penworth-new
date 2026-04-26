@@ -1,8 +1,41 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-26 ~02:25 UTC by CEO Claude session (CEO-128 in-platform admin-grant indicator shipped — note the P0 banner above is from a parallel session and remains the most urgent open item).
+**Last updated:** 2026-04-26 ~09:08 UTC by CEO Claude session (PR #6 bundle merged + 5 tasks closed: CEO-103/105/106/107/108).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
+
+---
+
+## Most recent session activity (2026-04-26 ~09:08 UTC — bundle PR #6 merged, 5 tasks shipped)
+
+Multi-session arc spanning ~7 chat sessions of incremental work culminated in a single squash-merge to main. Bundle contained:
+
+- **CEO-103** (b241221) — Command Center surfaces KB, alerts, tickets, known issues, reports
+- **CEO-105** (30c92a3) — admin-generate-livebook edge fn reads CARTESIA_KEY + ADMIN_SECRET from env
+- **CEO-106** (f55988a + 9298af1 follow-up) — Upload-your-own front cover with optional typography flag. New POST /api/projects/[id]/cover-upload mounted on CoverDesignScreen + PublishScreen. 4 i18n keys × 11 locales.
+- **CEO-107** (b31d826) — Unpublish action + UI button on /projects/[id]/publishing
+- **CEO-108** (d6e1279) — Backward-jump rerun stages with per-agent cost ladder. New POST /api/projects/[id]/rerun-stage. Debit-before-flip with refund-on-failure, fires pipeline.restart-agent Inngest event mirroring admin force-retry. Confirmation modal with cost display + insufficient-credits gating. 10 i18n keys × 11 locales.
+
+**Squash-merge:** `8e46102` on main. **Production deploy:** READY at 09:08 UTC. **penworth.ai HEAD:** 200 OK.
+
+**Pre-push hook caught a real bug.** The `Session` interface locally declared in `editor/page.tsx` wasn't extended alongside `InterviewSession` in `types/agent-workflow.ts` for CEO-106's two new columns. Husky's `npx tsc --noEmit` filter rejected the push; fix landed as commit `9298af1`. Without the hook this would have blocked Vercel CI for hours.
+
+**Spawned follow-ups:**
+- **CEO-133 (p2, awaiting Founder)** — Rotate ADMIN_SECRET + CARTESIA_KEY now that they're env-only. Old hardcoded values are still in Git history. Founder approval needed before key rotation since CARTESIA_KEY rotation touches Cartesia billing.
+- **CEO-119 (p3, open)** — Investigate who is committing to legacy `nawrasalali/penworth-ai` repo and decide archive/delete. Hygiene only.
+
+**Memory rule corrections from this session arc:**
+- The husky pre-push typecheck hook is now on **penworth-new**, not just penworth-store as the prior memory note claimed.
+- CEO-118 was a sandbox-egress mirage (parallel session retraction commit `55f4cfe` aligned with my own re-verification). Future sessions should trust direct Vercel control-plane queries over older session notes.
+- Task-code collisions confirmed real and frequent — this thread cleanly took CEO-119, then a parallel session burned through CEO-120 to CEO-132 before I returned, forcing me onto CEO-133. Sequence-backed task-code generator is overdue.
+
+**Memory rule that paid off massively:** "Re-fetch origin/main IMMEDIATELY before push." Main had advanced 15 commits between the bundle's last fetch and the push attempt, including the parallel CEO-118 retraction, DR runbook (CEO-020), and admin-grant DB fixes (migrations 030 + 031). Without the re-fetch the push would have failed or merged with stale-base assumptions.
+
+**Health snapshot at session end:** stuck=0, incidents=0, webhooks failed 24h=0, in_progress=1, awaiting_founder=22, open total=29.
+
+---
+
+## Prior session activity (2026-04-26 ~02:25 UTC — CEO-128 in-platform admin-grant indicator shipped — note the P0 banner above is from a parallel session and remains the most urgent open item).
 
 ---
 
