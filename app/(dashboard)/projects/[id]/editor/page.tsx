@@ -1310,6 +1310,30 @@ function EditorContentNew() {
             pipelineFailureReason={pipelineFailureReason}
             failureCount={pipelineFailureCount}
             onRetryWriting={startWriting}
+            onContinueToQA={async () => {
+              // CEO-060 — manual recovery path. Mirrors the SSE
+              // 'complete' branch above (line ~822). Used when the
+              // user landed on the writing screen with the run
+              // already finished server-side but the SSE 'complete'
+              // event never reached this client (closed tab,
+              // network blip, browser refresh). Defensive about all
+              // three pieces: refresh chapters from DB so the QA
+              // screen sees the real word counts, then advance, then
+              // kick off the QA checks. Same call shape as SSE.
+              const { data: freshChapters } = await supabase
+                .from('chapters')
+                .select('*')
+                .eq('project_id', projectId)
+                .order('order_index');
+              if (freshChapters) setChapters(freshChapters);
+              const total = outlineSections.filter(s => s.type === 'chapter').length;
+              await advanceToNextAgent({
+                currentChapter: total,
+                totalChapters: total,
+                progress: 100,
+              });
+              startQAChecks();
+            }}
           />
         );
 
