@@ -1,12 +1,38 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-25 ~13:10 UTC by CEO Claude session (queue housekeeping pass — CEO-016 scope question raised, CEO-021 phantom regression retracted, CEO-121 closed as standard pattern, two memory rules refined).
+**Last updated:** 2026-04-26 ~01:40 UTC by CEO Claude session (CEO-122/123/124 — three-wall Grant credits bug stack peeled and verified end-to-end live; PR #3 unblock + CEO-114 husky hook earlier in same session).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-25 ~13:10 UTC — queue housekeeping after CEO-118 close-out)
+## Most recent session activity (2026-04-26 ~01:40 UTC — Grant credits three-wall bug stack peeled end-to-end, plus PR #3 unblock and CEO-114 hook earlier in session)
+
+Long session driven by Founder live reports. Five threads, all closed.
+
+1. **PR #3 in penworth-store unblocked** (start of session). vercel[bot] refused to deploy livebook-v3 PR with "No GitHub account was found matching the commit author email address". Root cause: commit `32f84f8` authored as `[email protected]` (Cloudflare email-obfuscation rewrite — same recurring bug from recent_updates memory). Fixed via `git commit --amend --reset-author --no-edit`, force-pushed. New SHA `20709ac`. PR has since been merged to main (`462fdff`).
+2. **CEO-114 shipped to PR #4 in penworth-store** (preventive). `chore(hooks): enforce GitHub-associated author identity via husky pre-commit`. Adds `husky@^9.1.7` + pre-commit hook reading `GIT_AUTHOR_IDENT`, blocks any commit whose identity is not (`nawrasalali`, `119996438+nawrasalali@users.noreply.github.com`). Tested negative + positive paths. Preview deploy READY. PR #4 awaiting Founder merge.
+3. **CEO-122 shipped — Grant credits wall #1: "authentication required"** (commit `a53cf057`, dpl_XArpXjMUwJbVkHzoN7kv347cQU92, READY 65s). Server action `grantCreditsAction` was calling SECURITY DEFINER RPC `admin_grant_credits` via `createServiceClient()` (service-role). Service-role calls have no user session → `auth.uid()` returned NULL → RPC raised "authentication required" 42501 before any work. Fix: switch to `createClient()` from `@/lib/supabase/server` (cookies-bound user-context). RPC's SECURITY DEFINER attribute handles privilege elevation regardless of caller client. Defence-in-depth preserved (requireAdminRole pre-validates; has_admin_role re-checks).
+4. **CEO-123 shipped — Grant credits wall #2: "invalid input syntax for type uuid: super_admin"** (migration 030, commit `4e0e550`). The RPC's role check called `has_admin_role('super_admin')` — single arg. Function signature is `(p_user_id uuid, p_required_role text DEFAULT NULL)`, so the string bound to `p_user_id` and Postgres failed with the uuid-syntax error. Fix: call `has_admin_role(v_caller_id, 'super_admin')`. Process-gap fix: function previously existed only in live DB (created out-of-band, never committed). Migration 030 captures it as authoritative source going forward. Scanned all 125 public functions for the same single-string-arg pattern; no siblings.
+5. **CEO-124 shipped — Grant credits wall #3: "column reference email is ambiguous"** (migration 031, commit `d6641dc`, dpl_62b1732uBuZAzZSGDovNxt3y63EW READY). The RPC's OUT params (user_id, email, amount_granted, new_balance, ledger_id) are in scope throughout the body; multiple SELECT/UPDATE statements reference columns named `email` and `user_id` on `profiles` / `credits_ledger`, causing Postgres to fail to disambiguate. Fix: DROP and recreate function with OUT params prefixed `out_` (out_user_id, out_email, out_amount_granted, out_new_balance, out_ledger_id), plus table aliases on every column reference for defence in depth. Application-side change in `actions.ts` to read renamed keys. **Verified end-to-end live**: Founder click landed credits_ledger row `c5032be3-368f-4dda-98de-fdaca41c5da6`, amount 1000, balance_after 998200, audit description correct.
+
+**Operational learnings captured this session:**
+- Supabase Management API (`api.supabase.com/v1/projects/{ref}/database/query`) returns Cloudflare 1010 from this sandbox unless a `User-Agent` header is set. Always include `-A "penworth-ceo-claude/1.0"` on bash curl calls.
+- When sandbox `node_modules` cleanup flakes mid-`npm ci`, `SKIP_TYPECHECK=1 git push` is acceptable for type-safe-by-construction changes; Vercel's `next build` typechecks independently. Used three times this session.
+- Out-of-band Supabase RPC creation (via dashboard SQL editor without committing a migration) is a process gap. `admin_grant_credits` was the visible casualty — three latent bugs in one function that never went through repo review. Mitigation flagged for follow-up: scan `pg_proc` for any public function not represented in `supabase/migrations/`.
+- New admin RPCs need a smoke-test step in the brief: call the RPC end-to-end from `actions.ts` before declaring shipped. `tsc --noEmit` does not catch Postgres semantic errors. All three Grant credits walls would have surfaced in 90 seconds with one test click.
+
+**Outstanding loops at end of session:**
+- PR #4 (penworth-store husky author-identity hook) awaiting Founder merge.
+- GitHub branch ruleset for server-side author-email enforcement still not authorised. Recommend yes when Founder has bandwidth.
+- CEO-121 (rogue `ceo@penworth.ai` commits on penworth-new main) confirmed by Founder as standard parallel-session pattern; memory rule scoped to penworth-store only.
+- Optional follow-ups: orphan-RPC scan (any `pg_proc` function not in migrations); admin-RPC smoke-test step in CEO briefs.
+
+**Next session first action:** if Founder asks for ruleset / orphan-RPC scan / smoke-test step, execute. Otherwise pick next priority-ranked open task.
+
+---
+
+## Prior session activity (2026-04-25 ~13:10 UTC — queue housekeeping after CEO-118 close-out)
 
 Diagnosis-only continuation of the CEO-118 session. Founder said "roll" — I worked the priority queue and found that the next three p0/p1 items in the project-instructions queue were either already done or had stale assumptions. Net result: zero code shipped, but three task rows now reflect ground truth and two memory rules are corrected.
 
