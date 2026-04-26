@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { BookOpen, CheckCircle2 } from 'lucide-react';
 import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 import { mapAuthError, mapAuthErrorKey } from '@/lib/auth/error-map';
+import { logAuthError } from '@/lib/auth/telemetry';
 
 function ForgotPasswordForm() {
   const [email, setEmail] = useState('');
@@ -34,6 +35,7 @@ function ForgotPasswordForm() {
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
       if (error) {
         console.error('[forgot-password] resetPasswordForEmail failed:', error);
+        logAuthError({ context: 'forgot_password', kind: 'returned', email, error });
         // Show the success state even on failure for accounts that don't
         // exist — don't leak which emails are registered. The only error
         // we expose is rate-limiting, since that's user-correctable (wait
@@ -47,6 +49,7 @@ function ForgotPasswordForm() {
       setSent(true);
     } catch (err) {
       console.error('[forgot-password] unexpected exception:', err);
+      logAuthError({ context: 'forgot_password', kind: 'thrown', email, error: err });
       setErrorMsg(t('auth.forgot.error', locale));
     } finally {
       setLoading(false);

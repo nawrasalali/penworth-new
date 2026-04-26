@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { BookOpen, Check, Gift } from 'lucide-react';
 import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 import { mapAuthError } from '@/lib/auth/error-map';
+import { logAuthError } from '@/lib/auth/telemetry';
 import AuthorRefCapture from '@/components/AuthorRefCapture';
 
 function SignupForm() {
@@ -89,6 +90,7 @@ function SignupForm() {
 
       if (error) {
         console.error('[signup] signUp failed:', error);
+        logAuthError({ context: 'signup', kind: 'returned', email, error });
         setError(mapAuthError(error, locale));
         return;
       }
@@ -108,7 +110,14 @@ function SignupForm() {
 
       router.push(`/login?lang=${lang}&message=${encodeURIComponent(t('auth.checkEmailForConfirm', locale))}`);
     } catch (err) {
-      setError(t('auth.genericError', locale));
+      // supabase-js can THROW (rather than return a structured error) on
+      // network failures, CORS preflight rejects, and some 5xx responses.
+      // Pipe the thrown value through mapAuthError so users see "rate
+      // limited" / "network issue" / etc instead of a generic error, and
+      // log it for diagnostics so we can see which subclass actually fires.
+      console.error('[signup] unexpected exception:', err);
+      logAuthError({ context: 'signup', kind: 'thrown', email, error: err });
+      setError(mapAuthError(err as { message?: string; status?: number; code?: string }, locale));
     } finally {
       setLoading(false);
     }
@@ -128,14 +137,21 @@ function SignupForm() {
 
       if (result.error) {
         console.error('[signup] signInWithOAuth error:', result.error);
+        logAuthError({ context: 'signup_oauth', kind: 'returned', error: result.error });
         setError(mapAuthError(result.error, locale));
       } else if (!result.data?.url) {
         console.error('[signup] signInWithOAuth returned no URL — provider likely disabled in Supabase');
+        logAuthError({
+          context: 'signup_oauth',
+          kind: 'returned',
+          error: { message: 'no redirect URL', code: 'no_redirect_url' },
+        });
         setError(t('auth.err.oauthUnavailable', locale));
       }
     } catch (err) {
       console.error('[signup] signInWithOAuth threw:', err);
-      setError(t('auth.genericError', locale));
+      logAuthError({ context: 'signup_oauth', kind: 'thrown', error: err });
+      setError(mapAuthError(err as { message?: string; status?: number; code?: string }, locale));
     }
   };
 

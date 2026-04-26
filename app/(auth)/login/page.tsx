@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { BookOpen } from 'lucide-react';
 import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 import { mapAuthError } from '@/lib/auth/error-map';
+import { logAuthError } from '@/lib/auth/telemetry';
 
 function LoginForm() {
   const [email, setEmail] = useState('');
@@ -51,6 +52,7 @@ function LoginForm() {
         // the generic friendly message — we never surface Supabase's raw
         // text to end users.
         console.error('[login] signInWithPassword failed:', error);
+        logAuthError({ context: 'login', kind: 'returned', email, error });
         setError(mapAuthError(error, locale));
         return;
       }
@@ -64,8 +66,12 @@ function LoginForm() {
       router.push(redirect);
       router.refresh();
     } catch (err) {
+      // supabase-js can throw on network/CORS failures and some 5xx paths.
+      // Pipe through mapAuthError so the user sees a useful message
+      // (rate-limit, network) instead of a generic catch-all.
       console.error('[login] unexpected exception:', err);
-      setError(t('auth.genericError', locale));
+      logAuthError({ context: 'login', kind: 'thrown', email, error: err });
+      setError(mapAuthError(err as { message?: string; status?: number; code?: string }, locale));
     } finally {
       setLoading(false);
     }
@@ -88,17 +94,24 @@ function LoginForm() {
 
       if (result.error) {
         console.error('[login] signInWithOAuth error:', result.error);
+        logAuthError({ context: 'login_oauth', kind: 'returned', error: result.error });
         setError(mapAuthError(result.error, locale));
       } else if (!result.data?.url) {
         // No error AND no redirect URL — Supabase didn't give us anywhere
         // to go. This means Google is disabled or misconfigured in the
         // Supabase Auth settings.
         console.error('[login] signInWithOAuth returned no URL — provider likely disabled in Supabase');
+        logAuthError({
+          context: 'login_oauth',
+          kind: 'returned',
+          error: { message: 'no redirect URL', code: 'no_redirect_url' },
+        });
         setError(t('auth.err.oauthUnavailable', locale));
       }
     } catch (err) {
       console.error('[login] signInWithOAuth threw:', err);
-      setError(t('auth.genericError', locale));
+      logAuthError({ context: 'login_oauth', kind: 'thrown', error: err });
+      setError(mapAuthError(err as { message?: string; status?: number; code?: string }, locale));
     }
   };
 
