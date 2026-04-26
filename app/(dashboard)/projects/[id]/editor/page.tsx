@@ -109,6 +109,11 @@ interface Session {
   author_photo_url: string | null;
   front_cover_url: string | null;
   front_cover_regenerations: number;
+  // CEO-106: distinguishes AI-generated covers from writer-uploaded ones
+  // and tracks whether uploaded artwork already includes title/author
+  // typography (so downstream renderers skip the overlay).
+  front_cover_source: 'generated' | 'uploaded' | null;
+  front_cover_has_typography: boolean | null;
   back_cover_url: string | null;
   back_cover_regenerations: number;
   follow_up_data: Record<string, any>;
