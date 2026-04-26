@@ -1,6 +1,6 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-26 ~02:15 UTC by CEO Claude session (P0 PRODUCTION BLOCKER discovered: Cartesia account credit cap exhausted, Guild voice interview non-functional in prod; CEO-060 shipped; CEO-118 retracted; queue audited).
+**Last updated:** 2026-04-26 ~02:25 UTC by CEO Claude session (CEO-128 in-platform admin-grant indicator shipped — note the P0 banner above is from a parallel session and remains the most urgent open item).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
@@ -22,7 +22,27 @@
 
 ---
 
-## Most recent session activity (2026-04-26 ~02:15 UTC — extended resume session: CEO-060 shipped, CEO-118 retracted, CEO-125 P0 surfaced)
+## Most recent session activity (2026-04-26 ~02:10 UTC — CEO-128 in-platform admin-grant indicator shipped)
+
+Continuation of the long Grant credits / PR #3 / CEO-114 session. After the three-wall RPC bug stack was peeled (CEO-122/123/124) and grants verified end-to-end live, Founder asked: "make sure the receiver is notified on the new credits received, and make sure these credits are usable."
+
+1. **Spendability — verified, no fix needed.** `admin_grant_credits` writes to `profiles.credits_balance`. The publishing-credit spend (`lib/publishing/credits.ts`), the AI-usage endpoint (`/api/credits` POST), and the user dashboard (`/api/credits` GET) all read/write the same column. Same source. Granted credits are immediately spendable.
+2. **Notification — initial pass built an email path** (Resend wrapper + `adminCreditGrant` template in `lib/email/templates.ts`, `sendAdminCreditGrantEmail` in `lib/email/index.ts`, fire-and-forget call in `actions.ts`). Founder reviewed and pivoted: "no email notification, only inside the platform, on total credits, show received from admin x credit." Email work was reverted before push — no email is sent.
+3. **CEO-128 shipped as in-platform indicator.** Single emerald-tinted line under the credits balance on both `/dashboard` top stats card and `/billing` credits card: "Received N credits from admin." Source of truth is `credits_ledger` filtered by `user_id` and `transaction_type='admin_adjustment'`, summed over positive amounts only (negative-amount filter guards against future schema drift where admins might log clawbacks). Conditional render — line only shows when cumulative > 0, never adds clutter for users who've never received a grant. Three files touched: `app/(dashboard)/dashboard/page.tsx`, `app/(dashboard)/billing/page.tsx`, `lib/i18n/strings.ts`. New StringKey `dashboard.receivedFromAdminTemplate` populated for all 11 locales (en, ar, es, fr, pt, ru, zh, bn, hi, id, vi). Commit `965005c`, deploy `dpl_FwggEbLXHWibGCWx46ygve6uHuiR` READY in production.
+4. **i18n caveat captured.** I'm confident on en/ar/es/fr translations; bn/hi/vi are translation-quality but should be sanity-checked by a native reviewer before launch. Logged in CEO-128 metadata.
+5. **Process pattern to keep using.** Founder's "no email" pivot mid-task → reverted unpushed work cleanly via `git checkout --` before doing the right thing. Building forward-only without a kill switch would have shipped email noise nobody asked for.
+
+**Outstanding loops at end of session:**
+- PR #4 (penworth-store husky author-identity hook) still awaiting Founder merge.
+- GitHub branch ruleset for server-side author-email enforcement still not authorised.
+- bn/hi/vi translation review for the new admin-grant string before launch.
+- **CEO-125 P0 (above) is the most urgent thing in the queue** — Cartesia exhausted means voice interview is dead in production.
+
+**Next session first action:** if Founder authorises, top up Cartesia (CEO-125), then merge PR #4, then ship branch ruleset. Otherwise pick next priority-ranked open task.
+
+---
+
+## Prior session activity (2026-04-26 ~02:15 UTC — extended resume session: CEO-060 shipped, CEO-118 retracted, CEO-125 P0 surfaced)
 
 Long single-conversation session driven by Founder rolling instructions ("Resume CEO-118", "roll", "roll", "Continue", "Continue"). Net: one P1 UX bug shipped to production, four non-issues retired from the queue, two memory rules sharpened.
 
