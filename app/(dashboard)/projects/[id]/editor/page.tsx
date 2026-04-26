@@ -370,6 +370,8 @@ function EditorContentNew() {
     frontCoverUrl: session?.front_cover_url || undefined,
     frontCoverPrompt: '',
     frontCoverRegenerations: session?.front_cover_regenerations || 0,
+    frontCoverSource: session?.front_cover_source || 'generated',
+    frontCoverHasTypography: session?.front_cover_has_typography ?? false,
     backCoverUrl: session?.back_cover_url || undefined,
     backCoverPrompt: '',
     backCoverRegenerations: session?.back_cover_regenerations || 0,
@@ -1044,6 +1046,43 @@ function EditorContentNew() {
     toast.info(t('editor.linkedinSoon', locale));
   };
 
+  // CEO-106: Upload-your-own front cover. Posts the chosen file plus a
+  // hasTypography flag to /api/projects/[id]/cover-upload, which writes
+  // it to the public covers bucket under
+  //   {userId}/uploaded-covers/{sessionId}.{ext}
+  // and updates interview_sessions.front_cover_url + front_cover_source +
+  // front_cover_has_typography. After success we refresh the session so
+  // CoverDesignScreen / PublishScreen pick up the new URL without a page
+  // reload.
+  const handleUploadCover = async (file: File, hasTypography: boolean) => {
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('hasTypography', hasTypography ? 'true' : 'false');
+
+      const resp = await fetch(`/api/projects/${projectId}/cover-upload`, {
+        method: 'POST',
+        body: fd,
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) {
+        toast.error(data.error || t('editor.coverUploadFailed', locale));
+        return;
+      }
+
+      toast.success(t('editor.coverUploaded', locale));
+
+      const sessionResponse = await fetch(`/api/interview-session?projectId=${projectId}`);
+      const sessionData = await sessionResponse.json();
+      if (sessionData.session) {
+        setSession(sessionData.session);
+      }
+    } catch (err) {
+      console.error('cover upload error:', err);
+      toast.error(t('editor.coverUploadFailed', locale));
+    }
+  };
+
   // Handler: View PDF — fetches a rendered PDF from /api/export and opens
   // it in a new tab via a blob URL. The export route applies v2 watermark
   // rules (free tier gets a 'by penworth.ai' footer; paid tiers are clean).
@@ -1333,6 +1372,7 @@ function EditorContentNew() {
             onUpdateAuthorInfo={handleUpdateAuthorInfo}
             onGenerateCover={handleGenerateCover}
             onUploadAuthorPhoto={handleUploadAuthorPhoto}
+            onUploadCover={handleUploadCover}
             onApproveAndContinue={async () => {
               await advanceToNextAgent({
                 frontCoverUrl: coverConfig.frontCoverUrl,
@@ -1359,6 +1399,7 @@ function EditorContentNew() {
             onUpdateAuthorInfo={handleUpdateAuthorInfo}
             onGenerateCover={handleGenerateCover}
             onUploadAuthorPhoto={handleUploadAuthorPhoto}
+            onUploadCover={handleUploadCover}
             onExtractFromLinkedIn={handleExtractFromLinkedIn}
             onViewPDF={handleViewPDF}
             onDownload={handleDownload}

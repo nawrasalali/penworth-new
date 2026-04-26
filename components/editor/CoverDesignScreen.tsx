@@ -39,6 +39,14 @@ interface CoverDesignScreenProps {
   onUpdateAuthorInfo: (info: Partial<AuthorInfo>) => void;
   onGenerateCover: (type: 'front' | 'back', prompt?: string) => Promise<void>;
   onUploadAuthorPhoto: (file: File) => Promise<void>;
+  /**
+   * CEO-106: lets the writer skip AI generation and bring their own
+   * front-cover artwork. `hasTypography=true` tells downstream renderers
+   * (PDF export, Visual Audiobook, Cinematic Livebook) to skip the
+   * title/author overlay because the uploaded file already has it baked
+   * in. Optional so older callers compile.
+   */
+  onUploadCover?: (file: File, hasTypography: boolean) => Promise<void>;
   onApproveAndContinue: () => void;
   locale?: Locale;
 }
@@ -51,6 +59,7 @@ export function CoverDesignScreen({
   onUpdateAuthorInfo,
   onGenerateCover,
   onUploadAuthorPhoto,
+  onUploadCover,
   onApproveAndContinue,
   locale = 'en',
 }: CoverDesignScreenProps) {
@@ -59,8 +68,13 @@ export function CoverDesignScreen({
   const [isGeneratingFront, setIsGeneratingFront] = useState(false);
   const [isGeneratingBack, setIsGeneratingBack] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [uploadHasTypography, setUploadHasTypography] = useState<boolean>(
+    coverConfig.frontCoverHasTypography ?? false,
+  );
   const [aboutDraft, setAboutDraft] = useState(authorInfo.aboutAuthor || '');
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const frontRegens = coverConfig.frontCoverRegenerations ?? 0;
   const backRegens = coverConfig.backCoverRegenerations ?? 0;
@@ -97,6 +111,19 @@ export function CoverDesignScreen({
       await onUploadAuthorPhoto(file);
     } finally {
       setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onUploadCover) return;
+    setIsUploadingCover(true);
+    try {
+      await onUploadCover(file, uploadHasTypography);
+    } finally {
+      setIsUploadingCover(false);
+      // reset so re-uploading the same filename retriggers onChange
+      if (coverInputRef.current) coverInputRef.current.value = '';
     }
   };
 
@@ -188,6 +215,41 @@ export function CoverDesignScreen({
               </Button>
               {!canPayFront && !frontIsFirstGen && (
                 <p className="text-xs text-red-500 mt-1 text-center">{t('cover.notEnoughCredits', locale)}</p>
+              )}
+
+              {/* CEO-106: Upload your own front cover. Skips AI generation entirely. */}
+              {onUploadCover && (
+                <div className="mt-3 pt-3 border-t space-y-2">
+                  <input
+                    ref={coverInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handleCoverFileChange}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={isUploadingCover}
+                    onClick={() => coverInputRef.current?.click()}
+                  >
+                    {isUploadingCover ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t('cover.uploading', locale)}</>
+                    ) : (
+                      <><Upload className="h-4 w-4 mr-2" /> {t('cover.uploadOwn', locale)}</>
+                    )}
+                  </Button>
+                  <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={uploadHasTypography}
+                      onChange={(e) => setUploadHasTypography(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span>{t('cover.uploadHasTypography', locale)}</span>
+                  </label>
+                </div>
               )}
             </div>
 

@@ -296,6 +296,18 @@ export interface CoverConfig {
   frontCoverUrl?: string;
   frontCoverPrompt?: string;
   frontCoverRegenerations: number;
+  /**
+   * 'generated' (default — AI-produced art that needs the title/author
+   * overlay) or 'uploaded' (writer brought their own art via
+   * /api/projects/[id]/cover-upload).
+   */
+  frontCoverSource?: 'generated' | 'uploaded';
+  /**
+   * Set on uploaded covers. When true, downstream renderers (PDF, Visual
+   * Audiobook, Cinematic Livebook) skip the title/author overlay because
+   * the uploaded artwork already includes it.
+   */
+  frontCoverHasTypography?: boolean;
   backCoverUrl?: string;
   backCoverPrompt?: string;
   backCoverRegenerations: number;
@@ -351,6 +363,8 @@ export interface InterviewSession {
   front_cover_url?: string | null;
   front_cover_prompt?: string | null;
   front_cover_regenerations?: number;
+  front_cover_source?: 'generated' | 'uploaded';
+  front_cover_has_typography?: boolean;
   back_cover_url?: string | null;
   back_cover_prompt?: string | null;
   back_cover_regenerations?: number;
