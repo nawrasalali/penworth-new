@@ -1,29 +1,39 @@
 // admin-generate-livebook
-// JWT-bypass admin endpoint that runs Cartesia TTS livebook generation for a
-// given store_listings row. Same pipeline as generate-livebook but uses a
-// shared secret in the x-admin-secret header so the founder (or the
-// auto-trigger from the writer publish route) can kick off generation for
-// any listing without needing the author's session token.
+// JWT-bypass admin endpoint that runs ElevenLabs TTS livebook generation
+// for a given store_listings row. Same pipeline as generate-livebook but
+// uses a shared secret in the x-admin-secret header so the founder (or
+// the auto-trigger from the writer publish route) can kick off
+// generation for any listing without needing the author's session token.
 //
 // Secrets are read from Edge Function env (Supabase project secrets):
-//   - CARTESIA_KEY      (Cartesia TTS API key)
-//   - ADMIN_SECRET      (shared secret for x-admin-secret header)
+//   - ELEVENLABS_API_KEY  (ElevenLabs TTS API key)
+//   - ADMIN_SECRET        (shared secret for x-admin-secret header)
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are auto-injected by the runtime.
 //
-// CEO-105 (2026-04-25): moved CARTESIA_KEY and ADMIN_SECRET out of inline
-// constants into Deno.env so the source can live in the public repo.
+// Provider history:
+//   - Original: Cartesia Sonic-2 (CARTESIA_KEY env)
+//   - CEO-105 (2026-04-25): moved CARTESIA_KEY + ADMIN_SECRET out of inline
+//     constants into Deno.env so the source could live in the public repo.
+//   - CEO-134 (2026-04-26): killed Cartesia after credit cap was exhausted
+//     in production. Voice provider swapped to ElevenLabs
+//     eleven_multilingual_v2; CARTESIA_KEY env var retired entirely.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 
-const CARTESIA_KEY = Deno.env.get("CARTESIA_KEY");
+const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 const ADMIN_SECRET = Deno.env.get("ADMIN_SECRET");
-const MODEL_ID = "sonic-2";
+const ELEVENLABS_API = "https://api.elevenlabs.io/v1";
+const ELEVENLABS_MODEL = "eleven_multilingual_v2";
 const TEMPLATE_URL = "https://store.penworth.ai/livebook-template.html";
 
+// Voice IDs are stable public ElevenLabs library voices. Names map by
+// vibe to the previous Cartesia voices:
+//   default_male  → Adam (warm, multilingual, narrator-style)
+//   default_female → Rachel (neutral American English, clear)
 const VOICES: Record<string, { id: string; name: string }> = {
-  default_male:   { id: "a0e99841-438c-4a64-b679-ae501e7d6091", name: "Barbershop Man" },
-  default_female: { id: "79a125e8-cd45-4c13-8a67-188112f4dd22", name: "British Lady" },
+  default_male:   { id: "pNInz6obpgDQGcFmaJgB", name: "Adam" },
+  default_female: { id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel" },
 };
 
 const MAX_WORDS = 1800;
@@ -46,19 +56,25 @@ function trimToBudget(s: string[], max: number): string[] {
   return out;
 }
 
-async function tts(text: string, voiceId: string, ctx: string, attempt = 1): Promise<ArrayBuffer> {
-  const r = await fetch("https://api.cartesia.ai/tts/bytes", {
+async function tts(text: string, voiceId: string, _ctx: string, attempt = 1): Promise<ArrayBuffer> {
+  const r = await fetch(`${ELEVENLABS_API}/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
     method: "POST",
-    headers: { "X-API-Key": CARTESIA_KEY!, "Cartesia-Version": "2024-11-13", "Content-Type": "application/json" },
+    headers: {
+      "xi-api-key": ELEVENLABS_API_KEY!,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
-      model_id: MODEL_ID, transcript: text,
-      voice: { mode: "id", id: voiceId, __experimental_controls: { speed: "normal", emotion: ["positivity:low", "curiosity"] } },
-      output_format: { container: "mp3", encoding: "mp3", sample_rate: 44100, bit_rate: 128000 },
-      language: "en", context_id: ctx,
+      text,
+      model_id: ELEVENLABS_MODEL,
     }),
   });
-  if (r.status === 429 && attempt <= 10) { await new Promise((res) => setTimeout(res, 2000 * attempt)); return tts(text, voiceId, ctx, attempt + 1); }
-  if (!r.ok) throw new Error(`cartesia ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  // ElevenLabs uses 429 + Retry-After for rate limits and 408 for queue
+  // timeouts. Retry on either, exponential backoff capped at 10 attempts.
+  if ((r.status === 429 || r.status === 408) && attempt <= 10) {
+    await new Promise((res) => setTimeout(res, 2000 * attempt));
+    return tts(text, voiceId, _ctx, attempt + 1);
+  }
+  if (!r.ok) throw new Error(`elevenlabs ${r.status}: ${(await r.text()).slice(0, 200)}`);
   return await r.arrayBuffer();
 }
 
@@ -67,9 +83,9 @@ function mmss(s: number) { const m = Math.floor(s / 60), x = Math.floor(s % 60);
 
 Deno.serve(async (req: Request) => {
   try {
-    if (!CARTESIA_KEY || !ADMIN_SECRET) {
+    if (!ELEVENLABS_API_KEY || !ADMIN_SECRET) {
       return new Response(
-        JSON.stringify({ error: "server misconfigured: CARTESIA_KEY/ADMIN_SECRET missing from Edge Function secrets" }),
+        JSON.stringify({ error: "server misconfigured: ELEVENLABS_API_KEY/ADMIN_SECRET missing from Edge Function secrets" }),
         { status: 500, headers: { "Content-Type": "application/json" } },
       );
     }

@@ -3,10 +3,18 @@ import Anthropic from '@anthropic-ai/sdk';
 /**
  * The Guild Voice Interview System
  *
- * Uses Claude Sonnet 4.5 as the conversation brain, Cartesia Ink-Whisper for
- * transcription, and Cartesia Sonic-3 for the interviewer's voice. The
- * interview runs as a series of turns — each turn is (audio input → transcript
- * → AI response → TTS audio). A full session is capped at 10 minutes.
+ * Uses Claude Sonnet 4.5 as the conversation brain, OpenAI Whisper for
+ * transcription, and ElevenLabs (eleven_multilingual_v2) for the
+ * interviewer's voice. The interview runs as a series of turns — each
+ * turn is (audio input → transcript → AI response → TTS audio). A full
+ * session is capped at 10 minutes.
+ *
+ * Provider history:
+ *   - Original: OpenAI Whisper (STT) + OpenAI TTS (TTS)
+ *   - CEO-110 (2026-04-25): swapped both to Cartesia Ink-Whisper + Sonic-3
+ *   - CEO-134 (2026-04-26): killed Cartesia entirely after credits were
+ *     exhausted in production. STT moved back to OpenAI Whisper;
+ *     TTS moved to ElevenLabs (already used by store narration).
  *
  * Ref: Penworth_Guild_Complete_Specification.md Section 6, Step 4.
  */
@@ -16,14 +24,32 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Using the current Sonnet tier (available in env)
 const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
 
-// Cartesia API — used for both speech-to-text (Ink-Whisper) and text-to-speech
-// (Sonic-3). Sonic-3 covers 42+ languages including Arabic, Bengali, Indonesian
-// and Vietnamese (the older sonic-2/sonic-multilingual models do not).
-const CARTESIA_API = 'https://api.cartesia.ai';
-const CARTESIA_VERSION = '2025-04-16';
-// Default voice: Katie — multilingual, conversational, suited for voice agents
-// per Cartesia's own guidance. Stable across all Penworth locales.
-const CARTESIA_VOICE_ID = 'f786b574-daa5-4673-aa0c-cbe3e8534c02';
+// OpenAI Whisper — speech-to-text. whisper-1 supports 50+ languages and
+// auto-detects when language='auto'; we pass the explicit language code
+// to lock decoding to the applicant's chosen interview language.
+const OPENAI_API = 'https://api.openai.com/v1';
+const OPENAI_STT_MODEL = 'whisper-1';
+
+// ElevenLabs — text-to-speech. eleven_multilingual_v2 covers all 11
+// Penworth locales (en, ar, es, fr, pt, ru, zh, bn, hi, id, vi). Voice
+// IDs mirror the map in app/api/publishing/penworth-store/narrate/route.ts
+// so the Guild interviewer and Store narration share voice characteristics.
+const ELEVENLABS_API = 'https://api.elevenlabs.io/v1';
+const ELEVENLABS_MODEL = 'eleven_multilingual_v2';
+const ELEVENLABS_VOICE_BY_LANGUAGE: Record<string, string> = {
+  en: '21m00Tcm4TlvDq8ikWAM', // Rachel — neutral female American English
+  ar: 'pNInz6obpgDQGcFmaJgB', // Adam — multilingual male
+  es: 'pNInz6obpgDQGcFmaJgB',
+  pt: 'pNInz6obpgDQGcFmaJgB',
+  fr: 'pNInz6obpgDQGcFmaJgB',
+  ru: 'pNInz6obpgDQGcFmaJgB',
+  zh: 'pNInz6obpgDQGcFmaJgB',
+  bn: 'pNInz6obpgDQGcFmaJgB',
+  hi: 'pNInz6obpgDQGcFmaJgB',
+  id: 'pNInz6obpgDQGcFmaJgB',
+  vi: 'pNInz6obpgDQGcFmaJgB',
+};
+const ELEVENLABS_FALLBACK_VOICE = '21m00Tcm4TlvDq8ikWAM';
 
 /**
  * Extract the applicant's actual first name, skipping common title prefixes
@@ -252,7 +278,7 @@ export async function generateNextMessage(params: {
 }
 
 // ---------------------------------------------------------------------------
-// Whisper transcription (speech → text)
+// OpenAI Whisper transcription (speech → text)
 // ---------------------------------------------------------------------------
 
 export async function transcribeAudio(
@@ -260,66 +286,72 @@ export async function transcribeAudio(
   filename: string,
   language: string,
 ): Promise<{ text: string; duration_s: number | null }> {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY not set — Guild voice interview transcription cannot run.');
+  }
+
   const formData = new FormData();
   const blob = new Blob([audioBuffer as any], { type: guessMimeType(filename) });
   formData.append('file', blob, filename);
-  formData.append('model', 'ink-whisper');
+  formData.append('model', OPENAI_STT_MODEL);
   formData.append('language', mapToWhisperLanguageCode(language));
+  // Whisper supports verbose_json which gives us a duration field; without
+  // this it returns plain text only and duration_s ends up null.
+  formData.append('response_format', 'verbose_json');
 
-  const response = await fetch(`${CARTESIA_API}/stt`, {
+  const response = await fetch(`${OPENAI_API}/audio/transcriptions`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.CARTESIA_API_KEY}`,
-      'Cartesia-Version': CARTESIA_VERSION,
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: formData,
   });
 
   if (!response.ok) {
     const errText = await response.text();
-    console.error('[ink-whisper] API error:', errText);
-    throw new Error(`Ink-Whisper transcription failed: ${response.status}`);
+    console.error('[whisper] API error:', errText);
+    throw new Error(`Whisper transcription failed: ${response.status}`);
   }
 
   const data = (await response.json()) as { text: string; duration?: number };
   return {
     text: (data.text || '').trim(),
-    duration_s: data.duration || null,
+    duration_s: typeof data.duration === 'number' ? data.duration : null,
   };
 }
 
 // ---------------------------------------------------------------------------
-// Cartesia Sonic-3 (text → speech)
+// ElevenLabs TTS (text → speech)
 // ---------------------------------------------------------------------------
 
 export async function synthesizeSpeech(
   text: string,
   language: string,
 ): Promise<Buffer> {
-  const response = await fetch(`${CARTESIA_API}/tts/bytes`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.CARTESIA_API_KEY}`,
-      'Cartesia-Version': CARTESIA_VERSION,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model_id: 'sonic-3',
-      transcript: text,
-      voice: { mode: 'id', id: CARTESIA_VOICE_ID },
-      language: mapToWhisperLanguageCode(language),
-      output_format: {
-        container: 'mp3',
-        sample_rate: 44100,
-        bit_rate: 128000,
+  if (!process.env.ELEVENLABS_API_KEY) {
+    throw new Error('ELEVENLABS_API_KEY not set — Guild interviewer voice cannot run.');
+  }
+
+  const voiceId = ELEVENLABS_VOICE_BY_LANGUAGE[language] || ELEVENLABS_FALLBACK_VOICE;
+  const response = await fetch(
+    `${ELEVENLABS_API}/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
+    {
+      method: 'POST',
+      headers: {
+        'xi-api-key': process.env.ELEVENLABS_API_KEY,
+        'Content-Type': 'application/json',
       },
-    }),
-  });
+      body: JSON.stringify({
+        text,
+        model_id: ELEVENLABS_MODEL,
+      }),
+    },
+  );
 
   if (!response.ok) {
     const errText = await response.text();
-    console.error('[cartesia-tts] API error:', errText);
-    throw new Error(`Cartesia TTS failed: ${response.status}`);
+    console.error('[elevenlabs-tts] API error:', errText);
+    throw new Error(`ElevenLabs TTS failed: ${response.status}`);
   }
 
   const arrayBuffer = await response.arrayBuffer();
