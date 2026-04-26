@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,6 +22,7 @@ import {
   Check,
   Linkedin,
   Globe,
+  Loader2,
 } from 'lucide-react';
 
 interface PublishScreenProps {
@@ -37,6 +38,13 @@ interface PublishScreenProps {
   onUpdateAuthorInfo: (info: Partial<AuthorInfo>) => void;
   onGenerateCover: (type: 'front' | 'back', prompt?: string) => Promise<void>;
   onUploadAuthorPhoto: (file: File) => void;
+  /**
+   * CEO-106: lets the writer skip AI generation for the front cover and
+   * bring their own artwork. `hasTypography=true` tells downstream
+   * renderers to skip the title/author overlay because the uploaded file
+   * already includes typography. Optional so older callers compile.
+   */
+  onUploadCover?: (file: File, hasTypography: boolean) => Promise<void>;
   onExtractFromLinkedIn: (url: string) => void;
   onViewPDF: () => void;
   onDownload: () => void;
@@ -75,6 +83,7 @@ export function PublishScreen({
   onUpdateAuthorInfo,
   onGenerateCover,
   onUploadAuthorPhoto,
+  onUploadCover,
   onExtractFromLinkedIn,
   onViewPDF,
   onDownload,
@@ -100,6 +109,12 @@ export function PublishScreen({
   const [isGeneratingCover, setIsGeneratingCover] = useState(false);
   const [editingAbout, setEditingAbout] = useState(false);
   const [aboutDraft, setAboutDraft] = useState(authorInfo.aboutAuthor || '');
+  // CEO-106: upload-your-own front cover (mirrors CoverDesignScreen state).
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [uploadHasTypography, setUploadHasTypography] = useState<boolean>(
+    coverConfig.frontCoverHasTypography ?? false,
+  );
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   // Keep aboutDraft in sync with the prop when it arrives from the session
   // (author info is saved in the Cover Design step before Publish loads).
@@ -125,6 +140,19 @@ export function PublishScreen({
       await onGenerateCover('back');
     } finally {
       setIsGeneratingCover(false);
+    }
+  };
+
+  // CEO-106: handler for the upload-your-own front cover input.
+  const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onUploadCover) return;
+    setIsUploadingCover(true);
+    try {
+      await onUploadCover(file, uploadHasTypography);
+    } finally {
+      setIsUploadingCover(false);
+      if (coverInputRef.current) coverInputRef.current.value = '';
     }
   };
 
@@ -355,6 +383,41 @@ export function PublishScreen({
                 </>
               )}
             </Button>
+
+            {/* CEO-106: Upload your own front cover. */}
+            {onUploadCover && (
+              <div className="mt-3 pt-3 border-t space-y-2">
+                <input
+                  ref={coverInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handleCoverFileChange}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={isUploadingCover}
+                  onClick={() => coverInputRef.current?.click()}
+                >
+                  {isUploadingCover ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t('cover.uploading', locale)}</>
+                  ) : (
+                    <><Upload className="h-4 w-4 mr-2" /> {t('cover.uploadOwn', locale)}</>
+                  )}
+                </Button>
+                <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={uploadHasTypography}
+                    onChange={(e) => setUploadHasTypography(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>{t('cover.uploadHasTypography', locale)}</span>
+                </label>
+              </div>
+            )}
           </div>
           
           {/* Back Cover */}

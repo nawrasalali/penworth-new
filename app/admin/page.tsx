@@ -14,6 +14,11 @@ import {
   AlertTriangle,
   Scale,
   ExternalLink,
+  Bell,
+  LifeBuoy,
+  AlertOctagon,
+  ClipboardList,
+  Library,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -238,6 +243,38 @@ export default async function AdminPage() {
                   {approachingTotal}
                 </span>
               )}
+            </Link>
+            {/* CEO-103: surface remaining admin pages from Command Center.
+                These were previously only reachable by typing the URL. */}
+            <Link
+              href="/admin/command-center/alerts"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted whitespace-nowrap"
+            >
+              <Bell className="h-3.5 w-3.5" /> Alerts
+            </Link>
+            <Link
+              href="/admin/tickets"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted whitespace-nowrap"
+            >
+              <LifeBuoy className="h-3.5 w-3.5" /> Tickets
+            </Link>
+            <Link
+              href="/admin/known-issues"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted whitespace-nowrap"
+            >
+              <AlertOctagon className="h-3.5 w-3.5" /> Known issues
+            </Link>
+            <Link
+              href="/admin/reports"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted whitespace-nowrap"
+            >
+              <ClipboardList className="h-3.5 w-3.5" /> Reports
+            </Link>
+            <Link
+              href="/admin/kb"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border hover:bg-muted whitespace-nowrap"
+            >
+              <Library className="h-3.5 w-3.5" /> Knowledge base
             </Link>
           </div>
           <div className="text-xs text-muted-foreground">

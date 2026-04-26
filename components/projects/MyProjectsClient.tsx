@@ -10,6 +10,7 @@ import {
   RotateCcw,
   AlertTriangle,
   X,
+  CloudOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CATEGORIES, type CategoryId } from '@/lib/categories';
@@ -124,6 +125,21 @@ export function MyProjectsClient({
   const askPermanentDelete = (p: ProjectRow) => {
     setConfirmId(p.id);
     setConfirmTitle(p.title || t('projects.untitled', locale));
+  };
+
+  const handleUnpublish = async (p: ProjectRow) => {
+    const name = p.title || t('projects.untitled', locale);
+    const resp = await fetch(`/api/projects/${p.id}/unpublish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || data?.error) {
+      toast.error(data?.error || t('toast.unpublishFailed', locale));
+      return;
+    }
+    toast.success(`${t('toast.unpublished', locale)} — "${name}"`);
+    startTransition(() => router.refresh());
   };
 
   const confirmPermanentDelete = async () => {
@@ -264,6 +280,7 @@ export function MyProjectsClient({
               onSoftDelete={handleSoftDelete}
               onRestore={handleRestore}
               onPermanentDelete={askPermanentDelete}
+              onUnpublish={handleUnpublish}
             />
           ))}
         </div>
@@ -326,6 +343,7 @@ function ProjectCard({
   onSoftDelete,
   onRestore,
   onPermanentDelete,
+  onUnpublish,
 }: {
   project: ProjectRow;
   view: View;
@@ -334,6 +352,7 @@ function ProjectCard({
   onSoftDelete: (p: ProjectRow) => void;
   onRestore: (p: ProjectRow) => void;
   onPermanentDelete: (p: ProjectRow) => void;
+  onUnpublish: (p: ProjectRow) => void;
 }) {
   const timeAgo = formatRelative(new Date(project.updated_at), locale);
   const deletedAgo = project.deleted_at ? formatRelative(new Date(project.deleted_at), locale) : null;
@@ -423,14 +442,26 @@ function ProjectCard({
             </IconButton>
           </>
         ) : (
-          <IconButton
-            title={t('action.moveToBin', locale)}
-            onClick={() => onSoftDelete(project)}
-            disabled={disabled}
-            className="bg-white/90 dark:bg-neutral-800/90 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </IconButton>
+          <>
+            {project.ui_status === 'published' && (
+              <IconButton
+                title={t('action.unpublish', locale)}
+                onClick={() => onUnpublish(project)}
+                disabled={disabled}
+                className="bg-white/90 dark:bg-neutral-800/90 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-900/30"
+              >
+                <CloudOff className="h-3.5 w-3.5" />
+              </IconButton>
+            )}
+            <IconButton
+              title={t('action.moveToBin', locale)}
+              onClick={() => onSoftDelete(project)}
+              disabled={disabled}
+              className="bg-white/90 dark:bg-neutral-800/90 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </IconButton>
+          </>
         )}
       </div>
     </div>
