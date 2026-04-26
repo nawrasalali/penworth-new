@@ -1,12 +1,35 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-26 ~09:42 UTC by CEO Claude session (Cartesia killed, ElevenLabs TTS live, env vars deleted, P0 cleared).
+**Last updated:** 2026-04-26 ~10:00 UTC by CEO Claude session (Guild voice interview now single-provider on ElevenLabs — CEO-138 STT collapse shipped).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-26 ~09:42 UTC — Cartesia killed, ElevenLabs TTS live in production)
+## Most recent session activity (2026-04-26 ~10:00 UTC — Guild STT collapsed onto ElevenLabs Scribe)
+
+Founder one-liner: "i enabled eleven labs" — meaning the `speech_to_text` permission on the existing `ELEVENLABS_API_KEY` was granted. CEO-134's temporary OpenAI-Whisper detour collapsed onto ElevenLabs Scribe in the same session.
+
+**What shipped:**
+- **PR #8** (squash `f878c44`) — `lib/ai/guild-interviewer.ts` `transcribeAudio` swapped from OpenAI `whisper-1` to ElevenLabs `scribe_v1`. Same multipart shape, `xi-api-key` auth, same `ELEVENLABS_API_KEY` as the TTS path. `audio_duration_secs` populated correctly.
+- **Pre-flight smoke verified:** ElevenLabs TTS-generated MP3 round-tripped through Scribe and came back as identical text with word-level timing (`logprob` per token, 99-language coverage).
+- **Production deploy READY** at 09:53:45 UTC for sha `f878c44d`. penworth.ai HEAD = 200.
+- **Zero OpenAI code references remain** anywhere in the codebase. Single-provider voice stack: ElevenLabs `eleven_multilingual_v2` (TTS) + `scribe_v1` (STT) on one key.
+
+**Tasks closed this session:**
+- CEO-135 (add `OPENAI_API_KEY` + smoke-test Guild) → done, superseded
+- CEO-138 (the STT collapse) → done
+
+**Task-code collision noted:** my commit references "(CEO-137)" because that was the next-free code when authored, but a parallel session burned CEO-137 on an unrelated Stripe checkout 404 fix during PR #8's in-flight window. DB row is CEO-138; commit/PR text says CEO-137. Both reference `f878c44`. The collision is documented in CEO-138's `last_update_note` for future audits. This is the second collision in 24 hours — sequence-backed task-code generator is overdue.
+
+**Single residual Founder action across the whole Cartesia kill arc:**
+- Cancel the Cartesia subscription at `play.cartesia.ai/subscription`. Tracked under CEO-136. Low urgency — env vars are gone, no traffic flows there.
+
+**The Guild voice interview is now production-ready.** First applicant attempt will work end-to-end: interviewer's voice (ElevenLabs TTS) → applicant audio (Scribe STT) → Claude conversation → next interviewer turn. No further blockers in the voice pipeline.
+
+---
+
+## Prior session activity (2026-04-26 ~09:42 UTC — Cartesia killed, ElevenLabs TTS live in production)
 
 Founder gave a one-line directive: "swap to elevenlabs, kills cartesia". Cartesia credit cap had exhausted production (CEO-125 P0 from prior session). Provider swap shipped end-to-end in this session.
 
