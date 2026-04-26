@@ -50,11 +50,14 @@ export async function grantCreditsAction(formData: FormData) {
   const row = Array.isArray(data) ? data[0] : data;
   revalidatePath('/admin/command-center/grants');
 
+  // OUT-param names are prefixed with out_ since migration 031 to avoid
+  // colliding with profiles.email / credits_ledger.user_id inside the
+  // function body. Old keys (email, amount_granted, …) no longer exist.
   return {
     ok: true as const,
-    email: row?.email ?? email,
-    amountGranted: row?.amount_granted ?? amount,
-    newBalance: row?.new_balance ?? null,
-    ledgerId: row?.ledger_id ?? null,
+    email: row?.out_email ?? email,
+    amountGranted: row?.out_amount_granted ?? amount,
+    newBalance: row?.out_new_balance ?? null,
+    ledgerId: row?.out_ledger_id ?? null,
   };
 }
