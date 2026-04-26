@@ -54,6 +54,21 @@ import {
 import { getRichInterviewQuestions } from '@/lib/ai/agents/interview-system';
 import { fetchLegacyUiQuestions } from '@/lib/ai/interview-prompts-db';
 import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
+import { getRerunCost } from '@/lib/plans';
+
+// CEO-108: pipeline order, used to detect backward jumps. Mirrors
+// DEFAULT_AGENT_ORDER in lib/pipeline/heartbeat.ts (server-only) so we
+// don't have to import a server module into a client component.
+const PIPELINE_ORDER: AgentName[] = [
+  'validate',
+  'interview',
+  'research',
+  'outline',
+  'writing',
+  'qa',
+  'cover',
+  'publishing',
+];
 
 // =============================================================================
 // TYPES
@@ -303,6 +318,17 @@ function EditorContentNew() {
   const [isResearching, setIsResearching] = useState(false);
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
   const [isWriting, setIsWriting] = useState(false);
+
+  // CEO-108: backward-jump rerun confirmation. When the writer clicks
+  // an earlier completed stage in the pipeline, open a modal that
+  // shows the credit cost and asks them to confirm an actual re-run
+  // (which fires pipeline.restart-agent on the back end). Forward
+  // jumps and same-stage clicks stay free and skip the modal.
+  const [rerunModal, setRerunModal] = useState<{
+    target: AgentName;
+    cost: number;
+  } | null>(null);
+  const [isRerunning, setIsRerunning] = useState(false);
   const [isCheckingQA, setIsCheckingQA] = useState(false);
 
   // Pipeline health — driven by SSE 'session_update' events. 'active'
@@ -1227,6 +1253,20 @@ function EditorContentNew() {
     const status = agentStatus[target];
     if (status !== 'completed' && status !== 'active') return;
 
+    // CEO-108: detect backward jumps. A backward jump opens the rerun
+    // confirmation modal and (on confirm) hits /api/projects/[id]/rerun-stage,
+    // which charges per the rerun ladder and fires pipeline.restart-agent.
+    // Forward / same-stage jumps stay free via the existing 'jump' action.
+    const targetIdx = PIPELINE_ORDER.indexOf(target);
+    const currentIdx = PIPELINE_ORDER.indexOf(currentAgent);
+    const isBackward = targetIdx >= 0 && currentIdx >= 0 && targetIdx < currentIdx;
+
+    if (isBackward) {
+      const cost = getRerunCost(target);
+      setRerunModal({ target, cost });
+      return;
+    }
+
     const response = await fetch('/api/interview-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1240,6 +1280,62 @@ function EditorContentNew() {
     const result = await response.json();
     if (result.session) {
       setSession(result.session);
+    }
+  };
+
+  // CEO-108: actually fire the paid rerun once the writer confirms.
+  // Charges per the rerun ladder (PUBLISHING_CREDIT_COSTS.rerun_*),
+  // flips current_agent server-side, and dispatches the
+  // pipeline.restart-agent Inngest event so the stage recomputes.
+  const confirmRerun = async () => {
+    if (!rerunModal || !session) return;
+    setIsRerunning(true);
+    try {
+      const resp = await fetch(`/api/projects/${projectId}/rerun-stage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent: rerunModal.target }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        if (data?.code === 'INSUFFICIENT_CREDITS') {
+          toast.error(t('rerun.insufficientCredits', locale));
+          router.push('/billing');
+        } else {
+          toast.error(data?.error || t('rerun.failed', locale));
+        }
+        return;
+      }
+      if (data.session) {
+        setSession(data.session);
+      }
+      // Refresh the credit display via direct profile read — mirrors the
+      // page-load pattern at line ~465. We catch silently because this
+      // is cosmetic; the canonical balance is on the server side.
+      try {
+        const { data: { user: u } } = await supabase.auth.getUser();
+        if (u) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('credits_balance, credits_purchased')
+            .eq('id', u.id)
+            .single();
+          if (profile) {
+            setUserCredits(
+              (profile.credits_balance || 0) + (profile.credits_purchased || 0),
+            );
+          }
+        }
+      } catch {
+        // Non-fatal — credit refresh is cosmetic.
+      }
+      toast.success(t('rerun.started', locale));
+      setRerunModal(null);
+    } catch (err) {
+      console.error('rerun error:', err);
+      toast.error(t('rerun.failed', locale));
+    } finally {
+      setIsRerunning(false);
     }
   };
 
@@ -1499,6 +1595,58 @@ function EditorContentNew() {
         defaultContentType={project?.content_type}
         onSuccess={handlePublishSuccess}
       />
+
+      {/* CEO-108: backward-jump rerun confirmation. */}
+      {rerunModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="rerun-modal-title"
+        >
+          <div className="w-full max-w-md rounded-xl bg-background p-6 shadow-xl">
+            <h2 id="rerun-modal-title" className="text-lg font-semibold mb-2">
+              {t('rerun.confirmTitle', locale)}
+            </h2>
+            <p className="text-sm text-muted-foreground mb-1">
+              {t('rerun.confirmBody', locale)
+                .replace('{stage}', getAgentLabels(rerunModal.target, locale).shortName)}
+            </p>
+            <p className="text-sm font-medium mb-4">
+              {t('rerun.cost', locale).replace('{cost}', String(rerunModal.cost))}
+            </p>
+            <p className="text-xs text-muted-foreground mb-5">
+              {t('rerun.confirmWarning', locale)}
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isRerunning}
+                onClick={() => setRerunModal(null)}
+              >
+                {t('rerun.cancel', locale)}
+              </Button>
+              <Button
+                type="button"
+                disabled={isRerunning || rerunModal.cost > userCredits}
+                onClick={confirmRerun}
+              >
+                {isRerunning ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t('rerun.starting', locale)}</>
+                ) : (
+                  t('rerun.confirm', locale)
+                )}
+              </Button>
+            </div>
+            {rerunModal.cost > userCredits && (
+              <p className="text-xs text-red-500 mt-3 text-right">
+                {t('rerun.insufficientCredits', locale)}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

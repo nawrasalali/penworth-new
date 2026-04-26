@@ -13,13 +13,40 @@ export const CREDIT_COSTS = {
  * small amounts (single API call, bounded cost). Penworth Computer
  * sessions burn significantly more — a full Kobo publish uses
  * ~30-60 Claude opus turns with screenshot vision inputs each turn.
+ *
+ * `rerun_*` entries (CEO-108) are charged when a writer jumps backward
+ * in the pipeline and asks for a stage to actually re-execute. Forward
+ * jumps and zero-work jumps (e.g. "go look at Cover again") stay free —
+ * those just call POST /api/interview-session action='jump'. The ladder
+ * is sized to the real compute each agent burns, balance-first.
  */
 export const PUBLISHING_CREDIT_COSTS = {
   /** Direct API auto-publish: D2D, Gumroad, Payhip */
   tier2_api: 50,
   /** Penworth Computer browser automation session (any platform) */
   computer_use: 500,
+
+  // CEO-108: backward-jump rerun ladder. Keys mirror AgentName from
+  // lib/pipeline/heartbeat.ts so callers can index directly:
+  //   PUBLISHING_CREDIT_COSTS[`rerun_${agent}` as keyof ...]
+  rerun_validate: 100,
+  rerun_interview: 200,
+  rerun_research: 400,
+  rerun_outline: 300,
+  rerun_writing: 1_000,
+  rerun_qa: 200,
+  rerun_cover: 300,
+  rerun_publishing: 50,
 } as const;
+
+/** Helper: cost to rerun a specific agent stage. Returns 0 if the
+ *  agent name isn't ladder-tracked (defensive — should never happen
+ *  for valid AgentName values). */
+export function getRerunCost(agent: string): number {
+  const key = `rerun_${agent}` as keyof typeof PUBLISHING_CREDIT_COSTS;
+  const v = PUBLISHING_CREDIT_COSTS[key];
+  return typeof v === 'number' ? v : 0;
+}
 
 export const PLAN_LIMITS: Record<string, {
   monthlyCredits: number;
