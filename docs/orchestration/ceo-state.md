@@ -1,12 +1,51 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-26 ~10:00 UTC by CEO Claude session (Guild voice interview now single-provider on ElevenLabs — CEO-138 STT collapse shipped).
+**Last updated:** 2026-04-26 ~10:14 UTC by CEO Claude session (off-Supabase backup pipeline live + legacy cleanup — CEO-139/140/141).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-26 ~10:00 UTC — Guild STT collapsed onto ElevenLabs Scribe)
+## Most recent session activity (2026-04-26 ~10:14 UTC — off-Supabase DR pipeline + legacy Supabase cleanup)
+
+Founder asked about getting rid of legacy Penworth backups, keeping one copy, and wiring weekly DR for the three live sites. Reframed: legacy backups don't protect live sites (different project), and weekly is too coarse — DR has to nightly-back-up the *active* prod project. Founder said "go for both" → "Continue."
+
+**What shipped:**
+- **`penworth-sg` Supabase project deleted** (`ekftsgccscbkgmbfbovx`, ap-northeast-2). Verified canonical legacy `rwkurzjbfpoqwfxtdfib` was a strict superset across every populated table (56 tables, 27,738 rows). Only delta was 32 rows from user-trashed (`status=binned`) projects of `feraselali2014@hotmail.com` — those 32 rows preserved into a new `archived_from_penworth_sg` table inside canonical legacy before deletion. CEO-139 done.
+- **Off-Supabase logical snapshot of canonical legacy** uploaded as a release asset to a new private repo `nawrasalali/penworth-backups`. Tag `legacy-2026-04-26`. Tarball 46.5 MB (78 MB raw), zero per-table errors. CEO-139 done.
+- **Nightly DB-dump pipeline live** in `penworth-backups` repo. `dump_supabase.py` uses Supabase Management API SQL endpoint (no DB password, no port 5432 — works in any sandboxed CI). `.github/workflows/nightly-dump.yml` cron at 18:00 UTC daily (~03:30 ACST), tarballs each table's JSON, creates a dated GitHub release, attaches the tarball as asset. 30-day retention with auto-prune. End-to-end manual run validated (run id `24954134095`, conclusion `success`) — release `prod-2026-04-26` with 876 KB tarball asset. CEO-141 done.
+- **Restore drill runbook** `RESTORE_DRILL.md` shipped in penworth-backups. Complements the existing `docs/orchestration/dr-runbook.md` here in penworth-new — runbook defines the procedure, restore-drill gives the concrete script. CEO-020 cross-linked.
+
+**Repo and infrastructure pointers:**
+- Backup repo (private): `https://github.com/nawrasalali/penworth-backups`
+- Latest release with active prod tarball: `https://github.com/nawrasalali/penworth-backups/releases/tag/prod-2026-04-26`
+- Latest release with canonical legacy tarball: `https://github.com/nawrasalali/penworth-backups/releases/tag/legacy-2026-04-26`
+- Repo Actions secret installed: `SUPABASE_MANAGEMENT_PAT` (libsodium-encrypted, registered 2026-04-26 10:12 UTC)
+- Workflow uses `${{ secrets.GITHUB_TOKEN }}` for releases — no extra GitHub PAT needed
+
+**Tasks moved this session:**
+- CEO-139 (legacy cleanup) → done
+- CEO-141 (off-Supabase nightly DB pipeline) → done
+- CEO-140 (pause canonical legacy after free-tier downgrade) → awaiting_founder
+- CEO-020 (DR drill) → last_update_note refreshed; DB tier now operationally live, drill calendar slot still pending Founder
+- CEO-129 (storage-bucket cross-region mirror) → last_update_note refreshed; scope now explicitly "storage buckets only" — DB tier is shipped via CEO-141. Implementation note: same penworth-backups repo can host a sibling `storage-mirror.yml` workflow.
+
+**Task-code collision (third in 48 hours):** My CEO-138/139/140 plan collided with a parallel session that allocated CEO-138 ("Collapse Guild voice interview STT onto ElevenLabs Scribe") at 10:20 UTC. Re-shifted to 139/140/141. Sequence-backed code generator is now overdue from "should ship soon" to "must ship next session."
+
+**Founder actions still queued from this work:**
+1. CEO-140: downgrade Penworth org (`mfrjhsekditomsyuayyd`) to free tier in the Supabase billing dashboard — then I issue the pause API call in <2 min.
+2. CEO-020: pick a calendar slot for the first restore drill (recommended: week before public launch).
+3. (Standing) CEO-129: storage-bucket mirror still uncovered. Cheapest path is a sibling workflow in penworth-backups using Supabase Storage REST API to push to a separate release per night. Authoring deferred until DB tier proves stable across at least one cron cycle.
+
+**What this DR does NOT cover (call-out for future sessions):**
+- Supabase Storage buckets (book covers, manuscripts, voice samples) — CEO-129 still p1 open
+- Vercel env vars — CEO-130 p2 open
+- Public status page — CEO-131 p3 open
+- Stripe replay — covered conceptually in `dr-runbook.md` §4D, no automation yet
+
+---
+
+## Prior session activity (2026-04-26 ~10:00 UTC — Guild STT collapsed onto ElevenLabs Scribe)
 
 Founder one-liner: "i enabled eleven labs" — meaning the `speech_to_text` permission on the existing `ELEVENLABS_API_KEY` was granted. CEO-134's temporary OpenAI-Whisper detour collapsed onto ElevenLabs Scribe in the same session.
 
