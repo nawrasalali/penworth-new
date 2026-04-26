@@ -1,12 +1,66 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-26 ~12:10 UTC by CEO Claude session (production signup unblocked — Supabase Auth SMTP cut over to Resend; auth rate limits raised to effectively unlimited).
+**Last updated:** 2026-04-26 ~13:35 UTC by CEO Claude session (production signup outage *fully* resolved — HIBP root cause, mapAuthError hardened across 11 locales, telemetry table live).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-26 ~12:10 UTC — production signup outage fixed)
+## Most recent session activity (2026-04-26 ~12:10–13:35 UTC — production signup outage, full root-cause and fix)
+
+The 12:10 entry below documented the SMTP layer of this incident. After that fix shipped, two more legacy users (Thomas Dye, Feras Alali) and the Founder himself (fresh browser, fresh email) all hit the same "An error occurred. Please try again." Multiple turns of progressive diagnosis followed; the actual root cause is recorded here.
+
+**True root cause: Supabase Auth `password_hibp_enabled = true` (default for new projects).** Every password-signup request runs the password through HaveIBeenPwned's breach corpus. Common passwords like `Password123!` are rejected with HTTP 422, `error_code: "weak_password"`, `weak_password.reasons: ["pwned"]`. The front-end's `mapAuthError` did not recognize `weak_password` or status 422, so it fell back to `auth.genericError` = "An error occurred. Please try again." Google OAuth doesn't run a password through HIBP, which is why OAuth signup kept working — that asymmetry was the diagnostic key.
+
+The SMTP rate-limit fix from 12:10 was real and necessary, but it was the OUTER layer. HIBP was the inner blocker that survived the SMTP fix and kept the outage going for another 90 minutes.
+
+**Fix shipped (in order):**
+
+1. **`password_hibp_enabled = false`** via Management API PATCH. Verified by reproduction: same `Password123!` that returned 422 30 seconds earlier returned 200 with `confirmation_sent_at` populated 30 seconds later. `password_min_length = 6` retained as the only password-policy constraint (Supabase default).
+
+2. **`auth_client_errors` telemetry table** (migrations `032_auth_client_errors.sql` for the schema, `033_auth_client_errors_policies.sql` for the RLS policies — Supabase MCP partial-apply trap, see learning below). Insert-only RLS for `anon` + `authenticated`, admin-readable. Captures context (signup/login/signup_oauth/login_oauth/forgot_password), error_kind (returned/thrown), message, status, code, user_agent, URL, sha256-hashed email. Ships forensic data on every future client-side auth failure.
+
+3. **`lib/auth/telemetry.ts`** — fire-and-forget client logger with sha256 email hashing, swallowed errors, no PII storage. Used by all four catch blocks across signup/login/forgot-password.
+
+4. **Four catch-block fixes** in `app/(auth)/signup/page.tsx`, `app/(auth)/login/page.tsx`, `app/(auth)/forgot-password/page.tsx`. Every catch was calling `setError(t('auth.genericError', locale))` — a thrown 429 / network / 5xx looked identical to "an error occurred." Now: pipe through `mapAuthError(err, locale)` and write a telemetry row.
+
+5. **`mapAuthError` hardened** with explicit handling for `weak_password` / pwned / status 422, `user_already_exists` / `email_exists`, `email_address_invalid`, `signup_disabled`. Each new key (`auth.err.weakPassword`, `auth.err.alreadyRegistered`, `auth.err.invalidEmail`, `auth.err.signupDisabled`) filled in all 11 locale bundles (en/ar/es/fr/pt/ru/zh/bn/hi/id/vi).
+
+**Commits shipped this session:**
+- `9df91d8` — `docs(ceo-state): production signup unblocked — Resend SMTP, auth rate limits to 1M/hr` (the SMTP-layer fix recorded; PATCH applied via Management API in same session)
+- `f0b1d48` — `fix(auth): pipe thrown errors through mapAuthError + add client-error telemetry` (telemetry table + lib/auth/telemetry.ts + four catch fixes)
+- `d26bf84` — `fix(auth): map weak_password/exists/invalid-email/signup-disabled to useful localized messages` (mapAuthError + 11 locales)
+
+**Production state at end of session:**
+- Email/password signup: **WORKING** for any 8+ char password, including everyday-strength ones.
+- Google OAuth signup: working (was never broken).
+- Login: working (was never broken).
+- HIBP off, SMTP via Resend, all auth rate limits at 1,000,000/hr, smtp_max_frequency=60s (per-recipient anti-spam, kept).
+- Telemetry table populated on every future failure → next failure is diagnosable in seconds, not hours.
+- `auth_client_errors` is empty as of session close — sweep `WHERE created_at > NOW() - INTERVAL '24 hours'` in next session to spot any new patterns.
+
+**Permanent learnings — must propagate to ANY new Supabase project (penworth-store, branches, future migrations):**
+
+1. **`password_hibp_enabled` defaults to TRUE on new Supabase projects.** This silently rejects most everyday passwords with code `weak_password`/422. Disable at project setup time alongside the SMTP wiring. Like `rate_limit_email_sent=2`, this is a default that's incompatible with a consumer signup form.
+
+2. **Supabase MCP `apply_migration` does NOT reliably batch DDL + policy creation.** My `032_auth_client_errors` migration included `CREATE TABLE`, `CREATE INDEX`, `ALTER TABLE ENABLE RLS`, `DROP POLICY IF EXISTS`, `CREATE POLICY`, and `COMMENT ON TABLE`. The table, indexes, and RLS-enable landed; the two policies did NOT — `pg_policies` showed empty even though `pg_policy` later showed them when re-applied separately. Workaround: split policy creation into a separate migration. Memory note already covers "DDL/DML and INSERT in a single batched call can silently roll back" — extend to **all multi-statement migrations involving policies**.
+
+3. **`mapAuthError` must catch every Supabase Auth error code we want to surface or it falls through to a useless generic.** Don't add new auth features without auditing what error codes they introduce.
+
+**Tasks moved this session:**
+- New incident logged in this state file (no `pipeline_incidents` row — auth is outside the writer pipeline scope).
+- The 4 keys-per-locale work confirmed memory rule #5 still holds: TypeScript build does not fall back; Vercel pre-push hook caught any drift.
+
+**Recommended next-session targets (unchanged):**
+- CEO-051 (p0 open): per-chapter Inngest fan-out refactor.
+- CEO-043 (p1 in_progress): wire remaining 6 author-pipeline agents to DB-backed prompts.
+- CEO-090 (p1 open, owner=claude_code): PDF template v4.
+- CEO-117 (p1 open): `/turn` endpoint smoke-test.
+- New: small task to query `auth_client_errors` daily and report patterns; could be a Command Center widget.
+
+---
+
+## Earlier in same session (2026-04-26 ~12:10 UTC — Resend SMTP + 1M/hr rate limits)
 
 Founder forwarded a screenshot from Thomas Dye (`thomas@rgs-capinvest.com`, legacy Penworth user) hitting "An error occurred. Please try again." on `penworth.ai/signup`. Asked: "is it only him, or everyone?"
 
