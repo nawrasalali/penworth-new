@@ -1,12 +1,37 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-26 ~01:40 UTC by CEO Claude session (CEO-122/123/124 — three-wall Grant credits bug stack peeled and verified end-to-end live; PR #3 unblock + CEO-114 husky hook earlier in same session).
+**Last updated:** 2026-04-26 ~02:00 UTC by CEO Claude session (CEO-060 writing-complete recovery CTA shipped to production; CEO-118 closed as non-incident; CEO-078/121 closed as dupes/non-issues; queue housekeeping + 2 memory rules refined).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-26 ~01:40 UTC — Grant credits three-wall bug stack peeled end-to-end, plus PR #3 unblock and CEO-114 hook earlier in session)
+## Most recent session activity (2026-04-26 ~02:00 UTC — long resume session: CEO-118 retracted, CEO-060 shipped, queue audited)
+
+Long single-conversation session driven by Founder rolling instructions ("Resume CEO-118", "roll", "roll", "Continue", "Continue"). Net: one P1 UX bug shipped to production, four non-issues retired from the queue, two memory rules sharpened.
+
+1. **CEO-118 closed as non-incident.** The prior CEO-118 session had logged a 7-step P0 fix plan describing three stacked Vercel/GitHub crises. All three were sandbox-egress mirages — `curl -I` HEAD requests return real Vercel headers, but `curl` GET bodies come back as 18-byte stubs from Anthropic egress TLS inspection. Re-verified via Vercel and GitHub JSON APIs: `penworth.ai` apex + www are owned by NEW project; OLD has zero custom domains; commit `5e94d23` deployed cleanly as `dpl_CPNBtLBJf3jKCo`; legacy `nawrasalali/penworth-ai` repo is 13 days dormant. This is misfire #3 of the same pattern. Memory rule (#1) widened from "503 cert-chain check" to "any GET body ≤18 bytes is a stub; cross-verify via JSON APIs".
+
+2. **Queue housekeeping pass after CEO-118.** Walked the priority queue and found three more stale rows: CEO-021 had a "regression detected" appendix that was the same mirage (retracted, status stays done); CEO-005 was already shipped 2026-04-24 as commit `45e2b80` (no action); CEO-016 brief is 5 days stale and now misaligned with what got built (parallel weekly-checkin model coexists with the brief's monthly-PD model — both 0-row, neither E2E tested). CEO-016 → `awaiting_founder` with the architectural choice on the row.
+
+3. **CEO-121 closed as not-an-anomaly.** Investigated commit `52282d6a` ("feat(help): world-class redesign", `ceo@penworth.ai` author, no GitHub login). It is a legitimate 725-line help-page redesign aligned with the 2026-04-25 referral rewire. Survey of last 200 commits on `penworth-new` main found SIX author emails in active production use, all deploying cleanly: `119996438+nawrasalali@users.noreply.github.com`, `ceo-claude@penworth.ai`, `ceo@penworth.ai`, `claude@anthropic.com`, `founder@penworth.ai`, `nawras@penworth.ai`. The "Vercel rejects non-noreply" rule applies to `penworth-store` ONLY (CEO-114 husky hook is store-scoped). Memory rule (#3) refined accordingly.
+
+4. **CEO-078 closed as duplicate of CEO-073.** Verified `app/api/covers/generate/route.ts` on main: lines ~270-330 mirror Ideogram bytes to the `covers` Supabase Storage bucket via service-role client, unconditional on coverType — both front and back covers persist via path `${userId}/covers/${sessionId}-{coverType}.{ext}`. Commit `00368ed` already shipped this. CEO-078 was filed before that commit landed; redundant now.
+
+5. **CEO-060 SHIPPED to production.** Long-standing P1 from "The Rewired Self" incident 2026-04-24. Bug: when writing finishes, the editor's SSE `'complete'` event auto-advances to QA — but if the user closed their tab mid-write or lost connection at the wrong moment, the server still flips `pipeline_status` to `'completed'` while the client stays on `current_agent='writing'`. User comes back to a 100%-progress screen with no advance control, book FEELS stuck. Fix: emerald-tinted recovery banner at the top of `WritingScreen` with a "Continue to QA review" CTA, rendered only when `onContinueToQA` is wired AND we have chapters AND not actively writing AND (`pipelineStatus === 'completed'` OR all chapters complete). Handler in editor page mirrors the SSE branch exactly — refresh chapters from DB, `advanceToNextAgent({total, total, 100})`, `startQAChecks()`. Same outcome as SSE happy path; no surprising auto-state-change. Three i18n keys (`writing.allDoneHeading`, `writing.allDoneBody`, `writing.continueToQA`) added to `StringKey` union and populated in all 11 locale bundles via per-locale Python script (memory rule from commit 9f24dbb). Shipped as commit `4204eb4`, `dpl_YtYLTfF787Rfx7` READY in production. Pushed with `SKIP_TYPECHECK=1` because sandbox npm install left `next/headers` and `next/font/google` partially typed (3 pre-existing tsc errors, none on changed files); Vercel's full-deps `next build` typechecked clean.
+
+6. **CEO-120 spawned (p3, awaiting_founder)** — archive dormant `nawrasalali/penworth-ai` GitHub repo + delete OLD Vercel project `prj_6wRG4Qp9FG35U2WgKRJUP7kw2Q8E`. Both reversible. Founder green-light needed for the destructive Vercel DELETE.
+
+**What needs Founder decision next session:**
+- **CEO-016**: weekly-checkin (recommended), monthly-PD (per stale brief), or both?
+- **CEO-120**: green-light archive + DELETE of legacy repo + OLD Vercel project?
+- **PR #4 on penworth-store** (CEO-114 husky hook) still awaiting merge.
+
+**Next session first action:** if Founder picks any of those, execute. Otherwise pick highest-priority `open` task that has not been audited in the last 24h — likely CEO-019 (load test runbook) or CEO-020 (DR drill runbook), both fresh runbook-authoring jobs.
+
+---
+
+## Prior session activity (2026-04-26 ~01:40 UTC — Grant credits three-wall bug stack peeled end-to-end, plus PR #3 unblock and CEO-114 hook earlier in session)
 
 Long session driven by Founder live reports. Five threads, all closed.
 
