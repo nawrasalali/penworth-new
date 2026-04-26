@@ -1,12 +1,71 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-26 ~13:35 UTC by CEO Claude session (production signup outage *fully* resolved — HIBP root cause, mapAuthError hardened across 11 locales, telemetry table live).
+**Last updated:** 2026-04-26 ~13:55 UTC by CEO Claude session (THREE-LAYER signup outage fully resolved — SMTP, HIBP, and a stale legacy-migration trigger; all three real, all three required).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-26 ~12:10–13:35 UTC — production signup outage, full root-cause and fix)
+## Most recent session activity (2026-04-26 ~13:35–13:55 UTC — third layer of signup outage: stale migrate_user_on_signup trigger)
+
+After SMTP fix and HIBP disable both shipped, Founder retried in incognito with `rohinawras@gmail.com` → same generic error. **The fix from earlier in the session DID work** — but only for emails not in `pending_migrations`. Legacy users (Thomas Dye, Feras Alali, Roheena Tahir / rohinawras) hit a third layer of failure that my probes had been accidentally avoiding.
+
+**Diagnostic chain enabled by the telemetry shipped earlier:**
+- `auth_client_errors` rows captured exactly: `status=500`, `code=unexpected_failure`, `message="Database error saving new user"` — gotrue's signature for a trigger throwing in the post-INSERT chain.
+- gotrue logs (Supabase Management API → analytics/logs.all on `auth_logs`) carried the actual SQLSTATE: `column "type" of relation "credit_transactions" does not exist (SQLSTATE 42703)`.
+
+**Trigger chain on signup:**
+1. `auth.users` INSERT → `on_auth_user_created` → `handle_new_user()` inserts into `public.profiles`.
+2. `public.profiles` INSERT → `trigger_migrate_user` (AFTER INSERT) → `migrate_user_on_signup()`.
+3. `migrate_user_on_signup()` checks `pending_migrations` for the user's email. If found, copies legacy data and runs:
+   ```sql
+   INSERT INTO credit_transactions (user_id, amount, type, description)
+   VALUES (NEW.id, 0, 'migration', 'Account migrated from old Penworth platform');
+   ```
+4. `credit_transactions` no longer has `type` or `description` columns — they were renamed to `transaction_type` and `notes` in a prior schema change. The function is stale code.
+
+The bug fired ONLY for users in `pending_migrations` (Thomas, Feras, rohinawras, plus other legacy emails). My CEO probes used random `@gmail.com` addresses not in that table → trigger short-circuited at `IF FOUND` → success. That's why "the fix is shipped, verified" kept being true for me but signup kept failing for the actual users complaining.
+
+**Fix shipped (migration 034_drop_legacy_migration_trigger.sql):**
+- `DROP TRIGGER IF EXISTS trigger_migrate_user ON public.profiles;`
+- Function `migrate_user_on_signup()` retained on disk with a `COMMENT ON FUNCTION` warning that it's dead code referencing non-existent columns.
+- Founder's standing directive (CEO-021 era) was already "clean break — legacy users re-sign-up fresh." So the trigger was dead by policy AND broken by schema drift.
+- Reproduction: temporary `pending_migrations` row + signup probe → was failing pre-fix, now returns HTTP 200. Probe row + auth.users row both cleaned up.
+
+**`pending_migrations` table state at session close:**
+- Still populated with legacy-user rows (Thomas, Feras, Roheena, and others) — `migrated=false` for all.
+- Now harmless: trigger gone, table is just data with no behaviour attached. Founder may want to drop the table + the dead function in a future cleanup but not urgent.
+
+**Production state at end of session — fully unblocked:**
+- Email/password signup works for ALL users including legacy ones in `pending_migrations`.
+- HIBP off, SMTP via Resend, all auth rate limits at 1,000,000/hr.
+- `mapAuthError` recognises `weak_password`, `user_already_exists`, `email_address_invalid`, `signup_disabled` across 11 locales.
+- `auth_client_errors` telemetry table active for any future failures.
+- Legacy migration trigger dropped; broken function retained as documented dead code.
+
+**Three roots of the same outage, in order of discovery:**
+1. **SMTP rate limit** (`rate_limit_email_sent=2/hr` on built-in SMTP) — fixed in commit `9df91d8` via Resend SMTP + 1M/hr limits.
+2. **HIBP password rejection** (`password_hibp_enabled=true` defaulting on, returning `weak_password`/422 unmapped by mapAuthError) — fixed via Management API PATCH + commit `d26bf84` for mapAuthError + i18n.
+3. **Stale migration trigger on profiles** (`migrate_user_on_signup` referencing renamed `credit_transactions` columns) — fixed via migration `034`.
+
+Each fix was real and necessary. Layer 1 hid layer 2; layer 2 hid layer 3. Without the telemetry table from `f0b1d48`, layer 3 would have taken hours more to find.
+
+**Permanent learning to add to memory:**
+- **Always inspect ALL trigger chains, not just the obvious one, when "Database error saving new user" appears.** The visible trigger is `on_auth_user_created → handle_new_user`. The chain continues silently into triggers on the destination table (`profiles`). For Penworth, that chain runs through `set_referral_code`, `migrate_user_on_signup`, and `update_profiles_updated_at`. Any of them can blow up the signup. Postgres logs / gotrue logs carry the exact SQLSTATE.
+
+**Tasks moved this session:**
+- Three layers of signup outage — all closed.
+- Founder action recommended: decide whether to drop `pending_migrations` table, `pending_project_migrations` table, and `migrate_user_on_signup()` function entirely. Current state: trigger dropped, data inert. Cleanup is hygiene, not urgency.
+
+**Recommended next-session targets (unchanged):**
+- CEO-051 (p0 open): per-chapter Inngest fan-out refactor.
+- CEO-043 (p1 in_progress): wire remaining 6 author-pipeline agents to DB-backed prompts.
+- CEO-090 (p1 open, owner=claude_code): PDF template v4.
+- CEO-117 (p1 open): `/turn` endpoint smoke-test.
+
+---
+
+## Earlier in same session (2026-04-26 ~12:10–13:35 UTC — production signup outage, full root-cause and fix)
 
 The 12:10 entry below documented the SMTP layer of this incident. After that fix shipped, two more legacy users (Thomas Dye, Feras Alali) and the Founder himself (fresh browser, fresh email) all hit the same "An error occurred. Please try again." Multiple turns of progressive diagnosis followed; the actual root cause is recorded here.
 
