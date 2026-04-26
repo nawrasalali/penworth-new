@@ -309,3 +309,62 @@ export async function findSessionIdForProject(
     return null;
   }
 }
+
+/**
+ * Default mid-operation heartbeat interval. Two minutes is well below
+ * every per-agent stuck threshold (writing is the longest at 45 min,
+ * but most agents reap at 10-15 min), so even one survived pulse
+ * inside a long LLM call is enough to keep the session out of the
+ * stuck queue. The Anthropic SDK's longest realistic single-call
+ * latency on Opus today sits around 5-8 minutes for a full chapter,
+ * so a 2-minute keepalive guarantees 2-3 pulses per call.
+ */
+const HEARTBEAT_KEEPALIVE_INTERVAL_MS = 2 * 60 * 1000;
+
+/**
+ * Run an async operation with a periodic heartbeat pulse. Use this
+ * to wrap long-running, single-shot LLM invocations (writing, outline,
+ * qa, cover) where step entry is the only natural pulse point but the
+ * underlying API call can take many minutes. Without this, a 40-minute
+ * Opus chapter call would never refresh `agent_heartbeat_at`, and the
+ * pipeline-health cron would mark the session stuck even though the
+ * agent is still actively waiting on a healthy upstream.
+ *
+ * Safety properties:
+ *   - If sessionId is null/undefined, runs the operation with no
+ *     keepalive overhead — useful for unit-tested code paths.
+ *   - The pulse runs through pulseHeartbeat(), which absorbs its own
+ *     errors, so a transient Supabase blip during a pulse never poisons
+ *     the wrapped operation.
+ *   - The interval is cleared in `finally`, so even a thrown operation
+ *     does not leak a timer. We also call `.unref()` so a hanging timer
+ *     can never prevent the Node process from exiting (relevant during
+ *     local dev / Inngest worker shutdown).
+ */
+export async function withHeartbeatKeepalive<T>(
+  sessionId: string | null | undefined,
+  operation: () => Promise<T>,
+  intervalMs: number = HEARTBEAT_KEEPALIVE_INTERVAL_MS,
+): Promise<T> {
+  if (!sessionId) {
+    return operation();
+  }
+
+  const timer = setInterval(() => {
+    // Fire-and-forget. pulseHeartbeat already swallows its own errors.
+    void pulseHeartbeat(sessionId);
+  }, intervalMs);
+
+  // Don't let the keepalive timer keep the event loop alive on its own.
+  // In Node this is a no-op on browser-style timers; in Inngest workers
+  // it matters during graceful shutdown.
+  if (typeof (timer as NodeJS.Timeout).unref === 'function') {
+    (timer as NodeJS.Timeout).unref();
+  }
+
+  try {
+    return await operation();
+  } finally {
+    clearInterval(timer);
+  }
+}

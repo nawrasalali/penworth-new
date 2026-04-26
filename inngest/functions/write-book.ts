@@ -8,6 +8,7 @@ import {
   markAgentCompleted,
   logIncident,
   bumpFailureCount,
+  withHeartbeatKeepalive,
 } from '@/lib/pipeline/heartbeat';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
@@ -303,6 +304,7 @@ export const writeBook = inngest.createFunction(
             projectCtx,
             prior: written.map((w) => w.title).join(', '),
             industry,
+            sessionId,
           });
         } catch (err) {
           // p3 = audit-only. Step will retry (Inngest retries:3 at fn
@@ -357,6 +359,7 @@ export const writeBook = inngest.createFunction(
             projectCtx,
             prior: written.map((w) => w.title).join(', '),
             industry,
+            sessionId,
           });
         } catch (err) {
           await logIncident({
@@ -419,6 +422,7 @@ export const writeBook = inngest.createFunction(
             projectCtx,
             prior: written.map((w) => w.title).join(', '),
             industry,
+            sessionId,
           });
         } catch (err) {
           await logIncident({
@@ -521,10 +525,18 @@ interface WriteSectionInput {
   };
   prior: string;
   industry: string;
+  /**
+   * Pipeline session id. When supplied, the long Anthropic call inside
+   * writeSection is wrapped with a 2-minute heartbeat keepalive so the
+   * stuck-agent reaper never trips on a healthy in-flight LLM request.
+   * Optional so unit tests / out-of-pipeline callers don't have to mint
+   * a session row.
+   */
+  sessionId?: string | null;
 }
 
 async function writeSection(inp: WriteSectionInput) {
-  const { kind, title, description, keyPoints, targetWords, bodyNumber, projectId, userId, docTitle, orderIndex, meta, voiceProfile, projectCtx, prior, industry } = inp;
+  const { kind, title, description, keyPoints, targetWords, bodyNumber, projectId, userId, docTitle, orderIndex, meta, voiceProfile, projectCtx, prior, industry, sessionId } = inp;
 
   // Retry-safety: if a prior run already wrote this chapter (same
   // project_id + order_index), short-circuit before touching the
@@ -589,18 +601,26 @@ async function writeSection(inp: WriteSectionInput) {
   // after gets a 10× cheaper cache-read on the same ~2-4k token block.
   // 5-minute TTL by default, which comfortably covers the 3-8 minute
   // book-writing window.
-  const response = await anthropic.messages.create({
-    model: writeModel,
-    max_tokens: maxTokensFor('write_chapter'),
-    system: [
-      {
-        type: 'text',
-        text: systemPrompt,
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    messages: [{ role: 'user', content: userPrompt }],
-  });
+  //
+  // Wrapped in withHeartbeatKeepalive so the stuck-agent reaper sees a
+  // 2-minute pulse cadence even though this is a single-shot LLM call.
+  // Without this, a 30+ minute Opus chapter call on a high-context
+  // book would let agent_heartbeat_at age past the writing-agent
+  // threshold and the cron would kill a healthy in-flight request.
+  const response = await withHeartbeatKeepalive(sessionId, () =>
+    anthropic.messages.create({
+      model: writeModel,
+      max_tokens: maxTokensFor('write_chapter'),
+      system: [
+        {
+          type: 'text',
+          text: systemPrompt,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
+  );
 
   const content = response.content
     .filter((b: any) => b.type === 'text')
