@@ -18,6 +18,8 @@ interface UsageData {
   credits_used: number;
   credits_limit: number;
   credits_purchased: number;
+  /** Cumulative positive admin grants from credits_ledger.transaction_type='admin_adjustment'. */
+  admin_grant_total: number;
   documents_this_month: number;
   documents_limit: number;
 }
@@ -164,10 +166,24 @@ function BillingContent() {
 
     const limits = planLimits[plan] || planLimits.free;
 
+    // Cumulative positive admin grants. Surfaces in the credits card so
+    // the user knows their boost came from an admin and how much. Only
+    // positive amounts to guard against any future schema drift where
+    // admins might log clawbacks via the same ledger surface.
+    const { data: adminGrantRows } = await supabase
+      .from('credits_ledger')
+      .select('amount')
+      .eq('user_id', user.id)
+      .eq('transaction_type', 'admin_adjustment')
+      .gt('amount', 0);
+    const adminGrantTotal =
+      adminGrantRows?.reduce((sum, r) => sum + (r.amount || 0), 0) || 0;
+
     setUsage({
       credits_used: limits.credits - (profile?.credits_balance || 0),
       credits_limit: limits.credits,
       credits_purchased: profile?.credits_purchased || 0,
+      admin_grant_total: adminGrantTotal,
       documents_this_month: docsThisMonth || 0,
       documents_limit: limits.docs,
     });
@@ -306,6 +322,12 @@ function BillingContent() {
           {usage.credits_purchased > 0 && (
             <p className="text-xs text-green-600 mt-1">
               + {usage.credits_purchased.toLocaleString()} {t('billing.credits', locale).toLowerCase()}
+            </p>
+          )}
+          {usage.admin_grant_total > 0 && (
+            <p className="text-xs text-emerald-600 mt-1">
+              {t('dashboard.receivedFromAdminTemplate', locale)
+                .replace('{amount}', usage.admin_grant_total.toLocaleString())}
             </p>
           )}
           <p className="text-xs text-muted-foreground mt-2 border-t pt-2">

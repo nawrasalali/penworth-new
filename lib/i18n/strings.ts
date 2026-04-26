@@ -341,6 +341,7 @@ export type StringKey =
   | 'dashboard.planSuffix' | 'dashboard.newProject'
   | 'dashboard.creditsAvailable'
   | 'dashboard.monthlyPurchasedTemplate'
+  | 'dashboard.receivedFromAdminTemplate'
   | 'dashboard.documentsThisMonth'
   | 'dashboard.remaining'
   | 'dashboard.wordsGenerated' | 'dashboard.last30Days'
@@ -896,6 +897,7 @@ const en: Bundle = {
   'dashboard.newProject': 'New Project',
   'dashboard.creditsAvailable': 'Credits available',
   'dashboard.monthlyPurchasedTemplate': '{monthly} monthly + {purchased} purchased',
+  'dashboard.receivedFromAdminTemplate': 'Received {amount} credits from admin',
   'dashboard.documentsThisMonth': 'Books this month',
   'dashboard.remaining': '{n} remaining',
   'dashboard.wordsGenerated': 'Words generated',
@@ -1475,6 +1477,7 @@ const ar: Bundle = {
   'dashboard.newProject': 'مشروع جديد',
   'dashboard.creditsAvailable': 'الرصيد المتاح',
   'dashboard.monthlyPurchasedTemplate': '{monthly} شهري + {purchased} مشترى',
+  'dashboard.receivedFromAdminTemplate': 'تم استلام {amount} رصيد من المسؤول',
   'dashboard.documentsThisMonth': 'الكتب هذا الشهر',
   'dashboard.remaining': 'متبقٍّ {n}',
   'dashboard.wordsGenerated': 'الكلمات المُولَّدة',
@@ -2054,6 +2057,7 @@ const es: Bundle = {
   'dashboard.newProject': 'Nuevo proyecto',
   'dashboard.creditsAvailable': 'Créditos disponibles',
   'dashboard.monthlyPurchasedTemplate': '{monthly} mensuales + {purchased} comprados',
+  'dashboard.receivedFromAdminTemplate': 'Recibiste {amount} créditos del administrador',
   'dashboard.documentsThisMonth': 'Libros este mes',
   'dashboard.remaining': '{n} restantes',
   'dashboard.wordsGenerated': 'Palabras generadas',
@@ -2633,6 +2637,7 @@ const fr: Bundle = {
   'dashboard.newProject': 'Nouveau projet',
   'dashboard.creditsAvailable': 'Crédits disponibles',
   'dashboard.monthlyPurchasedTemplate': '{monthly} mensuels + {purchased} achetés',
+  'dashboard.receivedFromAdminTemplate': 'Reçu {amount} crédits de l\'administrateur',
   'dashboard.documentsThisMonth': 'Livres ce mois',
   'dashboard.remaining': '{n} restants',
   'dashboard.wordsGenerated': 'Mots générés',
@@ -3212,6 +3217,7 @@ const pt: Bundle = {
   'dashboard.newProject': 'Novo projeto',
   'dashboard.creditsAvailable': 'Créditos disponíveis',
   'dashboard.monthlyPurchasedTemplate': '{monthly} mensais + {purchased} comprados',
+  'dashboard.receivedFromAdminTemplate': 'Recebido {amount} créditos do administrador',
   'dashboard.documentsThisMonth': 'Livros este mês',
   'dashboard.remaining': '{n} restantes',
   'dashboard.wordsGenerated': 'Palavras geradas',
@@ -3791,6 +3797,7 @@ const ru: Bundle = {
   'dashboard.newProject': 'Новый проект',
   'dashboard.creditsAvailable': 'Доступные кредиты',
   'dashboard.monthlyPurchasedTemplate': '{monthly} ежемесячных + {purchased} купленных',
+  'dashboard.receivedFromAdminTemplate': 'Получено {amount} кредитов от администратора',
   'dashboard.documentsThisMonth': 'Книг в этом месяце',
   'dashboard.remaining': 'Осталось {n}',
   'dashboard.wordsGenerated': 'Сгенерировано слов',
@@ -4370,6 +4377,7 @@ const zh: Bundle = {
   'dashboard.newProject': '新项目',
   'dashboard.creditsAvailable': '可用积分',
   'dashboard.monthlyPurchasedTemplate': '月度 {monthly} + 已购 {purchased}',
+  'dashboard.receivedFromAdminTemplate': '从管理员处收到 {amount} 积分',
   'dashboard.documentsThisMonth': '本月书籍',
   'dashboard.remaining': '剩余 {n}',
   'dashboard.wordsGenerated': '生成字数',
@@ -4949,6 +4957,7 @@ const bn: Bundle = {
   'dashboard.newProject': 'নতুন প্রকল্প',
   'dashboard.creditsAvailable': 'উপলব্ধ ক্রেডিট',
   'dashboard.monthlyPurchasedTemplate': '{monthly} মাসিক + {purchased} কেনা',
+  'dashboard.receivedFromAdminTemplate': 'অ্যাডমিনের কাছ থেকে {amount} ক্রেডিট পেয়েছেন',
   'dashboard.documentsThisMonth': 'এই মাসের বই',
   'dashboard.remaining': '{n} বাকি',
   'dashboard.wordsGenerated': 'তৈরি শব্দ',
@@ -5528,6 +5537,7 @@ const hi: Bundle = {
   'dashboard.newProject': 'नया प्रोजेक्ट',
   'dashboard.creditsAvailable': 'उपलब्ध क्रेडिट',
   'dashboard.monthlyPurchasedTemplate': '{monthly} मासिक + {purchased} खरीदे गए',
+  'dashboard.receivedFromAdminTemplate': 'एडमिन से {amount} क्रेडिट प्राप्त हुए',
   'dashboard.documentsThisMonth': 'इस महीने की पुस्तकें',
   'dashboard.remaining': '{n} बाकी',
   'dashboard.wordsGenerated': 'उत्पन्न शब्द',
@@ -6107,6 +6117,7 @@ const id: Bundle = {
   'dashboard.newProject': 'Proyek baru',
   'dashboard.creditsAvailable': 'Kredit tersedia',
   'dashboard.monthlyPurchasedTemplate': '{monthly} bulanan + {purchased} dibeli',
+  'dashboard.receivedFromAdminTemplate': 'Menerima {amount} kredit dari admin',
   'dashboard.documentsThisMonth': 'Buku bulan ini',
   'dashboard.remaining': '{n} tersisa',
   'dashboard.wordsGenerated': 'Kata dihasilkan',
@@ -6686,6 +6697,7 @@ const vi: Bundle = {
   'dashboard.newProject': 'Dự án mới',
   'dashboard.creditsAvailable': 'Tín dụng khả dụng',
   'dashboard.monthlyPurchasedTemplate': '{monthly} hàng tháng + {purchased} đã mua',
+  'dashboard.receivedFromAdminTemplate': 'Đã nhận {amount} tín dụng từ quản trị viên',
   'dashboard.documentsThisMonth': 'Sách tháng này',
   'dashboard.remaining': 'Còn {n}',
   'dashboard.wordsGenerated': 'Từ đã tạo',
