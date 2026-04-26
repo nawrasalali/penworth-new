@@ -1,12 +1,168 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-25 ~12:15 UTC by CEO Claude session (CEO-115 voice-interview pipeline live on Cartesia; Founder unblocked for first Guild interview test).
+**Last updated:** 2026-04-26 ~02:25 UTC by CEO Claude session (CEO-128 in-platform admin-grant indicator shipped — note the P0 banner above is from a parallel session and remains the most urgent open item).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-25 ~12:15 UTC — CEO-115 voice-interview Cartesia swap shipped)
+## ⚠ P0 PRODUCTION BLOCKER — READ FIRST (CEO-125, awaiting_founder)
+
+**Cartesia account credit cap is EXHAUSTED.** Discovered 2026-04-26 02:06 UTC during CEO-116 verification. Every call to `api.cartesia.ai/tts/bytes` returns HTTP 402 — every model (sonic, sonic-2, sonic-3), every locale (verified all 11). Body: "Model credits limit reached: Please upgrade your subscription at https://play.cartesia.ai/subscription to increase your credit limit or enable overages for your account." API key is valid (`/voices` returned 200), so this is account-level quota, not auth.
+
+**Production impact:** CEO-115 (Cartesia voice-interview pipeline shipped 2026-04-25) is non-functional in production right now. Any Guild applicant who attempts the voice interview hits a 402 mid-call before the interviewer says anything. The shipped runtime appears working in code review but is dead at the API boundary.
+
+**Founder action — single click resolves it:** Sign in at https://play.cartesia.ai/subscription and ENABLE OVERAGES on the current plan. ~60 seconds. Cartesia continues serving and bills the overflow at per-character rates. No commitment to a higher plan tier; first month of real usage tells us whether to upgrade or stay.
+
+**Until then:** any "Resume CEO-115" / "Resume CEO-117" / "test the Guild voice interview" instruction will fail at the same wall. Don't burn a session retrying.
+
+**Verification once unblocked:** re-run `/tmp/cartesia_smoke.py` (preserved in CEO-116's `last_update_note`). Expected: 11/11 locales return 200 with multi-KB MP3 bodies.
+
+**Post-unblock follow-up:** add a Vercel-cron daily health check that POSTs one character to Cartesia and pages on 4xx. Without this, we hit the same wall again silently.
+
+---
+
+## Most recent session activity (2026-04-26 ~02:10 UTC — CEO-128 in-platform admin-grant indicator shipped)
+
+Continuation of the long Grant credits / PR #3 / CEO-114 session. After the three-wall RPC bug stack was peeled (CEO-122/123/124) and grants verified end-to-end live, Founder asked: "make sure the receiver is notified on the new credits received, and make sure these credits are usable."
+
+1. **Spendability — verified, no fix needed.** `admin_grant_credits` writes to `profiles.credits_balance`. The publishing-credit spend (`lib/publishing/credits.ts`), the AI-usage endpoint (`/api/credits` POST), and the user dashboard (`/api/credits` GET) all read/write the same column. Same source. Granted credits are immediately spendable.
+2. **Notification — initial pass built an email path** (Resend wrapper + `adminCreditGrant` template in `lib/email/templates.ts`, `sendAdminCreditGrantEmail` in `lib/email/index.ts`, fire-and-forget call in `actions.ts`). Founder reviewed and pivoted: "no email notification, only inside the platform, on total credits, show received from admin x credit." Email work was reverted before push — no email is sent.
+3. **CEO-128 shipped as in-platform indicator.** Single emerald-tinted line under the credits balance on both `/dashboard` top stats card and `/billing` credits card: "Received N credits from admin." Source of truth is `credits_ledger` filtered by `user_id` and `transaction_type='admin_adjustment'`, summed over positive amounts only (negative-amount filter guards against future schema drift where admins might log clawbacks). Conditional render — line only shows when cumulative > 0, never adds clutter for users who've never received a grant. Three files touched: `app/(dashboard)/dashboard/page.tsx`, `app/(dashboard)/billing/page.tsx`, `lib/i18n/strings.ts`. New StringKey `dashboard.receivedFromAdminTemplate` populated for all 11 locales (en, ar, es, fr, pt, ru, zh, bn, hi, id, vi). Commit `965005c`, deploy `dpl_FwggEbLXHWibGCWx46ygve6uHuiR` READY in production.
+4. **i18n caveat captured.** I'm confident on en/ar/es/fr translations; bn/hi/vi are translation-quality but should be sanity-checked by a native reviewer before launch. Logged in CEO-128 metadata.
+5. **Process pattern to keep using.** Founder's "no email" pivot mid-task → reverted unpushed work cleanly via `git checkout --` before doing the right thing. Building forward-only without a kill switch would have shipped email noise nobody asked for.
+
+**Outstanding loops at end of session:**
+- PR #4 (penworth-store husky author-identity hook) still awaiting Founder merge.
+- GitHub branch ruleset for server-side author-email enforcement still not authorised.
+- bn/hi/vi translation review for the new admin-grant string before launch.
+- **CEO-125 P0 (above) is the most urgent thing in the queue** — Cartesia exhausted means voice interview is dead in production.
+
+**Next session first action:** if Founder authorises, top up Cartesia (CEO-125), then merge PR #4, then ship branch ruleset. Otherwise pick next priority-ranked open task.
+
+---
+
+## Prior session activity (2026-04-26 ~02:15 UTC — extended resume session: CEO-060 shipped, CEO-118 retracted, CEO-125 P0 surfaced)
+
+Long single-conversation session driven by Founder rolling instructions ("Resume CEO-118", "roll", "roll", "Continue", "Continue"). Net: one P1 UX bug shipped to production, four non-issues retired from the queue, two memory rules sharpened.
+
+1. **CEO-118 closed as non-incident.** The prior CEO-118 session had logged a 7-step P0 fix plan describing three stacked Vercel/GitHub crises. All three were sandbox-egress mirages — `curl -I` HEAD requests return real Vercel headers, but `curl` GET bodies come back as 18-byte stubs from Anthropic egress TLS inspection. Re-verified via Vercel and GitHub JSON APIs: `penworth.ai` apex + www are owned by NEW project; OLD has zero custom domains; commit `5e94d23` deployed cleanly as `dpl_CPNBtLBJf3jKCo`; legacy `nawrasalali/penworth-ai` repo is 13 days dormant. This is misfire #3 of the same pattern. Memory rule (#1) widened from "503 cert-chain check" to "any GET body ≤18 bytes is a stub; cross-verify via JSON APIs".
+
+2. **Queue housekeeping pass after CEO-118.** Walked the priority queue and found three more stale rows: CEO-021 had a "regression detected" appendix that was the same mirage (retracted, status stays done); CEO-005 was already shipped 2026-04-24 as commit `45e2b80` (no action); CEO-016 brief is 5 days stale and now misaligned with what got built (parallel weekly-checkin model coexists with the brief's monthly-PD model — both 0-row, neither E2E tested). CEO-016 → `awaiting_founder` with the architectural choice on the row.
+
+3. **CEO-121 closed as not-an-anomaly.** Investigated commit `52282d6a` ("feat(help): world-class redesign", `ceo@penworth.ai` author, no GitHub login). It is a legitimate 725-line help-page redesign aligned with the 2026-04-25 referral rewire. Survey of last 200 commits on `penworth-new` main found SIX author emails in active production use, all deploying cleanly: `119996438+nawrasalali@users.noreply.github.com`, `ceo-claude@penworth.ai`, `ceo@penworth.ai`, `claude@anthropic.com`, `founder@penworth.ai`, `nawras@penworth.ai`. The "Vercel rejects non-noreply" rule applies to `penworth-store` ONLY (CEO-114 husky hook is store-scoped). Memory rule (#3) refined accordingly.
+
+4. **CEO-078 closed as duplicate of CEO-073.** Verified `app/api/covers/generate/route.ts` on main: lines ~270-330 mirror Ideogram bytes to the `covers` Supabase Storage bucket via service-role client, unconditional on coverType — both front and back covers persist via path `${userId}/covers/${sessionId}-{coverType}.{ext}`. Commit `00368ed` already shipped this. CEO-078 was filed before that commit landed; redundant now.
+
+5. **CEO-060 SHIPPED to production.** Long-standing P1 from "The Rewired Self" incident 2026-04-24. Bug: when writing finishes, the editor's SSE `'complete'` event auto-advances to QA — but if the user closed their tab mid-write or lost connection at the wrong moment, the server still flips `pipeline_status` to `'completed'` while the client stays on `current_agent='writing'`. User comes back to a 100%-progress screen with no advance control, book FEELS stuck. Fix: emerald-tinted recovery banner at the top of `WritingScreen` with a "Continue to QA review" CTA, rendered only when `onContinueToQA` is wired AND we have chapters AND not actively writing AND (`pipelineStatus === 'completed'` OR all chapters complete). Handler in editor page mirrors the SSE branch exactly — refresh chapters from DB, `advanceToNextAgent({total, total, 100})`, `startQAChecks()`. Same outcome as SSE happy path; no surprising auto-state-change. Three i18n keys (`writing.allDoneHeading`, `writing.allDoneBody`, `writing.continueToQA`) added to `StringKey` union and populated in all 11 locale bundles via per-locale Python script (memory rule from commit 9f24dbb). Shipped as commit `4204eb4`, `dpl_YtYLTfF787Rfx7` READY in production. Pushed with `SKIP_TYPECHECK=1` because sandbox npm install left `next/headers` and `next/font/google` partially typed (3 pre-existing tsc errors, none on changed files); Vercel's full-deps `next build` typechecked clean.
+
+6. **CEO-120 spawned (p3, awaiting_founder)** — archive dormant `nawrasalali/penworth-ai` GitHub repo + delete OLD Vercel project `prj_6wRG4Qp9FG35U2WgKRJUP7kw2Q8E`. Both reversible. Founder green-light needed for the destructive Vercel DELETE.
+
+7. **CEO-116 BLOCKED, CEO-125 (P0) spawned** — picked up CEO-116 (verify Cartesia Sonic-3 covers all 11 Penworth locales) as a clean single-session ship. Built the smoke-test script (preserved at `/tmp/cartesia_smoke.py`), POSTed to `api.cartesia.ai/tts/bytes` with the exact production payload shape per locale. **All 11 locales returned HTTP 402 "Model credits limit reached"** — this is account-level, not sonic-3-specific (verified by also calling sonic-2 and sonic which 402 the same way; `/voices` returned 200 confirming the API key itself is valid). Implication: **CEO-115's voice-interview pipeline is non-functional in production right now** — every Guild applicant gets a 402 mid-call. Filed CEO-125 as P0 awaiting_founder for a single-click overage enable at https://play.cartesia.ai/subscription.
+
+8. **CEO-020 DR runbook authored — `docs/orchestration/dr-runbook.md` (367 lines, commit `7f774cd`).** Real-infrastructure-anchored: 119 public tables, 31 migrations, 9 storage buckets each named with size cap + regenerability, 3 inngest function files. Six drill scenarios (A-F) with explicit pass criteria and elapsed-time targets. Honest §7 gaps section names what we cannot recover from today and spawned three sub-tasks: CEO-129 (p1, R2 cross-region storage backup — without this, manuscripts loss = legal exposure to authors), CEO-130 (p2, encrypted offline env var backup), CEO-131 (p2 awaiting_founder, status.penworth.ai). CEO-020 itself moved to awaiting_founder for runbook review + a calendar slot for first drill (recommended: week before launch).
+
+**What needs Founder decision next session — RANK ORDER:**
+- **CEO-125 (P0)**: enable Cartesia overages (60-second click, no plan commitment) — until done, Guild voice interview is dead in prod.
+- **CEO-016**: weekly-checkin (recommended), monthly-PD (per stale brief), or both?
+- **CEO-020**: review DR runbook + schedule first drill calendar slot.
+- **CEO-131**: pick a status-page provider (instatus.com, statuspage.io, or roll-our-own).
+- **CEO-120**: green-light archive + DELETE of legacy repo + OLD Vercel project?
+- **PR #4 on penworth-store** (CEO-114 husky hook) still awaiting merge.
+
+**Next session first action:** if Founder hasn't actioned CEO-125, surface it again loudly before anything else — voice interview claims to work but cannot. Otherwise proceed on remaining `open` p1 work — CEO-129 (R2 mirror) is the most launch-critical, followed by CEO-049 (heartbeat keepalive, 2-hour code change), CEO-019 (load test runbook, similar shape to CEO-020).
+
+---
+
+## Prior session activity (2026-04-26 ~01:40 UTC — Grant credits three-wall bug stack peeled end-to-end, plus PR #3 unblock and CEO-114 hook earlier in session)
+
+Long session driven by Founder live reports. Five threads, all closed.
+
+1. **PR #3 in penworth-store unblocked** (start of session). vercel[bot] refused to deploy livebook-v3 PR with "No GitHub account was found matching the commit author email address". Root cause: commit `32f84f8` authored as `[email protected]` (Cloudflare email-obfuscation rewrite — same recurring bug from recent_updates memory). Fixed via `git commit --amend --reset-author --no-edit`, force-pushed. New SHA `20709ac`. PR has since been merged to main (`462fdff`).
+2. **CEO-114 shipped to PR #4 in penworth-store** (preventive). `chore(hooks): enforce GitHub-associated author identity via husky pre-commit`. Adds `husky@^9.1.7` + pre-commit hook reading `GIT_AUTHOR_IDENT`, blocks any commit whose identity is not (`nawrasalali`, `119996438+nawrasalali@users.noreply.github.com`). Tested negative + positive paths. Preview deploy READY. PR #4 awaiting Founder merge.
+3. **CEO-122 shipped — Grant credits wall #1: "authentication required"** (commit `a53cf057`, dpl_XArpXjMUwJbVkHzoN7kv347cQU92, READY 65s). Server action `grantCreditsAction` was calling SECURITY DEFINER RPC `admin_grant_credits` via `createServiceClient()` (service-role). Service-role calls have no user session → `auth.uid()` returned NULL → RPC raised "authentication required" 42501 before any work. Fix: switch to `createClient()` from `@/lib/supabase/server` (cookies-bound user-context). RPC's SECURITY DEFINER attribute handles privilege elevation regardless of caller client. Defence-in-depth preserved (requireAdminRole pre-validates; has_admin_role re-checks).
+4. **CEO-123 shipped — Grant credits wall #2: "invalid input syntax for type uuid: super_admin"** (migration 030, commit `4e0e550`). The RPC's role check called `has_admin_role('super_admin')` — single arg. Function signature is `(p_user_id uuid, p_required_role text DEFAULT NULL)`, so the string bound to `p_user_id` and Postgres failed with the uuid-syntax error. Fix: call `has_admin_role(v_caller_id, 'super_admin')`. Process-gap fix: function previously existed only in live DB (created out-of-band, never committed). Migration 030 captures it as authoritative source going forward. Scanned all 125 public functions for the same single-string-arg pattern; no siblings.
+5. **CEO-124 shipped — Grant credits wall #3: "column reference email is ambiguous"** (migration 031, commit `d6641dc`, dpl_62b1732uBuZAzZSGDovNxt3y63EW READY). The RPC's OUT params (user_id, email, amount_granted, new_balance, ledger_id) are in scope throughout the body; multiple SELECT/UPDATE statements reference columns named `email` and `user_id` on `profiles` / `credits_ledger`, causing Postgres to fail to disambiguate. Fix: DROP and recreate function with OUT params prefixed `out_` (out_user_id, out_email, out_amount_granted, out_new_balance, out_ledger_id), plus table aliases on every column reference for defence in depth. Application-side change in `actions.ts` to read renamed keys. **Verified end-to-end live**: Founder click landed credits_ledger row `c5032be3-368f-4dda-98de-fdaca41c5da6`, amount 1000, balance_after 998200, audit description correct.
+
+**Operational learnings captured this session:**
+- Supabase Management API (`api.supabase.com/v1/projects/{ref}/database/query`) returns Cloudflare 1010 from this sandbox unless a `User-Agent` header is set. Always include `-A "penworth-ceo-claude/1.0"` on bash curl calls.
+- When sandbox `node_modules` cleanup flakes mid-`npm ci`, `SKIP_TYPECHECK=1 git push` is acceptable for type-safe-by-construction changes; Vercel's `next build` typechecks independently. Used three times this session.
+- Out-of-band Supabase RPC creation (via dashboard SQL editor without committing a migration) is a process gap. `admin_grant_credits` was the visible casualty — three latent bugs in one function that never went through repo review. Mitigation flagged for follow-up: scan `pg_proc` for any public function not represented in `supabase/migrations/`.
+- New admin RPCs need a smoke-test step in the brief: call the RPC end-to-end from `actions.ts` before declaring shipped. `tsc --noEmit` does not catch Postgres semantic errors. All three Grant credits walls would have surfaced in 90 seconds with one test click.
+
+**Outstanding loops at end of session:**
+- PR #4 (penworth-store husky author-identity hook) awaiting Founder merge.
+- GitHub branch ruleset for server-side author-email enforcement still not authorised. Recommend yes when Founder has bandwidth.
+- CEO-121 (rogue `ceo@penworth.ai` commits on penworth-new main) confirmed by Founder as standard parallel-session pattern; memory rule scoped to penworth-store only.
+- Optional follow-ups: orphan-RPC scan (any `pg_proc` function not in migrations); admin-RPC smoke-test step in CEO briefs.
+
+**Next session first action:** if Founder asks for ruleset / orphan-RPC scan / smoke-test step, execute. Otherwise pick next priority-ranked open task.
+
+---
+
+## Prior session activity (2026-04-25 ~13:10 UTC — queue housekeeping after CEO-118 close-out)
+
+Diagnosis-only continuation of the CEO-118 session. Founder said "roll" — I worked the priority queue and found that the next three p0/p1 items in the project-instructions queue were either already done or had stale assumptions. Net result: zero code shipped, but three task rows now reflect ground truth and two memory rules are corrected.
+
+1. **CEO-021 phantom regression retracted.** The "REGRESSION DETECTED 2026-04-25" appendix on CEO-021's note was the same sandbox-egress mirage that drove CEO-118. Vercel API confirms penworth.ai/www are owned by NEW project; OLD has zero custom domains. Appended a retraction note to the row; status stays `done`.
+2. **CEO-005 Recipients CRUD UI** — verified this was already shipped 2026-04-24 (commit `45e2b80`). The project instructions claiming it as p1 to-do are stale. No action.
+3. **CEO-016 Mentor Agent UI → awaiting_founder.** Audited code + DB before writing UI. The brief (authored 2026-04-20) targets a monthly-PD model (`guild_pd_sessions`, `guild_growth_plans`, voice + PDF) — both DB tables exist but are 0-row, no API routes, no UI. Meanwhile a parallel weekly-checkin model has been built (`guild_weekly_checkins` table, `lib/guild/agents/mentor.ts` (110 lines), routes `/api/guild/agents/mentor/{start,continue,end}`, `app/guild/dashboard/agents/mentor/{page.tsx, MentorChat.tsx}`) — also 0-row, never run E2E. Founder needs to choose: ship monthly-PD per brief (heavier — voice + PDF runtime needs E2E first), ship the simpler weekly-checkin (smaller — finish wiring + one E2E), or both. Recommendation: weekly-checkin. Question parked on the row.
+4. **CEO-121 closed as not-an-anomaly.** Investigated commit `52282d6a` ("feat(help): world-class redesign", `ceo@penworth.ai` author). It's a legitimate 725-line help-page redesign aligned with the 2026-04-25 referral rewire. Survey of last 200 commits on penworth-new main: SIX author emails in active production use (`119996438+nawrasalali@users.noreply.github.com`, `ceo-claude@penworth.ai`, `ceo@penworth.ai`, `claude@anthropic.com`, `founder@penworth.ai`, `nawras@penworth.ai`). All deploy cleanly. The "Vercel rejects non-noreply" rule was over-generalized from `penworth-store` burns — it does NOT apply to `penworth-new`. CEO-114's husky hook is store-only.
+5. **Memory rules refined:**
+   - Sandbox-egress rule (#1) widened from "503 cert-chain check" to "any GET body ≤18 bytes is a stub; HEAD works; cross-verify via Vercel/GitHub JSON APIs". Misfire #3 now logged.
+   - Git-identity rule (#3) scoped to `penworth-store` ONLY. Don't burn cycles "fixing" non-noreply commits on `penworth-new`.
+6. **Tasks created/closed this pass:**
+   - `CEO-118` → done (non-incident, see prior session entry)
+   - `CEO-120` → awaiting_founder (legacy repo + OLD Vercel project cleanup, p3, needs go for Vercel DELETE)
+   - `CEO-121` → done (rogue committer was standard pattern)
+   - `CEO-016` → awaiting_founder (mentor architecture choice)
+   - `CEO-021` → done (retraction note appended)
+
+**What the Founder needs to decide next:**
+- **CEO-016**: ship monthly-PD per brief, ship weekly-checkin (recommended), or both?
+- **CEO-120**: green-light DELETE of OLD Vercel project `prj_6wRG4Qp9FG35U2WgKRJUP7kw2Q8E` and archive of `nawrasalali/penworth-ai` GitHub repo? (Both reversible.)
+- **PR #4 on penworth-store** (CEO-114 husky hook) still awaiting merge from the 12:56 UTC session.
+
+**Next session first action:** if Founder picks a CEO-016 path, execute. Otherwise pick the highest-priority `open` task that has not been audited this day — likely CEO-019 (load test) or CEO-020 (DR drill), both of which need a runbook authored from scratch.
+
+---
+
+## Prior session activity (2026-04-25 ~12:56 UTC — CEO-122 admin-grant fix shipped + CEO-114 husky hook + PR #3 unblock, all in one session)
+
+This was a multi-thread session driven by Founder live reports. Three threads, all closed:
+
+1. **PR #3 in penworth-store unblocked** (start of session). `vercel[bot]` had refused to deploy livebook-v3 PR with "No GitHub account was found matching the commit author email address". Root cause: commit `32f84f8` authored as `[email protected]` (Cloudflare email-obfuscation rewrite — exactly the recurring bug documented in recent_updates memory). Cloned `penworth-store`, set GitHub-noreply identity, ran `git commit --amend --reset-author --no-edit`, force-pushed. New SHA `20709ac`. Vercel went Building immediately; PR has since been merged to main (`462fdff`).
+2. **CEO-114 shipped to PR #4 in penworth-store** (preventive hardening). `chore(hooks): enforce GitHub-associated author identity via husky pre-commit` at https://github.com/nawrasalali/penworth-store/pull/4. Adds `husky@^9.1.7` + `prepare: "husky || true"` script + `.husky/pre-commit` that reads `GIT_AUTHOR_IDENT`, parses name/email with sed, blocks any commit whose identity is not (`nawrasalali`, `119996438+nawrasalali@users.noreply.github.com`). Tested negative path (blocks `Bad Person <[email protected]>`) and positive path. Preview deploy READY. Awaiting Founder merge. Founder also flagged the same hook should land in penworth-new (CEO-121 already tracking the symptom there).
+3. **CEO-122 admin-grant fix shipped to production** (mid-session, Founder live report with screenshot). Founder hit "authentication required" red banner on `/admin/command-center/grants` when clicking Grant credits. Diagnosed via Supabase Management API: RPC `admin_grant_credits` is `SECURITY DEFINER` and internally checks `auth.uid()` for caller identity + `has_admin_role('super_admin')` for authz. The server action was calling it via `createServiceClient()` (service-role key) — service-role calls have no user session, so `auth.uid()` returned NULL and the RPC raised "authentication required" (42501) before doing any work. Fix: switch to `createClient()` from `@/lib/supabase/server` (cookies-bound user-context). RPC's `SECURITY DEFINER` attribute handles privilege elevation regardless of caller client. Defence-in-depth preserved — `requireAdminRole` pre-validates AND `has_admin_role` re-checks. Deployed as commit `a53cf057` / `dpl_XArpXjMUwJbVkHzoN7kv347cQU92`, READY in 65 seconds, aliased to penworth.ai/new.penworth.ai/www.penworth.ai. Pushed with `SKIP_TYPECHECK=1` because sandbox node_modules reinstall flaked; Vercel `next build` typechecked independently and passed. Only one admin server action with this pattern; scanned, no siblings.
+4. **Operational learnings captured:**
+   - Supabase Management API (`api.supabase.com/v1/projects/{ref}/database/query`) returns Cloudflare 1010 from this sandbox unless a `User-Agent` header is set. Always include `-A "penworth-ceo-claude/1.0"` or equivalent on bash-based curl calls to it.
+   - When sandbox node_modules cleanup flakes mid-`npm ci`, fall back to `SKIP_TYPECHECK=1 git push` for tightly-scoped changes that are type-safe by construction (e.g. import swaps to functions with identical signatures), and rely on Vercel's independent `next build` typecheck to catch anything wrong. Rollback is `git revert` if the build errors.
+5. **Outstanding loops at end of session:**
+   - PR #4 in penworth-store awaiting Founder merge.
+   - Founder's earlier "ship the GitHub branch ruleset too" question (server-side enforcement of author email allow-list) deferred — not yet authorised. Recommend yes when Founder has bandwidth.
+   - Founder agreed on Vercel auth: leave Deployment Protection on for `penworth-store`, durable fix is signing into Vercel in browser as team owner.
+6. Tasks updated: CEO-114 → `awaiting_founder` (PR #4 merge); CEO-122 → `done` (production verified).
+
+**Next session first action:** if Founder replies "merge PR #4" or "ship the ruleset", execute. Otherwise pick next priority-ranked open task.
+
+---
+
+## Prior session activity (2026-04-25 ~12:45 UTC — CEO-118 closed as non-incident, two follow-ups spawned)
+
+1. **CEO-118 closed as a non-incident.** The prior CEO-118 session left a 7-step P0 fix plan describing three stacked issues: (A) `penworth.ai` still aliased to OLD Vercel project, (B) commit `5e94d23` did not auto-deploy on NEW project, (C) legacy `nawrasalali/penworth-ai` repo had four unknown commits this session. Re-verified all three from authoritative sources (Vercel API for aliases + deployments, GitHub API for commit history). All three were false positives.
+2. **Reality (A):** Vercel API confirms `penworth.ai` and `www.penworth.ai` are owned by NEW project `prj_9EWDVGIK1CNzWdMUwEv7KTSep70i`, both verified, www→apex 308 redirect intact. OLD project `prj_6wRG4Qp9FG35U2WgKRJUP7kw2Q8E` has zero custom domains — only `project-zeoe1.vercel.app`. CEO-021 Step 1 already worked.
+3. **Reality (B):** Commit `5e94d23` (Send credits + Store Admin) deployed successfully as `dpl_CPNBtLBJf3jKCo` to production at 2026-04-25 12:04:31 UTC. Auto-deploy is healthy. Current production is `dpl_FhsjxjHZKFuQvj9Ut3sujnL3TotC` at sha `3fbbc67f` — a docs-only commit on top.
+4. **Reality (C):** `nawrasalali/penworth-ai` legacy repo's last commit is 2026-04-12 17:34 UTC, 13 days dormant. No fresh pushes this session. The previous session imagined the four pushes from sandbox-egress noise.
+5. **Root cause of the misdiagnosis** is the same Anthropic sandbox-egress TLS-inspection trap that misfired CEO-028 twice. Sandbox `curl -I` HEAD requests return real Vercel headers; sandbox `curl` GET bodies return an 18-byte "DNS cache overflow" stub. The prior session ran GETs against `penworth.ai/`, got the 18-byte stub, interpreted the empty body as evidence the wrong project was serving, and built a fictional crisis. Memory rule updated to widen the diagnostic from "TLS cert chain check" to "any GET body ≤18 bytes is a stub — never act on it; always cross-verify via Vercel/GitHub JSON APIs". This is misfire #3.
+6. **One real anomaly captured separately as CEO-121 (p3, open):** commit `52282d6a55` on `penworth-new` main (2026-04-25 11:12:56 UTC, "feat(help): world-class redesign") was authored under `ceo@penworth.ai` with no associated GitHub login. Violates the noreply-email memory rule but Vercel accepted it and it deployed. Yellow flag, not red — needs investigation but not blocking.
+7. **CEO-120 (p3, awaiting_founder)** spawned for the legitimate cleanup loose end: archive the dormant `nawrasalali/penworth-ai` GitHub repo (reversible) and delete OLD Vercel project `prj_6wRG4Qp9FG35U2WgKRJUP7kw2Q8E` (recoverable from same GitHub repo). Founder green-light needed for the destructive Vercel DELETE.
+8. **No code shipped this session** — diagnosis-only resume. The two follow-ups are queued in `ceo_orchestration_tasks`.
+
+**Next session first action:** if any task arrives that requires fetching a live web page body, route via Vercel/GitHub API or `web_fetch` (different egress path), never via bash `curl <url>` for HTML.
+
+---
+
+## Prior session activity (2026-04-25 ~12:15 UTC — CEO-115 voice-interview Cartesia swap shipped)
 
 1. **CEO-115 closed** — guild voice-interview pipeline now runs entirely on Cartesia (Ink-Whisper STT + Sonic-3 TTS). Single-file commit `7dec203` swapping `lib/ai/guild-interviewer.ts`. Production smoke-test against Founder's Arabic test application (`0945e125-5d1e-47de-888e-527e18750a06`) returned HTTP 200 + 284KB Arabic mp3 from Sonic-3; interview row `2752e61e-1a60-42f1-9c32-b26b0e72e38b` created. Founder ready to walk full UI test at `https://new.penworth.ai/guild/interview/schedule?application_id=0945e125-5d1e-47de-888e-527e18750a06`.
 2. **Root cause why the pipeline was dead:** `OPENAI_API_KEY` was never set on writer Vercel. The original code called OpenAI Whisper + OpenAI TTS. The first call to `/api/guild/interview/start` would 500 on `synthesizeSpeech` before returning the opening question to the browser. Discovered via Vercel env-var enumeration during the diagnostic phase.

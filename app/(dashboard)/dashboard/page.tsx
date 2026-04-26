@@ -96,6 +96,23 @@ export default async function DashboardPage() {
   const totalCredits = creditsBalance + creditsPurchased;
   const documentsThisMonth = profile?.documents_this_month || 0;
 
+  // Cumulative credits received via admin grants (from credits_ledger,
+  // transaction_type='admin_adjustment'). Surfaces as a small line under
+  // the credits card so the user knows where the boost came from. Read
+  // separately from the profile because the ledger is the source of
+  // truth for how the balance was assembled. Only positive amounts are
+  // counted — admins shouldn't be able to create negative grants today,
+  // but the filter guards against future schema drift where the same
+  // ledger surface might log admin clawbacks.
+  const { data: adminGrantRows } = await supabase
+    .from('credits_ledger')
+    .select('amount')
+    .eq('user_id', user?.id)
+    .eq('transaction_type', 'admin_adjustment')
+    .gt('amount', 0);
+  const adminGrantTotal =
+    adminGrantRows?.reduce((sum, r) => sum + (r.amount || 0), 0) || 0;
+
   // Fetch recent projects
   const { data: recentProjects } = await supabase
     .from('projects')
@@ -161,6 +178,12 @@ export default async function DashboardPage() {
                 .replace('{monthly}', creditsBalance.toLocaleString())
                 .replace('{purchased}', creditsPurchased.toLocaleString())}
             </p>
+            {adminGrantTotal > 0 && (
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                {t('dashboard.receivedFromAdminTemplate', locale)
+                  .replace('{amount}', adminGrantTotal.toLocaleString())}
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card>

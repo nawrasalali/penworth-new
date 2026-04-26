@@ -56,6 +56,12 @@ interface WritingScreenProps {
   pipelineFailureReason?: string | null;
   failureCount?: number;
   onRetryWriting?: () => void;
+  // CEO-060 — manual advance to QA. Used when the user landed on the
+  // writing screen with the run already finished (closed tab mid-write,
+  // SSE 'complete' event missed). When absent, the recovery banner is
+  // not shown — the editor page is the source of truth for whether
+  // advance is wired.
+  onContinueToQA?: () => void;
 }
 
 export function WritingScreen({
@@ -72,6 +78,7 @@ export function WritingScreen({
   pipelineFailureReason = null,
   failureCount = 0,
   onRetryWriting,
+  onContinueToQA,
 }: WritingScreenProps) {
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
@@ -137,6 +144,55 @@ export function WritingScreen({
           {t('writing.subtitle', locale)}
         </p>
       </div>
+
+      {/* CEO-060 — Writing-complete recovery CTA.
+
+          Bug being fixed: when the writing run finishes, the editor's
+          SSE 'complete' handler auto-advances to QA. But if the user
+          closed their tab mid-write (or just lost connection at the
+          wrong moment) they come back to a screen that says "100%
+          complete" with no obvious way forward and the book FEELS
+          stuck. Founder hit this on his own book "The Rewired Self"
+          on 2026-04-24 — chapters were all written but the UI offered
+          no advance control.
+
+          The banner only renders when we KNOW the run is done AND
+          the parent has wired `onContinueToQA`. Two completion
+          signals satisfy "done": (a) pipelineStatus === 'completed'
+          (server-authoritative — the inngest writing function flips
+          this when the last chapter lands), or (b) every chapter row
+          we know about is in 'complete' status AND we are not still
+          actively writing (so we ignore the transient pre-status-
+          flip moment). hasChapters guards the empty-outline edge
+          case; without it a 0/0 ratio would also satisfy condition
+          (b) and we'd flash the banner before any work has happened. */}
+      {onContinueToQA && hasChapters && !isWriting && (
+        pipelineStatus === 'completed' ||
+        completedChapters === chapters.length
+      ) && (
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex-shrink-0 rounded-full bg-emerald-100 p-1.5 dark:bg-emerald-900/50">
+              <CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                {t('writing.allDoneHeading', locale)}
+              </h3>
+              <p className="mt-1 text-sm text-emerald-800/90 dark:text-emerald-200/80">
+                {t('writing.allDoneBody', locale)}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={onContinueToQA}
+              className="flex-shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {t('writing.continueToQA', locale)}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Pipeline health banner — shown only when the run is in a
           non-happy state. Drives the founder's P0 fix: before this
