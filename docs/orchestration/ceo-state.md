@@ -1,12 +1,47 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-26 ~13:55 UTC by CEO Claude session (THREE-LAYER signup outage fully resolved — SMTP, HIBP, and a stale legacy-migration trigger; all three real, all three required).
+**Last updated:** 2026-04-27 ~00:00 UTC by CEO Claude session (CEO-151 shipped — academy-generate-audio edge function deployed v3 ACTIVE; all 30 audio targets generated for the 3 mandatory Foundations courses).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-26 ~13:35–13:55 UTC — third layer of signup outage: stale migrate_user_on_signup trigger)
+## Most recent session activity (2026-04-26 23:30–24:00 UTC — CEO-151 academy audio pipeline shipped end-to-end)
+
+**What shipped (PR #14, commit `af8d98f`):**
+- `supabase/functions/academy-generate-audio/index.ts` — new edge function; POST `{slug, target, force?}` with `x-admin-secret`; calls ElevenLabs `with-timestamps`; uploads mp3 + alignment.json + .srt to `guild-academy/audio/{slug}/{target}.{ext}`. Deployed v3 ACTIVE on project `lodupspxdvadamrqvkje`.
+- `scripts/generate-academy-audio.ts` — fixed Daniel voice ID (was `onwK4e9ZLuTAKqWW03F`, 19 chars; correct `onwK4e9ZLuTAKqWW03F9`, verified live via `/v1/voices` listing). Local fallback script never exercised the daniel-voiced segments, so the bug had been latent.
+
+**Audio coverage now in `guild-academy` bucket (90 storage objects, ~125 MB total):**
+- welcome-to-the-guild: seg-1…seg-6 + cp-a-prompt + cp-a-wrong + cp-b-prompt + cp-b-wrong (40.4 MB)
+- commission-mechanics: same 10 targets (42.3 MB)
+- representing-penworth-well: same 10 targets (42.2 MB)
+
+Player at `app/guild/dashboard/academy/[slug]/page.tsx` reads from exactly these paths. Previously degraded to text-only; will now serve audio + captions for all three mandatory courses.
+
+**Operational notes captured for future sessions:**
+- Edge function reachable from Supabase network via `pg_net.http_post()`. Sandbox egress blocks the functions endpoint (per memory).
+- `pg_net` `timeout_milliseconds` should be ≥150000ms for segment-length narration; some calls take 130–145s. Even when pg_net abandons the response stream, the edge function still completes the upload.
+- Cost: ~$13 per course at ElevenLabs Creator pricing, ~$40 total one-time. Function skips files that already exist in storage unless `force=true` is passed.
+- Voice rotation: brian (seg-1, seg-2), charlotte (seg-3, cp-a-prompt, cp-a-wrong), daniel (seg-4, seg-5), rachel (cp-b-prompt, cp-b-wrong, seg-6).
+
+**Key learning — CEO-134 deploy pattern reused:** edge function deployment via Management API multipart works without modification.
+```
+POST https://api.supabase.com/v1/projects/{ref}/functions/deploy?slug={name}&bundleOnly=false
+Authorization: Bearer {SUPABASE_MANAGEMENT_PAT}
+multipart: metadata (JSON, type=application/json) + file (TS, type=application/typescript)
+```
+Status flips from BUILDING to ACTIVE; version increments on each deploy. Use this for any future Deno edge function ship.
+
+**Health snapshot at session start:**
+- Stuck sessions: 0. Open incidents: 0. Webhook failures (24h): 0. Unacked alerts (24h): 4 (all P2/P3 stuck-agent fires from 2026-04-26 17:10 UTC and earlier — known CEO-043 symptoms; no new investigation needed).
+- Queue: 25 open (ceo), 23 awaiting_founder, 7 blocked, 1 in_progress (CEO-043 Phase 1 still pending).
+- Store live listings: 4. Guild members: 1 active.
+
+---
+
+## Earlier session activity (2026-04-26 ~13:55 UTC — three-layer signup outage fully resolved)
+
 
 After SMTP fix and HIBP disable both shipped, Founder retried in incognito with `rohinawras@gmail.com` → same generic error. **The fix from earlier in the session DID work** — but only for emails not in `pending_migrations`. Legacy users (Thomas Dye, Feras Alali, Roheena Tahir / rohinawras) hit a third layer of failure that my probes had been accidentally avoiding.
 
