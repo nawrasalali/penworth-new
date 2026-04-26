@@ -1,12 +1,33 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-26 ~09:08 UTC by CEO Claude session (PR #6 bundle merged + 5 tasks closed: CEO-103/105/106/107/108).
+**Last updated:** 2026-04-26 ~09:42 UTC by CEO Claude session (Cartesia killed, ElevenLabs TTS live, env vars deleted, P0 cleared).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-26 ~09:08 UTC — bundle PR #6 merged, 5 tasks shipped)
+## Most recent session activity (2026-04-26 ~09:42 UTC — Cartesia killed, ElevenLabs TTS live in production)
+
+Founder gave a one-line directive: "swap to elevenlabs, kills cartesia". Cartesia credit cap had exhausted production (CEO-125 P0 from prior session). Provider swap shipped end-to-end in this session.
+
+**What shipped:**
+- **PR #7** (squash `fc3f174`) — `lib/ai/guild-interviewer.ts` + `supabase/functions/admin-generate-livebook/index.ts` swapped from Cartesia to ElevenLabs (TTS) + OpenAI Whisper (STT). Voice IDs mirror the existing Store narration map (Adam multilingual + Rachel English).
+- **Edge function `admin-generate-livebook`** explicitly deployed via Supabase Management API (POST `/v1/projects/{ref}/functions/deploy?slug={name}` multipart). Bumped from version 9 (Cartesia) to version 10 (ElevenLabs). The merge alone did NOT trigger the deploy — see new memory rule.
+- **Vercel env cleanup:** `CARTESIA_API_KEY` (id `GTQprTDfc0iY8OHD`) and `CARTESIA_KEY` (id `Yi5xua2oSAKLWtDp`) both DELETEd from `prj_9EWDVGIK1CNzWdMUwEv7KTSep70i`. Verified 0 Cartesia env vars remain.
+- **Supabase secrets cleanup:** `CARTESIA_KEY` deleted from edge function secrets. `ELEVENLABS_API_KEY` added (mirrors the Vercel env var). Verified 0 Cartesia secrets remain.
+- **Smoke verification:** edge function returns 403 "forbidden" on bad `x-admin-secret` post-cleanup, which proves the `ELEVENLABS_API_KEY` env-presence guard still passes — the function reads the new key correctly and runs to the auth check.
+
+**Tasks closed:** CEO-125 (P0 Cartesia exhausted), CEO-133 (CARTESIA_KEY rotation — superseded), CEO-134 (the swap itself), CEO-136 (env var deletion — CEO portion done; awaiting Founder for subscription cancellation only).
+
+**Single Founder action remaining:**
+- Add `OPENAI_API_KEY` to Vercel env (`prj_9EWDVGIK1CNzWdMUwEv7KTSep70i`, all 3 targets). Without it, Guild voice interview transcription throws on every applicant turn. TTS is fully working without it. Tracked as **CEO-135 (p1, awaiting_founder)**.
+- Cancel Cartesia subscription at `play.cartesia.ai/subscription`. Tracked as the last bullet under **CEO-136**.
+
+**New memory rule captured:** Supabase edge functions do NOT auto-deploy from GitHub merges. Repo source on main can lag the deployed function indefinitely until an explicit deploy via the Management API. Verified via the version field on `GET /v1/projects/{ref}/functions/{slug}`. Memory entry #12 added.
+
+---
+
+## Prior session activity (2026-04-26 ~09:08 UTC — bundle PR #6 merged, 5 tasks shipped)
 
 Multi-session arc spanning ~7 chat sessions of incremental work culminated in a single squash-merge to main. Bundle contained:
 
@@ -39,19 +60,15 @@ Multi-session arc spanning ~7 chat sessions of incremental work culminated in a 
 
 ---
 
-## ⚠ P0 PRODUCTION BLOCKER — READ FIRST (CEO-125, awaiting_founder)
+## ✓ Cleared P0 — Cartesia exhausted (CEO-125)
 
-**Cartesia account credit cap is EXHAUSTED.** Discovered 2026-04-26 02:06 UTC during CEO-116 verification. Every call to `api.cartesia.ai/tts/bytes` returns HTTP 402 — every model (sonic, sonic-2, sonic-3), every locale (verified all 11). Body: "Model credits limit reached: Please upgrade your subscription at https://play.cartesia.ai/subscription to increase your credit limit or enable overages for your account." API key is valid (`/voices` returned 200), so this is account-level quota, not auth.
+**Resolved 2026-04-26 ~09:42 UTC by CEO-134.** The Cartesia credit cap was killing every TTS call from CEO-115's voice-interview pipeline. Founder authorized the full provider swap; the entire Cartesia integration was replaced with ElevenLabs (TTS) + OpenAI Whisper (STT) and the env vars were deleted. See "Most recent session activity" at the top for the close-out detail. Historical context preserved below for the audit trail; no action needed.
 
-**Production impact:** CEO-115 (Cartesia voice-interview pipeline shipped 2026-04-25) is non-functional in production right now. Any Guild applicant who attempts the voice interview hits a 402 mid-call before the interviewer says anything. The shipped runtime appears working in code review but is dead at the API boundary.
+The original banner read:
 
-**Founder action — single click resolves it:** Sign in at https://play.cartesia.ai/subscription and ENABLE OVERAGES on the current plan. ~60 seconds. Cartesia continues serving and bills the overflow at per-character rates. No commitment to a higher plan tier; first month of real usage tells us whether to upgrade or stay.
+> **Cartesia account credit cap is EXHAUSTED.** Every call to `api.cartesia.ai/tts/bytes` returned HTTP 402 — every model, every locale. CEO-115 voice-interview pipeline was non-functional in production. Founder action requested: enable overages at `play.cartesia.ai/subscription`. CEO-134 took the alternate path: kill Cartesia entirely.
 
-**Until then:** any "Resume CEO-115" / "Resume CEO-117" / "test the Guild voice interview" instruction will fail at the same wall. Don't burn a session retrying.
-
-**Verification once unblocked:** re-run `/tmp/cartesia_smoke.py` (preserved in CEO-116's `last_update_note`). Expected: 11/11 locales return 200 with multi-KB MP3 bodies.
-
-**Post-unblock follow-up:** add a Vercel-cron daily health check that POSTs one character to Cartesia and pages on 4xx. Without this, we hit the same wall again silently.
+**Single residual Founder action:** cancel the Cartesia subscription at `play.cartesia.ai/subscription` (no longer urgent — the env vars are gone, no traffic flows there). Tracked under CEO-136.
 
 ---
 
