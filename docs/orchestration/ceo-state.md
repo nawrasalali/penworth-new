@@ -60,13 +60,17 @@ Long single-conversation session driven by Founder rolling instructions ("Resume
 
 7. **CEO-116 BLOCKED, CEO-125 (P0) spawned** — picked up CEO-116 (verify Cartesia Sonic-3 covers all 11 Penworth locales) as a clean single-session ship. Built the smoke-test script (preserved at `/tmp/cartesia_smoke.py`), POSTed to `api.cartesia.ai/tts/bytes` with the exact production payload shape per locale. **All 11 locales returned HTTP 402 "Model credits limit reached"** — this is account-level, not sonic-3-specific (verified by also calling sonic-2 and sonic which 402 the same way; `/voices` returned 200 confirming the API key itself is valid). Implication: **CEO-115's voice-interview pipeline is non-functional in production right now** — every Guild applicant gets a 402 mid-call. Filed CEO-125 as P0 awaiting_founder for a single-click overage enable at https://play.cartesia.ai/subscription.
 
+8. **CEO-020 DR runbook authored — `docs/orchestration/dr-runbook.md` (367 lines, commit `7f774cd`).** Real-infrastructure-anchored: 119 public tables, 31 migrations, 9 storage buckets each named with size cap + regenerability, 3 inngest function files. Six drill scenarios (A-F) with explicit pass criteria and elapsed-time targets. Honest §7 gaps section names what we cannot recover from today and spawned three sub-tasks: CEO-129 (p1, R2 cross-region storage backup — without this, manuscripts loss = legal exposure to authors), CEO-130 (p2, encrypted offline env var backup), CEO-131 (p2 awaiting_founder, status.penworth.ai). CEO-020 itself moved to awaiting_founder for runbook review + a calendar slot for first drill (recommended: week before launch).
+
 **What needs Founder decision next session — RANK ORDER:**
 - **CEO-125 (P0)**: enable Cartesia overages (60-second click, no plan commitment) — until done, Guild voice interview is dead in prod.
 - **CEO-016**: weekly-checkin (recommended), monthly-PD (per stale brief), or both?
+- **CEO-020**: review DR runbook + schedule first drill calendar slot.
+- **CEO-131**: pick a status-page provider (instatus.com, statuspage.io, or roll-our-own).
 - **CEO-120**: green-light archive + DELETE of legacy repo + OLD Vercel project?
 - **PR #4 on penworth-store** (CEO-114 husky hook) still awaiting merge.
 
-**Next session first action:** if Founder hasn't actioned CEO-125, surface it again loudly before anything else — voice interview claims to work but cannot. Then re-run `/tmp/cartesia_smoke.py` to verify and close CEO-116. After that, pick highest-priority `open` task — likely CEO-019 (load test runbook) or CEO-020 (DR drill runbook).
+**Next session first action:** if Founder hasn't actioned CEO-125, surface it again loudly before anything else — voice interview claims to work but cannot. Otherwise proceed on remaining `open` p1 work — CEO-129 (R2 mirror) is the most launch-critical, followed by CEO-049 (heartbeat keepalive, 2-hour code change), CEO-019 (load test runbook, similar shape to CEO-020).
 
 ---
 
