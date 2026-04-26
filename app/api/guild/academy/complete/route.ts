@@ -9,6 +9,7 @@ import {
   isLocked,
   scoreSubmission,
 } from '@/lib/academy/quiz';
+import { triggerActivationIfEligible } from '@/lib/academy/activation';
 
 export const dynamic = 'force-dynamic';
 
@@ -173,6 +174,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to save progress' }, { status: 500 });
     }
 
+    // Activation flow — fires when a passing submission was for a mandatory
+    // course AND the member has now passed all three. Idempotent server-side
+    // (academy_completed_at gate), so racing parallel submissions are safe.
+    let activation: Awaited<ReturnType<typeof triggerActivationIfEligible>> | null = null;
+    if (passed && module.category === 'mandatory') {
+      try {
+        activation = await triggerActivationIfEligible(member.id, admin);
+      } catch (e) {
+        console.error('[academy/complete] activation trigger error', e);
+        // Don't fail the quiz submission just because activation has a
+        // downstream issue — the member can retry via /api/guild/academy/activate.
+      }
+    }
+
     return NextResponse.json({
       passed,
       score: scored.score,
@@ -183,6 +198,16 @@ export async function POST(req: NextRequest) {
       attempts_remaining: Math.max(0, config.max_attempts - newAttemptsUsed),
       locked_until: lockoutUntil,
       missed_question_ns: passed ? [] : scored.missed,
+      activation: activation
+        ? {
+            activated: activation.activated,
+            already_activated: activation.already_activated,
+            referral_code: activation.referral_code,
+            certificate_code: activation.certificate_code,
+            certificate_pdf_url: activation.certificate_pdf_signed_url,
+            email_sent: activation.email_sent,
+          }
+        : null,
     });
   } catch (e: any) {
     console.error('[academy/complete] exception', e);

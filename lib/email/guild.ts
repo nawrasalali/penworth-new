@@ -116,6 +116,35 @@ export async function sendGuildPostInterviewCodeEmail(params: {
 }
 
 // ---------------------------------------------------------------------------
+// Academy Foundations completion — fires when a member passes the third
+// mandatory course. Activation flow has issued the certificate, set the
+// referral code, and unlocked the seven Guild agents.
+// ---------------------------------------------------------------------------
+
+export async function sendGuildAcademyActivationEmail(params: {
+  email: string;
+  displayName: string;
+  referralCode: string;
+  certificateCode: string;
+  certificatePdfUrl: string;
+  verifyUrl: string;
+  tier: string;
+}) {
+  return sendGuildEmail({
+    to: params.email,
+    subject: 'Your Penworth Guild Foundations are complete',
+    html: academyActivationTemplate(
+      params.displayName,
+      params.referralCode,
+      params.certificateCode,
+      params.certificatePdfUrl,
+      params.verifyUrl,
+      params.tier,
+    ),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Decline after interview
 // ---------------------------------------------------------------------------
 
@@ -280,6 +309,62 @@ function postInterviewCodeTemplate(displayName: string, referralCode: string, ti
     <div style="margin: 32px 0;">
       <a href="https://guild.penworth.ai/dashboard" class="btn">Enter your dashboard</a>
     </div>
+  `);
+}
+
+function academyActivationTemplate(
+  displayName: string,
+  referralCode: string,
+  certificateCode: string,
+  certificatePdfUrl: string,
+  verifyUrl: string,
+  tier: string,
+): string {
+  const firstName = extractFirstName(displayName);
+  const tierLabel = TIER_LABELS[tier] || 'Apprentice';
+  return wrapEmail(`
+    <h1 class="serif" style="font-size: 36px; line-height: 1.2; margin: 0 0 16px;">
+      You're activated, <span class="gold">${escape(firstName)}</span>.
+    </h1>
+    <p style="font-size: 18px; line-height: 1.6; color: #e7e2d4;">
+      Foundations complete. You are now an active <strong>${escape(tierLabel)}</strong> of The Penworth Guild.
+    </p>
+    <p style="font-size: 16px; line-height: 1.6; color: #c9c2b0;">
+      Your seven Guild agents are unlocked, your referral code is live, and your Foundations certificate is on the public record.
+    </p>
+    <div style="background: #0f1424; border: 1px solid #d4af37; border-radius: 8px; padding: 28px; margin: 28px 0; text-align: center;">
+      <div style="color: #8a8370; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">
+        Your referral code
+      </div>
+      <div class="serif gold" style="font-size: 32px; letter-spacing: 0.05em;">
+        ${escape(referralCode)}
+      </div>
+      <div class="muted" style="margin-top: 12px; font-size: 13px;">
+        Share this with anyone you bring to Penworth. Commission accrues on retained subscriptions.
+      </div>
+    </div>
+    <div style="background: #0f1424; border: 1px solid #2c2f3d; border-radius: 8px; padding: 24px; margin: 28px 0;">
+      <div style="color: #8a8370; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px;">
+        Foundations certificate
+      </div>
+      <div class="serif" style="font-size: 18px; color: #e7e2d4; margin-bottom: 8px;">Certificate ID</div>
+      <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 16px; color: #d4af37; margin-bottom: 16px;">
+        ${escape(certificateCode)}
+      </div>
+      <div style="margin-top: 8px;">
+        <a href="${escape(certificatePdfUrl)}" class="btn" style="margin-right: 12px;">Download PDF</a>
+        <a href="${escape(verifyUrl)}" class="btn-outline">Public verify link</a>
+      </div>
+      <div class="muted" style="margin-top: 16px; font-size: 12px;">
+        Anyone can verify your certificate at the public link above. Penworth keeps the holder, issuance date, and signature on record in perpetuity.
+      </div>
+    </div>
+    <div style="margin: 32px 0;">
+      <a href="https://guild.penworth.ai/dashboard" class="btn">Open your dashboard</a>
+    </div>
+    <p class="muted" style="font-size: 13px; line-height: 1.6; margin-top: 32px;">
+      Within ninety days you must hold a Penworth Pro or Max subscription to continue earning commission. Course 2 covers the requirement in full.
+    </p>
   `);
 }
 
