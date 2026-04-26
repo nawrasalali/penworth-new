@@ -1,12 +1,28 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-26 ~02:00 UTC by CEO Claude session (CEO-060 writing-complete recovery CTA shipped to production; CEO-118 closed as non-incident; CEO-078/121 closed as dupes/non-issues; queue housekeeping + 2 memory rules refined).
+**Last updated:** 2026-04-26 ~02:15 UTC by CEO Claude session (P0 PRODUCTION BLOCKER discovered: Cartesia account credit cap exhausted, Guild voice interview non-functional in prod; CEO-060 shipped; CEO-118 retracted; queue audited).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-26 ~02:00 UTC — long resume session: CEO-118 retracted, CEO-060 shipped, queue audited)
+## ⚠ P0 PRODUCTION BLOCKER — READ FIRST (CEO-125, awaiting_founder)
+
+**Cartesia account credit cap is EXHAUSTED.** Discovered 2026-04-26 02:06 UTC during CEO-116 verification. Every call to `api.cartesia.ai/tts/bytes` returns HTTP 402 — every model (sonic, sonic-2, sonic-3), every locale (verified all 11). Body: "Model credits limit reached: Please upgrade your subscription at https://play.cartesia.ai/subscription to increase your credit limit or enable overages for your account." API key is valid (`/voices` returned 200), so this is account-level quota, not auth.
+
+**Production impact:** CEO-115 (Cartesia voice-interview pipeline shipped 2026-04-25) is non-functional in production right now. Any Guild applicant who attempts the voice interview hits a 402 mid-call before the interviewer says anything. The shipped runtime appears working in code review but is dead at the API boundary.
+
+**Founder action — single click resolves it:** Sign in at https://play.cartesia.ai/subscription and ENABLE OVERAGES on the current plan. ~60 seconds. Cartesia continues serving and bills the overflow at per-character rates. No commitment to a higher plan tier; first month of real usage tells us whether to upgrade or stay.
+
+**Until then:** any "Resume CEO-115" / "Resume CEO-117" / "test the Guild voice interview" instruction will fail at the same wall. Don't burn a session retrying.
+
+**Verification once unblocked:** re-run `/tmp/cartesia_smoke.py` (preserved in CEO-116's `last_update_note`). Expected: 11/11 locales return 200 with multi-KB MP3 bodies.
+
+**Post-unblock follow-up:** add a Vercel-cron daily health check that POSTs one character to Cartesia and pages on 4xx. Without this, we hit the same wall again silently.
+
+---
+
+## Most recent session activity (2026-04-26 ~02:15 UTC — extended resume session: CEO-060 shipped, CEO-118 retracted, CEO-125 P0 surfaced)
 
 Long single-conversation session driven by Founder rolling instructions ("Resume CEO-118", "roll", "roll", "Continue", "Continue"). Net: one P1 UX bug shipped to production, four non-issues retired from the queue, two memory rules sharpened.
 
@@ -22,12 +38,15 @@ Long single-conversation session driven by Founder rolling instructions ("Resume
 
 6. **CEO-120 spawned (p3, awaiting_founder)** — archive dormant `nawrasalali/penworth-ai` GitHub repo + delete OLD Vercel project `prj_6wRG4Qp9FG35U2WgKRJUP7kw2Q8E`. Both reversible. Founder green-light needed for the destructive Vercel DELETE.
 
-**What needs Founder decision next session:**
+7. **CEO-116 BLOCKED, CEO-125 (P0) spawned** — picked up CEO-116 (verify Cartesia Sonic-3 covers all 11 Penworth locales) as a clean single-session ship. Built the smoke-test script (preserved at `/tmp/cartesia_smoke.py`), POSTed to `api.cartesia.ai/tts/bytes` with the exact production payload shape per locale. **All 11 locales returned HTTP 402 "Model credits limit reached"** — this is account-level, not sonic-3-specific (verified by also calling sonic-2 and sonic which 402 the same way; `/voices` returned 200 confirming the API key itself is valid). Implication: **CEO-115's voice-interview pipeline is non-functional in production right now** — every Guild applicant gets a 402 mid-call. Filed CEO-125 as P0 awaiting_founder for a single-click overage enable at https://play.cartesia.ai/subscription.
+
+**What needs Founder decision next session — RANK ORDER:**
+- **CEO-125 (P0)**: enable Cartesia overages (60-second click, no plan commitment) — until done, Guild voice interview is dead in prod.
 - **CEO-016**: weekly-checkin (recommended), monthly-PD (per stale brief), or both?
 - **CEO-120**: green-light archive + DELETE of legacy repo + OLD Vercel project?
 - **PR #4 on penworth-store** (CEO-114 husky hook) still awaiting merge.
 
-**Next session first action:** if Founder picks any of those, execute. Otherwise pick highest-priority `open` task that has not been audited in the last 24h — likely CEO-019 (load test runbook) or CEO-020 (DR drill runbook), both fresh runbook-authoring jobs.
+**Next session first action:** if Founder hasn't actioned CEO-125, surface it again loudly before anything else — voice interview claims to work but cannot. Then re-run `/tmp/cartesia_smoke.py` to verify and close CEO-116. After that, pick highest-priority `open` task — likely CEO-019 (load test runbook) or CEO-020 (DR drill runbook).
 
 ---
 
