@@ -1,12 +1,53 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-26 ~10:14 UTC by CEO Claude session (off-Supabase backup pipeline live + legacy cleanup — CEO-139/140/141).
+**Last updated:** 2026-04-26 ~10:35 UTC by CEO Claude session (storage-bucket mirror live — CEO-129 done; full off-Supabase DR posture complete: DB + storage).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-26 ~10:14 UTC — off-Supabase DR pipeline + legacy Supabase cleanup)
+## Most recent session activity (2026-04-26 ~10:35 UTC — storage-bucket mirror live; full DR posture complete)
+
+Founder said "continue" → I shipped CEO-129 (Supabase Storage bucket cross-region mirror) as the natural completion of the DR sweep started earlier this session.
+
+**What shipped (CEO-129):**
+- `mirror_storage.py` in `nawrasalali/penworth-backups`. Paginated bucket walker using Supabase Storage REST API. Service-role key fetched at runtime via Management API → no extra repo secret.
+- `.github/workflows/nightly-storage-mirror.yml`. Cron 19:00 UTC daily (~04:30 ACST), offset 1 hour after the DB dump. `storage-YYYY-MM-DD` release tag, 30-day auto-prune.
+- README updated; storage now covered.
+- End-to-end manual run validated 2026-04-26 10:34 UTC: workflow run `24954499747` `success`, release `storage-2026-04-26` with 59.8 MB tarball asset.
+- All 9 active-prod buckets covered: `manuscripts`, `voice-samples`, `covers`, `livebooks`, `cinematic`, `audiobooks`, `chapter-audio`, `compliance-exports`, `computer-use-screenshots`. Active footprint today: 14 objects, 64 MB.
+
+**Off-Supabase DR posture as of this commit:**
+- **Postgres**: nightly via CEO-141, 18:00 UTC, 30-day retention. RPO ≤24h, RTO ~2-6h.
+- **Storage**: nightly via CEO-129, 19:00 UTC, 30-day retention. RPO ≤24h.
+- **Stripe**: authoritative on Stripe side; replay via API on demand.
+- **Edge functions**: source in `nawrasalali/penworth-new` repo.
+- **Vercel env vars**: STILL UNCOVERED — see CEO-130 (p2 open).
+
+**Tasks moved this session:**
+- CEO-129 → done (storage mirror shipped + validated)
+- CEO-139 → done (legacy cleanup)
+- CEO-140 → awaiting_founder (legacy pause; needs Penworth-org free-tier downgrade)
+- CEO-141 → done (DB nightly dump pipeline)
+- CEO-020 → last_update_note refreshed; drill calendar slot still pending Founder
+- CEO-130 → unchanged but flagged as the only remaining DR gap
+
+**Verified along the way:** CEO-021 (DNS cutover) is genuinely DONE — task row confirms 9-step execution clean on 2026-04-21, with the 2026-04-25 "regression" retracted as a sandbox-curl false positive. The system-prompt immediate queue listing CEO-021 as still p0 was stale; live DB is authoritative.
+
+**Founder actions queued from this session:**
+1. CEO-140 — downgrade Penworth org (`mfrjhsekditomsyuayyd`) to free tier in Supabase billing dashboard, then I issue the pause API call. Stops ~$25/mo.
+2. CEO-020 — pick a calendar slot for the first restore drill. Recommended: week before public launch.
+
+**Recommended next-session targets (none touched this session):**
+- CEO-051 (p0 open): per-chapter Inngest fan-out refactor. Major work.
+- CEO-043 (p1 in_progress): wire remaining 6 author-pipeline agents to DB-backed prompts. Resume.
+- CEO-090 (p1 open, owner=claude_code): PDF template v4. Best dispatched to Claude Code with the existing brief.
+- CEO-049 (p1 open): Agent mid-step heartbeat pulsing. Bounded-scope, good fit for a focused session.
+- CEO-117 (p1 open): /turn endpoint smoke-test (browser webm → Ink-Whisper). Quick verification work.
+
+---
+
+## Prior session activity (2026-04-26 ~10:14 UTC — off-Supabase DR pipeline + legacy Supabase cleanup)
 
 Founder asked about getting rid of legacy Penworth backups, keeping one copy, and wiring weekly DR for the three live sites. Reframed: legacy backups don't protect live sites (different project), and weekly is too coarse — DR has to nightly-back-up the *active* prod project. Founder said "go for both" → "Continue."
 
