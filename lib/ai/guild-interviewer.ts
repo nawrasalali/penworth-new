@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 /**
  * The Guild Voice Interview System
  *
- * Uses Claude Sonnet 4.5 as the conversation brain, OpenAI Whisper for
+ * Uses Claude Sonnet 4.5 as the conversation brain, ElevenLabs Scribe for
  * transcription, and ElevenLabs (eleven_multilingual_v2) for the
  * interviewer's voice. The interview runs as a series of turns — each
  * turn is (audio input → transcript → AI response → TTS audio). A full
@@ -13,8 +13,11 @@ import Anthropic from '@anthropic-ai/sdk';
  *   - Original: OpenAI Whisper (STT) + OpenAI TTS (TTS)
  *   - CEO-110 (2026-04-25): swapped both to Cartesia Ink-Whisper + Sonic-3
  *   - CEO-134 (2026-04-26): killed Cartesia entirely after credits were
- *     exhausted in production. STT moved back to OpenAI Whisper;
- *     TTS moved to ElevenLabs (already used by store narration).
+ *     exhausted in production. STT moved temporarily to OpenAI Whisper;
+ *     TTS moved to ElevenLabs eleven_multilingual_v2.
+ *   - CEO-137 (2026-04-26): collapsed STT onto ElevenLabs Scribe once
+ *     Founder enabled the speech_to_text permission on the existing
+ *     ELEVENLABS_API_KEY. Single provider for both STT and TTS.
  *
  * Ref: Penworth_Guild_Complete_Specification.md Section 6, Step 4.
  */
@@ -24,11 +27,12 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Using the current Sonnet tier (available in env)
 const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
 
-// OpenAI Whisper — speech-to-text. whisper-1 supports 50+ languages and
-// auto-detects when language='auto'; we pass the explicit language code
-// to lock decoding to the applicant's chosen interview language.
-const OPENAI_API = 'https://api.openai.com/v1';
-const OPENAI_STT_MODEL = 'whisper-1';
+// ElevenLabs Scribe — speech-to-text. Reuses the same ELEVENLABS_API_KEY
+// (and the same ELEVENLABS_API base URL declared below for TTS) so the
+// Guild voice interview runs on a single provider. scribe_v1 supports
+// 99 languages; we pass the Whisper-style language code for parity with
+// the TTS path's language argument.
+const ELEVENLABS_STT_MODEL = 'scribe_v1';
 
 // ElevenLabs — text-to-speech. eleven_multilingual_v2 covers all 11
 // Penworth locales (en, ar, es, fr, pt, ru, zh, bn, hi, id, vi). Voice
@@ -278,7 +282,7 @@ export async function generateNextMessage(params: {
 }
 
 // ---------------------------------------------------------------------------
-// OpenAI Whisper transcription (speech → text)
+// ElevenLabs Scribe transcription (speech → text)
 // ---------------------------------------------------------------------------
 
 export async function transcribeAudio(
@@ -286,37 +290,43 @@ export async function transcribeAudio(
   filename: string,
   language: string,
 ): Promise<{ text: string; duration_s: number | null }> {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY not set — Guild voice interview transcription cannot run.');
+  if (!process.env.ELEVENLABS_API_KEY) {
+    throw new Error('ELEVENLABS_API_KEY not set — Guild voice interview transcription cannot run.');
   }
 
   const formData = new FormData();
   const blob = new Blob([audioBuffer as any], { type: guessMimeType(filename) });
   formData.append('file', blob, filename);
-  formData.append('model', OPENAI_STT_MODEL);
-  formData.append('language', mapToWhisperLanguageCode(language));
-  // Whisper supports verbose_json which gives us a duration field; without
-  // this it returns plain text only and duration_s ends up null.
-  formData.append('response_format', 'verbose_json');
+  formData.append('model_id', ELEVENLABS_STT_MODEL);
+  // Scribe accepts ISO 639-1 language codes via the language_code field.
+  // mapToWhisperLanguageCode already returns the right format (e.g. 'en',
+  // 'ar', 'zh') because Whisper used the same convention.
+  formData.append('language_code', mapToWhisperLanguageCode(language));
 
-  const response = await fetch(`${OPENAI_API}/audio/transcriptions`, {
+  const response = await fetch(`${ELEVENLABS_API}/speech-to-text`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      'xi-api-key': process.env.ELEVENLABS_API_KEY,
     },
     body: formData,
   });
 
   if (!response.ok) {
     const errText = await response.text();
-    console.error('[whisper] API error:', errText);
-    throw new Error(`Whisper transcription failed: ${response.status}`);
+    console.error('[elevenlabs-scribe] API error:', errText);
+    throw new Error(`ElevenLabs Scribe transcription failed: ${response.status}`);
   }
 
-  const data = (await response.json()) as { text: string; duration?: number };
+  // Scribe response shape:
+  //   { text, language_code, language_probability, words: [...],
+  //     transcription_id, audio_duration_secs }
+  const data = (await response.json()) as {
+    text?: string;
+    audio_duration_secs?: number;
+  };
   return {
     text: (data.text || '').trim(),
-    duration_s: typeof data.duration === 'number' ? data.duration : null,
+    duration_s: typeof data.audio_duration_secs === 'number' ? data.audio_duration_secs : null,
   };
 }
 
