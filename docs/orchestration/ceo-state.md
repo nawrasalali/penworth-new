@@ -1,12 +1,56 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-26 ~10:35 UTC by CEO Claude session (storage-bucket mirror live — CEO-129 done; full off-Supabase DR posture complete: DB + storage).
+**Last updated:** 2026-04-26 ~12:10 UTC by CEO Claude session (production signup unblocked — Supabase Auth SMTP cut over to Resend; auth rate limits raised to effectively unlimited).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-26 ~10:35 UTC — storage-bucket mirror live; full DR posture complete)
+## Most recent session activity (2026-04-26 ~12:10 UTC — production signup outage fixed)
+
+Founder forwarded a screenshot from Thomas Dye (`thomas@rgs-capinvest.com`, legacy Penworth user) hitting "An error occurred. Please try again." on `penworth.ai/signup`. Asked: "is it only him, or everyone?"
+
+**Answer: everyone, since 2026-04-14.** Last successful signup in `auth.users` was the day this Supabase project was created. Twelve days of silent total signup failure.
+
+**Root cause:**
+- Supabase Auth was using the built-in SMTP, which has a hard default `rate_limit_email_sent = 2 per hour`. The first 2 signups (Founder testing) consumed the hourly token bucket and the bucket has not had time to drain meaningfully under continued attempts since.
+- Every subsequent signup failed with HTTP 429 `over_email_send_rate_limit` from `/auth/v1/signup`.
+- supabase-js wraps the 429 by throwing rather than returning a structured error, so the front-end's `catch (err)` block fired and surfaced the generic `auth.genericError` message — masking the real cause.
+- This was global, not domain-specific. Reproduced and confirmed via direct probe to `https://lodupspxdvadamrqvkje.supabase.co/auth/v1/signup` — `@gmail.com` and `@rgs-capinvest.com` both 429'd before the fix.
+
+**Fix shipped (Management API PATCH on `/v1/projects/{ref}/config/auth`):**
+- `smtp_host = smtp.resend.com`, `smtp_port = "465"`, `smtp_user = "resend"`, `smtp_pass = <RESEND_API_KEY>` (already in Vercel env, sender domain `penworth.ai` already verified in Resend — confirmed by sending a probe email to `nawras@penworth.ai`, message id `88e18ac7-ebf2-468e-9d15-5006ca1f236b`).
+- `smtp_admin_email = noreply@penworth.ai`, `smtp_sender_name = Penworth`.
+- All seven auth rate limits set to **1,000,000/hour** (Founder directive: "make sure this limit problem never happens, allow max limits or unlimited better"). Probed up to 1,000,000 — Supabase API accepted without complaint, no documented ceiling. Effective values now: `rate_limit_email_sent`, `rate_limit_otp`, `rate_limit_verify`, `rate_limit_token_refresh`, `rate_limit_anonymous_users`, `rate_limit_sms_sent`, `rate_limit_web3` all at 1,000,000.
+- `smtp_max_frequency` left at 60s. This is per-recipient, not per-account — it stops "resend confirmation" abuse where an attacker bombards a victim's inbox. Removing it would be a bad trade.
+
+**Verified end-to-end after fix:** Probe signup with `probe-do-not-use+<ts>@rgs-capinvest.com` (Thomas's actual domain) returned HTTP 200, `confirmation_sent_at` populated, user row created in `auth.users`. Probe users (`gmail.com` and `rgs-capinvest.com`) deleted post-test.
+
+**Where the next bottleneck now sits (and why this is the right place):**
+- Supabase Auth: 1,000,000/hr → not a real ceiling.
+- Resend account plan cap → IS the next ceiling, but it's billable headroom Founder controls, not a silent default. Pro plan ($20/mo) is 50,000/month, 1,000/day. Sufficient for thousands of signups; if Penworth ever exceeds that, the upgrade path is one click in Resend.
+- Resend per-second send rate → 2/s on free, 10/s on Pro. Not a concern for organic signup traffic.
+- `smtp_max_frequency = 60s` per recipient → intentional anti-spam guardrail.
+
+**Permanent learnings (must propagate to any future Supabase project: penworth-store, future migrations, branches):**
+1. **Built-in Supabase SMTP is rate-limited at 2/hour and is unusable for anything beyond a smoke test.** Any new Supabase project must have a custom SMTP wired before any user-facing signup is enabled. This includes preview/branch projects if they're going to be tested by humans.
+2. **Default `rate_limit_email_sent = 2`** is the trap. New projects should be patched to a high value at setup time.
+3. **supabase-js throws (rather than structured-errors) on 429**, so `mapAuthError` cannot translate `over_email_send_rate_limit` to a user-friendly message under current code. If we ever do hit a real rate limit in future, users get the generic error. Low-priority hardening: catch the 429 explicitly in `app/(auth)/signup/page.tsx` and surface a specific message. Not urgent now that the limit is 1M/hr, but worth a CEO-### task.
+
+**Tasks moved this session:**
+- New incident logged: production signup outage, P0 SEV2, root-caused, fixed, verified. (No `pipeline_incidents` row created — incident scope is auth, not the writer pipeline; ceo-state.md is the canonical record.)
+- Founder is handling user comms with Thomas directly.
+
+**Recommended next-session targets (unchanged from prior):**
+- CEO-051 (p0 open): per-chapter Inngest fan-out refactor.
+- CEO-043 (p1 in_progress): wire remaining 6 author-pipeline agents to DB-backed prompts.
+- CEO-090 (p1 open, owner=claude_code): PDF template v4.
+- CEO-049 (p1 open): agent mid-step heartbeat pulsing.
+- CEO-117 (p1 open): `/turn` endpoint smoke-test.
+
+---
+
+## Prior session activity (2026-04-26 ~10:35 UTC — storage-bucket mirror live; full DR posture complete)
 
 Founder said "continue" → I shipped CEO-129 (Supabase Storage bucket cross-region mirror) as the natural completion of the DR sweep started earlier this session.
 
