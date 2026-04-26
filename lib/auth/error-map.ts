@@ -35,6 +35,40 @@ export function mapAuthError(
     return t('auth.err.rateLimit', locale);
   }
 
+  // Weak / pwned password — HIBP rejection or password-policy rejection.
+  // Supabase returns 422 with code 'weak_password' and the body includes
+  // weak_password.reasons (e.g. ["pwned"], ["length"], ["characters"]).
+  // The unhandled case used to surface as the generic error and was the
+  // root cause of the 2026-04-26 production signup outage.
+  if (
+    code === 'weak_password' ||
+    msg.includes('weak password') ||
+    msg.includes('password is known to be weak') ||
+    msg.includes('pwned')
+  ) {
+    return t('auth.err.weakPassword', locale);
+  }
+
+  // User already registered — supabase returns code 'user_already_exists'
+  // or message includes "user already registered" / "already registered".
+  if (
+    code === 'user_already_exists' ||
+    code === 'email_exists' ||
+    msg.includes('already registered') ||
+    msg.includes('already exists')
+  ) {
+    return t('auth.err.alreadyRegistered', locale);
+  }
+
+  // Invalid email format — Supabase code 'email_address_invalid'.
+  if (
+    code === 'email_address_invalid' ||
+    msg.includes('email address') && msg.includes('invalid') ||
+    msg.includes('invalid email format')
+  ) {
+    return t('auth.err.invalidEmail', locale);
+  }
+
   // Email not confirmed
   if (msg.includes('email not confirmed') || msg.includes('not_confirmed') || code === 'email_not_confirmed') {
     return t('auth.err.emailNotConfirmed', locale);
@@ -58,8 +92,14 @@ export function mapAuthError(
     return t('auth.err.networkIssue', locale);
   }
 
+  // Signup disabled at project level
+  if (code === 'signup_disabled' || msg.includes('signup is disabled') || msg.includes('signups not allowed')) {
+    return t('auth.err.signupDisabled', locale);
+  }
+
   // Unrecognised — fall back to the generic friendly message rather than
-  // exposing Supabase's raw text to users.
+  // exposing Supabase's raw text to users. We log the code/status to the
+  // console at the call site, and telemetry captures it for diagnostics.
   return t('auth.genericError', locale);
 }
 
