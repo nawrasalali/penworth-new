@@ -37,7 +37,7 @@ const STORAGE_BUCKET = 'guild-academy';
 const VOICES = {
   brian: 'nPczCjzI2devNBz1zQrb', // V1, M, US — calm narrator
   charlotte: 'XB0fDUnXU5powFXDhCwa', // V2, F, UK — warm
-  daniel: 'onwK4e9ZLuTAKqWW03F', // V3, M, UK — authoritative
+  daniel: 'onwK4e9ZLuTAKqWW03F9', // V3, M, UK — Daniel (Steady Broadcaster, premade)
   rachel: '21m00Tcm4TlvDq8ikWAM', // V4, F, US — clear (already used elsewhere in the codebase)
 } as const;
 type VoiceKey = keyof typeof VOICES;
