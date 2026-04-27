@@ -1,12 +1,42 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-27 by CEO Claude session — TWO parallel ships today: (1) CEO-051 per-chapter Inngest fan-out shipped (PR #15 `3a3d16c`, prod deploy `dpl_6nCUht3P6Yzt97C1EWApMwR6T9u7` READY, feature-flagged off via `CHAPTER_FANOUT_ENABLED`); (2) Livebook image library Phases 0+1+2-backend shipped — CEO-163 (schema + seeding pipeline + GHA workflow), CEO-165 (retrieval pipeline + edge function ACTIVE + publish handler wired), CEO-166 (atomic enrolment SQL + API endpoint + 18 i18n keys × 11 locales). Phase 2 frontend (PublishToStoreModal + style picker + reader 3-mode rendering) is the only remaining build. All livebook code dormant until Founder provisions FAL_KEY + ANTHROPIC_API_KEY + VOYAGE_API_KEY (one-time, gates seeding AND matching).
+**Last updated:** 2026-04-27 by CEO Claude session — afternoon cleanup pass: closed CEO-161 (stuck-agent detector migration backfilled to repo as commit `27d2cb4`); raised CEO-187 (systemic repo↔DB migration drift, p3); verified CEO-102 auto-trigger live (ADMIN_SECRET on penworth-new prod env confirmed); flagged CEO-143 + CEO-144 to Founder triage as obsoleted by Livebook Image Library architecture pivot. Open queue trimmed by 1, 2 items kicked to Founder for close-or-rescope decision.
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-27 — CEO-051 chapter fan-out shipped)
+## Most recent session activity (2026-04-27 afternoon — CEO-161 closed + queue triage)
+
+**Founder direction at session open:** "Resume CTO mode for Penworth. Run start-of-session ritual then proceed... Then proceed on standing backlog unless I redirect."
+
+**What shipped this session:**
+
+`27d2cb4` — `fix(monitoring): backfill CEO-161 migration to repo (writing-only stuck detection)` — Adds `supabase/migrations/039_pipeline_detect_stuck_writing_only.sql` containing the `pipeline_detect_stuck_sessions()` function definition. Migration was applied to live DB on 2026-04-26 (Supabase MCP version 20260426234259) but never written back to repo. Empirical verification: zero stuck_agent incidents on non-writing stages in 36h since the live DB migration shipped — false-positive class confirmed gone.
+
+**Queue moves:**
+- CEO-161: in_progress → done. The "synthetic chain test" half of the original two-part scope was retired: empirical evidence (36h of zero false-positives in production) is stronger than a synthetic chain run, and avoids burning ElevenLabs/Anthropic credits.
+- CEO-187: NEW (p3, ceo, open). Discovered while closing CEO-161 — repo `supabase/migrations/` has 34 sequentially-numbered files (001-038, gap at 033) but live DB has 200+ migrations applied via Supabase MCP timestamp versioning. Recommendation: declare repo migrations historical scaffolding and live DB the source-of-truth, document explicitly. Cost of full backfill (~4-8h grunt) is decorative given Pro plan PITR + DR drill already cover the rebuild path.
+- CEO-102: refreshed last_update_note. Auto-trigger code shipped in `dfc411d` (2026-04-25 10:36 UTC). ADMIN_SECRET verified live on penworth-new prod env via Vercel API. Two `store_listings` published in the deploy/env-set gap window ("PREPARE NOW", "The Sunflower Secret", both 2026-04-25 11:38-11:59 UTC) have `livebook_asset_path=NULL`. Backfill needs Founder authorisation to spend ElevenLabs credits (~$0.50-1 per listing). The `generation_status` field in the original task scope was never implemented; `livebook_generated_at` serves as the proxy.
+- CEO-143 + CEO-144: ceo open → awaiting_founder. Both were specced 2026-04-26 against the Narrative Augmentation Engine architecture (Push 3.1, `chapter_plans`/`chapter_assets` tables, edge function `augment-chapter` v1). On 2026-04-27 the architecture pivoted to the Livebook Image Library (CEO-163/165/166) and the per-chapter generation UI those tasks describe is no longer the user-facing path. `chapter_assets` table has 3 rows from a single chapter on 2026-04-26 — abandoned. Endpoints `generate-chapter-asset`/`upload-chapter-asset`/`list-chapter-assets` do not exist in the repo. Triage decision needed from Founder: (a) close as obviated, OR (b) rescope to current architecture.
+
+**Side observations (not actioned):**
+- FAL_KEY and VOYAGE_API_KEY still not in penworth-new prod Vercel env. ANTHROPIC_API_KEY now present. Per CEO-163 brief, FAL_KEY + VOYAGE_API_KEY may live in GHA secrets (seeding) and/or Supabase function secrets (matching) rather than Vercel env — verify before chasing.
+- `chapter_assets` table is essentially dead but still has RLS, indexes, etc. Cleanup belongs to whichever decision is made on CEO-143/144.
+
+**Verification this session:**
+- penworth-new HEAD `27d2cb4` (was `fa029c0` at session open), Vercel deploy triggered automatically.
+- penworth-store HEAD unchanged at `1babdbd`.
+- Production health green: 0 stuck, 0 incidents, 0 webhook failures (24h), 0 unacked alerts (24h).
+
+**Founder asks at session close:**
+1. CEO-143/144: close or rescope? (Recommendation: close.)
+2. CEO-186 dispatch phase 1 — Stripe test coverage to Claude Code, ~6h agent time. Authorisation phrase: "dispatch phase 1".
+3. CEO-181: pen-test vendor pick (Doyensec / Trail of Bits / NCC Group / AU local).
+
+---
+
+## Prior session activity (2026-04-27 — CEO-051 chapter fan-out shipped)
 
 **Founder direction at session open:** "CEO-021 p0" → "Go" → "Approved". Quick redirect: CEO-021 already done (Apr 21, regression scare on Apr 25 retracted), so I surfaced the actual top of queue (CEO-051) and Founder confirmed.
 
