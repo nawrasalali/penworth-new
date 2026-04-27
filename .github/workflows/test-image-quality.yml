@@ -23,15 +23,25 @@ on:
         default: '5c63f175-ce4b-4446-8771-3107fc8ab5c9'
         type: string
       pages:
-        description: 'How many pages from the start of chapter 1 (~3000 chars/page). Claude segments these into scenes.'
+        description: 'Pages from start (3000 chars/page). 0 = full chapter 1.'
         required: true
         default: '3'
+        type: string
+      style:
+        description: 'Style slug (empty = all 3). Options: minimalist_editorial, pencil_sketch, conceptual_abstract'
+        required: false
+        default: ''
+        type: string
+      target_scenes:
+        description: 'Override target scene count (0 = auto, ~1 scene per 1100 chars).'
+        required: false
+        default: '0'
         type: string
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -75,7 +85,9 @@ jobs:
         run: |
           npx tsx scripts/test_image_quality.ts \
             --listing "${{ inputs.listing_id }}" \
-            --pages "${{ inputs.pages }}"
+            --pages "${{ inputs.pages }}" \
+            --style "${{ inputs.style }}" \
+            --target-scenes "${{ inputs.target_scenes }}"
 
       - name: Upload gallery artifact
         if: always()

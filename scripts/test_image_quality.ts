@@ -124,10 +124,41 @@ async function fetchExcerpt(listingId: string, pages: number): Promise<string> {
     .single();
   if (error) throw new Error(`Supabase read failed: ${error.message}`);
   const total = (data?.content_markdown ?? '') as string;
+  // pages=0 means read the entire first chapter (full-book mode).
+  if (pages <= 0) return total;
   return total.slice(0, pages * CHARS_PER_PAGE);
 }
 
-async function extractScenes(excerpt: string): Promise<Scene[]> {
+async function extractScenesChunked(fullText: string, targetScenes: number): Promise<Scene[]> {
+  // Chunk the book to keep each Claude call well within input-token
+  // budget AND keep the per-call scene count in a regime where Claude
+  // produces consistent quality. Claude tends to "compress" when asked
+  // for too many scenes from one chunk: 80 scenes from 86k chars in
+  // one call = thin prompts. 10 scenes per ~10k-char chunk = the
+  // density we proved at quality test #3.
+  const CHARS_PER_CHUNK = 10000;
+  const chunks: string[] = [];
+  for (let i = 0; i < fullText.length; i += CHARS_PER_CHUNK) {
+    chunks.push(fullText.slice(i, i + CHARS_PER_CHUNK));
+  }
+  const scenesPerChunk = Math.max(4, Math.round(targetScenes / chunks.length));
+  console.log(`     chunks: ${chunks.length}, target scenes/chunk: ${scenesPerChunk}`);
+
+  const all: Scene[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    process.stdout.write(`     chunk ${i + 1}/${chunks.length}… `);
+    const sceneSlice = await extractScenes(chunks[i], scenesPerChunk);
+    console.log(`${sceneSlice.length} scenes`);
+    for (const s of sceneSlice) {
+      all.push({ ...s, index: all.length });
+    }
+  }
+  return all;
+}
+
+async function extractScenes(excerpt: string, targetScenes = 8): Promise<Scene[]> {
+  const lo = Math.max(3, targetScenes - 2);
+  const hi = targetScenes + 2;
   const system = `You are a senior book-illustration art director. The author has written a non-fiction memoir about building AI startups. Your job: read the excerpt and segment it into scenes — distinct narrative or conceptual moments worth illustrating.
 
 For each scene, write a visual prompt of 25–40 words that describes ONE concrete image a magazine illustrator would draw to represent that scene. The prompt must:
@@ -140,7 +171,7 @@ For each scene, write a visual prompt of 25–40 words that describes ONE concre
 Return JSON only, no preamble:
 {"scenes":[{"excerpt":"<the 1–3 sentences this scene illustrates>","visual_prompt":"<25–40 word concrete visual>"}]}
 
-Aim for 6–10 scenes total. Quality over quantity.`;
+Aim for ${lo}–${hi} scenes total. Quality over quantity.`;
 
   const user = `EXCERPT (illustrate this):\n\n${excerpt}`;
 
@@ -230,29 +261,44 @@ async function main() {
   }
   const listingId = args.listing || '5c63f175-ce4b-4446-8771-3107fc8ab5c9';
   const pages = parseInt(args.pages || '3', 10);
+  // --style filters STYLES to only the matching slug; default = all 3.
+  const styleFilter = (args.style || '').trim().toLowerCase();
+  const activeStyles = styleFilter
+    ? STYLES.filter((s) => s.slug === styleFilter)
+    : STYLES;
+  if (styleFilter && activeStyles.length === 0) {
+    throw new Error(`Unknown style "${styleFilter}". Valid: ${STYLES.map((s) => s.slug).join(', ')}`);
+  }
+  // --target-scenes overrides the auto-derived scene count.
+  // Default: 1 scene per ~1100 chars of source text (matches the
+  // density we proved at the 3-page test where 9000 chars → 10 scenes).
+  const targetOverride = parseInt(args['target-scenes'] || '0', 10);
 
   console.log(`\n=== CEO-167 quality test ===`);
   console.log(`Listing: ${listingId}`);
-  console.log(`Pages:   ${pages} (${pages * CHARS_PER_PAGE} chars)`);
-  console.log(`Styles:  ${STYLES.map((s) => s.slug).join(', ')}\n`);
+  console.log(`Pages:   ${pages === 0 ? 'all (full chapter 1)' : `${pages} (${pages * CHARS_PER_PAGE} chars)`}`);
+  console.log(`Styles:  ${activeStyles.map((s) => s.slug).join(', ')}\n`);
 
   console.log('1/3 Reading excerpt from Supabase…');
   const excerpt = await fetchExcerpt(listingId, pages);
   console.log(`     read ${excerpt.length} chars\n`);
 
-  console.log('2/3 Extracting scenes via Claude Opus 4.7…');
-  const scenes = await extractScenes(excerpt);
-  console.log(`     ${scenes.length} scenes:`);
-  for (const s of scenes) {
-    console.log(`     [${s.index}] ${s.visual_prompt.slice(0, 110)}${s.visual_prompt.length > 110 ? '…' : ''}`);
-  }
-  console.log('');
+  const targetScenes = targetOverride > 0
+    ? targetOverride
+    : Math.max(8, Math.round(excerpt.length / 1100));
+  console.log(`2/3 Extracting ~${targetScenes} scenes via Claude Opus 4.7…`);
+  const scenes = excerpt.length <= 12000
+    ? await extractScenes(excerpt, targetScenes)
+    : await extractScenesChunked(excerpt, targetScenes);
+  // Re-index in order
+  scenes.forEach((s, i) => { s.index = i; });
+  console.log(`     ${scenes.length} scenes total\n`);
 
-  console.log(`3/3 Generating ${scenes.length * STYLES.length} images via Flux Pro 1.1…`);
+  console.log(`3/3 Generating ${scenes.length * activeStyles.length} images via Flux Pro 1.1…`);
   // Bounded concurrency: 4 jobs in flight. fal.ai rate-limits per-key.
   const queue: { scene: Scene; style: typeof STYLES[number] }[] = [];
   for (const scene of scenes) {
-    for (const style of STYLES) queue.push({ scene, style });
+    for (const style of activeStyles) queue.push({ scene, style });
   }
   const completed: CompletedJob[] = [];
   const inflight = new Set<Promise<void>>();
@@ -279,7 +325,7 @@ async function main() {
   // Re-shape into per-scene results
   const results: SceneResult[] = scenes.map((scene) => ({
     scene,
-    styles: STYLES.map((style) => {
+    styles: activeStyles.map((style) => {
       const c = completed.find((r) => r.scene.index === scene.index && r.style.slug === style.slug);
       return {
         slug: style.slug,
@@ -318,6 +364,7 @@ function renderGallery(
   results: SceneResult[],
 ): string {
   const cards = results.map((r) => {
+    const gridClass = r.styles.length === 1 ? 'styles-grid single-style' : 'styles-grid';
     const styleCells = r.styles.map((s) => {
       if (s.image_url) {
         return `
@@ -337,7 +384,7 @@ function renderGallery(
         <header><span class="scene-index">Scene ${r.scene.index + 1}</span></header>
         <blockquote class="excerpt">${escapeHtml(r.scene.excerpt)}</blockquote>
         <p class="visual-prompt"><strong>Visual prompt:</strong> ${escapeHtml(r.scene.visual_prompt)}</p>
-        <div class="styles-grid">${styleCells}</div>
+        <div class="${gridClass}">${styleCells}</div>
       </article>`;
   }).join('\n');
 
@@ -377,7 +424,14 @@ function renderGallery(
       font-size: 13px; color: #555; margin: 0 0 16px 0;
     }
     .styles-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .styles-grid.single-style {
+      grid-template-columns: 1fr;
+      max-width: 720px;
+      margin: 0 auto;
     }
     .cell { display: flex; flex-direction: column; gap: 8px; }
     .cell img {
