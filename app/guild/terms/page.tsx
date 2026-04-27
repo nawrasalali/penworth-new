@@ -113,7 +113,7 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="6. Community Guidelines & Conduct">
+        <Section title="6. Community Guidelines & Conduct" id="community-guidelines">
           <p>Guildmembers agree to:</p>
           <ul>
             <li>Represent Penworth honestly and not overstate the product&apos;s capabilities.</li>
@@ -196,9 +196,9 @@ export default function TermsPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, id }: { title: string; children: React.ReactNode; id?: string }) {
   return (
-    <section>
+    <section id={id} className={id ? 'scroll-mt-24' : undefined}>
       <h2 className="mb-4 font-serif text-2xl tracking-tight text-[#e7e2d4]">{title}</h2>
       <div className="space-y-4 text-sm leading-relaxed [&_a]:text-[#d4af37] [&_a:hover]:underline [&_li]:ml-6 [&_li]:list-disc [&_li]:py-1 [&_strong]:text-[#e7e2d4]">
         {children}
