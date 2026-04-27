@@ -1,13 +1,14 @@
 // Stripe ↔ DB reconciliation cron.
 //
 // Authored: 2026-04-27 by CTO security/ops pass.
+// Updated:  2026-04-27 (CEO-179) — auto-replay now works because handlers
+//           are extracted to lib/stripe/process-event.ts.
 //
 // Why this exists:
 //   The webhook handler at app/api/stripe/webhook/route.ts is the only path
 //   that updates our local mirror of Stripe state (subscriptions, invoices,
 //   charges). Two failure modes leak state:
-//     1. A handler errors mid-event; the row is recorded as status='failed'
-//        but is never automatically retried.
+//     1. A handler errors mid-event; the row is recorded as status='failed'.
 //     2. A webhook is delivered to a Vercel function that times out or
 //        cold-starts past Stripe's signature window, returning 5xx. Stripe
 //        retries on its own schedule but we never observe the gap.
@@ -15,21 +16,30 @@
 //   we go without a check the worse the divergence gets.
 //
 // What this does, every 6 hours:
-//   A. Pulls the last 24h of events from the Stripe events API.
-//   B. Looks them up by stripe_event_id in our stripe_webhook_events table.
-//   C. Anything in (A) that's not in (B) is a webhook we never received.
-//      Emits an alert listing the missing event IDs.
-//   D. Counts failed rows in the last 7 days and emits an alert if any exist.
-//      Does NOT auto-replay them — the webhook handlers are currently file-local
-//      to app/api/stripe/webhook/route.ts and the right replay path is to
-//      extract them into a shared module first (tracked separately).
+//   A. Counts processing_status='failed' rows from the last 7 days.
+//   B. Pulls the last 24h of events from the Stripe events API and diffs
+//      by stripe_event_id against stripe_webhook_events. Anything in (B)
+//      that's not in our table is a webhook we never received.
+//   C. Auto-replays up to 25 of the failed rows by calling the same
+//      processStripeEvent dispatcher the webhook route uses. Each replay
+//      bumps retry_count; rows that hit MAX_REPLAY_RETRIES (3) are left
+//      alone for human inspection. Successful replays flip to
+//      processing_status='replayed'; persistent failures keep status
+//      'failed' but record the latest error_message.
+//   D. Emits a single deduped alert (one per hour key) summarising drift,
+//      failed-row state, and replay outcomes if anything is actionable.
 //
 // Operator actions on alert:
-//   - "missing in db" → replay each missing event through the Stripe dashboard
-//     (Developers → Webhooks → resend) so the standard handler runs against
-//     the real signature header.
-//   - "failed in db"  → inspect error_message column; fix root cause; manually
-//     mark replayed once handler is patched.
+//   - "missing in db" → replay each missing event through the Stripe
+//     dashboard (Developers → Webhooks → resend) so the standard handler
+//     runs against the real signature header. The cron CAN'T fix this
+//     class — by definition we never received the webhook so we have no
+//     row to replay from.
+//   - "replay failures > 0" → inspect error_message on the failed rows;
+//     fix root cause; the next cron tick will retry until retry_count=3.
+//   - "retry_exhausted_count > 0" → manual intervention required: rows
+//     that won't process need either a code fix + manual replay, or a
+//     decision to mark them 'skipped' with a reason note.
 //
 // Dispatch:
 //   Inngest scheduled function. Inngest gives us retries, observability, and
@@ -38,12 +48,15 @@
 import { inngest } from '@/inngest/client';
 import { createServiceClient } from '@/lib/supabase/service';
 import { getStripeOrError } from '@/lib/stripe/client';
+import { processStripeEvent } from '@/lib/stripe/process-event';
 import type Stripe from 'stripe';
 
 const RECONCILE_WINDOW_FAILED_DAYS = 7;
 const RECONCILE_WINDOW_DRIFT_HOURS = 24;
 const STRIPE_EVENTS_PAGE_LIMIT = 100;
 const STRIPE_EVENTS_MAX_PAGES = 10; // hard cap: 1000 events per run
+const MAX_REPLAY_PER_RUN = 25; // bound the blast radius of one cron tick
+const MAX_REPLAY_RETRIES = 3; // give up after this many attempts per row
 
 interface DriftResult {
   stripe_events_checked: number;
@@ -54,6 +67,12 @@ interface FailedSummary {
   failed_count: number;
   oldest_failed_at: string | null;
   retry_exhausted_count: number;
+}
+
+interface ReplayResult {
+  replayed_ok: number;
+  replayed_failed: number;
+  skipped_too_many_retries: number;
 }
 
 export const stripeReconcile = inngest.createFunction(
@@ -140,16 +159,86 @@ export const stripeReconcile = inngest.createFunction(
     });
 
     // ─────────────────────────────────────────────────────────────────────
-    // Step C: alert if anything actionable
+    // Step C: auto-replay failed rows now that handlers are extractable
+    // (CEO-179). Bounded per run so a flood of failures doesn't burn one
+    // cron tick on retries; the next tick picks up the rest.
+    // ─────────────────────────────────────────────────────────────────────
+    const replay = await step.run('replay-failed-rows', async (): Promise<ReplayResult> => {
+      const supabase = createServiceClient();
+      const cutoff = new Date(
+        Date.now() - RECONCILE_WINDOW_FAILED_DAYS * 24 * 60 * 60 * 1000,
+      ).toISOString();
+
+      const { data: failed, error: failedErr } = await supabase
+        .from('stripe_webhook_events')
+        .select('id, stripe_event_id, event_type, payload, retry_count')
+        .eq('processing_status', 'failed')
+        .gte('received_at', cutoff)
+        .order('received_at', { ascending: true })
+        .limit(MAX_REPLAY_PER_RUN);
+
+      if (failedErr) throw new Error(`failed-rows fetch: ${failedErr.message}`);
+
+      const result: ReplayResult = {
+        replayed_ok: 0,
+        replayed_failed: 0,
+        skipped_too_many_retries: 0,
+      };
+      if (!failed || failed.length === 0) return result;
+
+      for (const row of failed) {
+        if ((row.retry_count ?? 0) >= MAX_REPLAY_RETRIES) {
+          result.skipped_too_many_retries++;
+          continue;
+        }
+        const event = row.payload as unknown as Stripe.Event;
+        try {
+          const outcome = await processStripeEvent(event);
+          await supabase
+            .from('stripe_webhook_events')
+            .update({
+              processing_status: outcome === 'unhandled' ? 'skipped' : 'replayed',
+              processed_at: new Date().toISOString(),
+              retry_count: (row.retry_count ?? 0) + 1,
+              last_retry_at: new Date().toISOString(),
+              error_message: null,
+            })
+            .eq('id', row.id);
+          result.replayed_ok++;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          await supabase
+            .from('stripe_webhook_events')
+            .update({
+              retry_count: (row.retry_count ?? 0) + 1,
+              last_retry_at: new Date().toISOString(),
+              error_message: message,
+            })
+            .eq('id', row.id);
+          result.replayed_failed++;
+          logger.warn(
+            `Replay failed for ${row.stripe_event_id} (${row.event_type}): ${message}`,
+          );
+        }
+      }
+      return result;
+    });
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Step D: alert if anything actionable
     // ─────────────────────────────────────────────────────────────────────
     if (
       drift.missing_in_db.length > 0 ||
-      failedSummary.failed_count > 0
+      failedSummary.failed_count > 0 ||
+      replay.replayed_failed > 0 ||
+      replay.skipped_too_many_retries > 0
     ) {
       await step.run('emit-alert', async () => {
         const supa = createServiceClient();
         const severity =
-          drift.missing_in_db.length > 5 || failedSummary.retry_exhausted_count > 0
+          drift.missing_in_db.length > 5 ||
+          replay.skipped_too_many_retries > 0 ||
+          failedSummary.retry_exhausted_count > 0
             ? 'high'
             : 'medium';
         await supa.rpc('alert_dispatch', {
@@ -160,11 +249,14 @@ export const stripeReconcile = inngest.createFunction(
           p_title:
             drift.missing_in_db.length > 0
               ? `Stripe reconcile: ${drift.missing_in_db.length} events missing in db`
-              : `Stripe reconcile: ${failedSummary.failed_count} failed rows pending`,
+              : replay.replayed_failed > 0
+                ? `Stripe reconcile: ${replay.replayed_failed} replay failure(s)`
+                : `Stripe reconcile: ${failedSummary.failed_count} failed rows pending`,
           p_body: JSON.stringify(
             {
               drift,
               failed: failedSummary,
+              replay,
               window: {
                 drift_hours: RECONCILE_WINDOW_DRIFT_HOURS,
                 failed_days: RECONCILE_WINDOW_FAILED_DAYS,
@@ -178,6 +270,6 @@ export const stripeReconcile = inngest.createFunction(
       });
     }
 
-    return { drift, failed: failedSummary };
+    return { drift, failed: failedSummary, replay };
   },
 );
