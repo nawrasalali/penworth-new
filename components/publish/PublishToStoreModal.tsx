@@ -1,9 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Rocket, X, BookOpen } from 'lucide-react';
+import {
+  LivebookEnrolmentSection,
+  type LivebookEnrolmentState,
+} from './LivebookEnrolmentSection';
 
 /**
  * Pre-publish modal for Penworth Store one-click publish.
@@ -64,6 +68,15 @@ export function PublishToStoreModal({
   const [authorNameInput, setAuthorNameInput] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [livebook, setLivebook] = useState<LivebookEnrolmentState>({
+    enrolled: false,
+    style: null,
+    ready: false,
+  });
+
+  const handleLivebookChange = useCallback((s: LivebookEnrolmentState) => {
+    setLivebook(s);
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -71,6 +84,7 @@ export function PublishToStoreModal({
       setAuthorNameInput((defaultAuthorName || '').trim());
       setError(null);
       setSubmitting(false);
+      setLivebook({ enrolled: false, style: null, ready: false });
     }
   }, [open, defaultAuthorName]);
 
@@ -86,8 +100,27 @@ export function PublishToStoreModal({
     const priceUsd = Number.isFinite(priceUsdNum) && priceUsdNum > 0 ? priceUsdNum : 0;
     const priceCents = Math.round(priceUsd * 100);
 
+    // Validate Livebook enrolment if toggled on.
+    if (livebook.enrolled && !livebook.ready) {
+      setError(
+        livebook.style === null
+          ? 'Pick a Livebook style or turn the toggle off.'
+          : 'Insufficient credits to enrol this book in Livebook.',
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
+      // Step 1 — publish FIRST so we get the listing_id back. The publish
+      // handler creates the store_listings row; enrolment then writes the
+      // livebook_enrolled flag onto it. Order matters: we cannot enrol a
+      // listing that does not yet exist. The publish handler also auto-
+      // fires the matcher when livebook_enrolled is true at first-publish
+      // time — but because enrol runs AFTER publish here, the matcher
+      // auto-fire won't catch it on this code path. The enrol API has
+      // its own post-success matcher kick that handles already-published
+      // listings, so this is wired correctly end-to-end.
       const resp = await fetch('/api/publishing/penworth-store', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -102,6 +135,48 @@ export function PublishToStoreModal({
       if (!resp.ok || data.error) {
         throw new Error(data.error || 'Publishing failed');
       }
+
+      // Step 2 — if Livebook enrolment was toggled, charge credits and
+      // flip the flags. The enrol API kicks off the matcher for this
+      // already-published listing.
+      if (livebook.enrolled && livebook.style && data.storeListingId) {
+        try {
+          const enrolResp = await fetch('/api/livebook/enrol', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              listing_id: data.storeListingId,
+              style: livebook.style,
+            }),
+          });
+          const enrolData = (await enrolResp.json().catch(() => ({}))) as {
+            ok?: boolean;
+            reason?: string;
+          };
+          if (!enrolResp.ok || !enrolData.ok) {
+            // Soft-fail: book is already published. Surface a non-blocking
+            // warning in the modal but still complete the publish flow.
+            // Author can re-enrol later from the Store dashboard.
+            const reason = enrolData.reason || `HTTP ${enrolResp.status}`;
+            console.warn('[publish modal] Livebook enrolment failed post-publish:', reason);
+            setError(
+              `Published, but Livebook enrolment failed (${reason}). You can enrol later from your Store dashboard.`,
+            );
+            // Don't onSuccess — let the author see the warning and dismiss
+            // the modal manually.
+            setSubmitting(false);
+            return;
+          }
+        } catch (enrolErr) {
+          console.warn('[publish modal] Livebook enrolment threw:', enrolErr);
+          setError(
+            'Published, but Livebook enrolment encountered a network error. You can enrol later from your Store dashboard.',
+          );
+          setSubmitting(false);
+          return;
+        }
+      }
+
       onSuccess({
         storeUrl: data.storeUrl,
         marketplaceUrl: data.marketplaceUrl,
@@ -201,6 +276,12 @@ export function PublishToStoreModal({
             </p>
           </div>
 
+          <LivebookEnrolmentSection
+            open={open}
+            disabled={submitting}
+            onChange={handleLivebookChange}
+          />
+
           {error && (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {error}
@@ -220,7 +301,7 @@ export function PublishToStoreModal({
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || (livebook.enrolled && !livebook.ready)}
             className="bg-gradient-to-r from-primary to-amber-500"
           >
             {submitting ? (

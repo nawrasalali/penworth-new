@@ -515,6 +515,30 @@ async function main() {
     await supabase.from('livebook_styles').update({ library_size: count }).eq('slug', flags.style);
     console.log(`livebook_styles.${flags.style}.library_size updated to ${count}`);
   }
+
+  // Refresh sample_thumbnail_urls — pick 3 random thumbnails for the
+  // publish-modal style picker preview. Done at end of seeding so the
+  // picker always has up-to-date samples reflecting the actual library.
+  const { data: sampleRows } = await supabase
+    .from('livebook_image_library')
+    .select('thumbnail_url')
+    .eq('style_slug', flags.style)
+    .eq('is_active', true)
+    .limit(50); // sample pool, then random-pick
+  if (sampleRows && sampleRows.length > 0) {
+    const shuffled = [...sampleRows].sort(() => Math.random() - 0.5);
+    const samples = shuffled
+      .slice(0, 3)
+      .map((r) => (r as { thumbnail_url: string | null }).thumbnail_url)
+      .filter((u): u is string => !!u);
+    if (samples.length > 0) {
+      await supabase
+        .from('livebook_styles')
+        .update({ sample_thumbnail_urls: samples })
+        .eq('slug', flags.style);
+      console.log(`livebook_styles.${flags.style}.sample_thumbnail_urls updated to ${samples.length} thumbnails`);
+    }
+  }
 }
 
 main().catch((e) => {
