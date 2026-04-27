@@ -230,9 +230,25 @@ async function tts(text: string, voiceId: string, attempt = 1): Promise<ArrayBuf
     },
   );
   // ElevenLabs uses 429 + Retry-After for rate limits and 408 for queue
-  // timeouts. Retry on either, exponential backoff capped at 10 attempts.
-  if ((r.status === 429 || r.status === 408) && attempt <= 10) {
-    await new Promise((res) => setTimeout(res, 2000 * attempt));
+  // timeouts. CEO-171 follow-up (2026-04-27): the prior backoff of
+  // 2000ms × attempt could compound to >100s per call on attempt 10,
+  // which combined with 5 concurrent workers all retrying at once
+  // would burn the entire 200s edge-function budget and yield no
+  // output (this hit during The New Rich's 40-paragraph regen, where
+  // bursting after a previous 31-call run had exhausted the per-minute
+  // bucket). Now we (a) honor the Retry-After header when present, so
+  // backoff is the server-recommended interval rather than guessed,
+  // (b) cap any single wait at 8s so a single bad attempt can't blow
+  // the whole budget, and (c) drop max attempts from 10 to 5. The
+  // worker pool concurrency was also dropped from 5 to 3 elsewhere
+  // to lower 429 rate at the source.
+  if ((r.status === 429 || r.status === 408) && attempt <= 5) {
+    const ra = r.headers.get("retry-after");
+    const raSec = ra ? parseFloat(ra) : NaN;
+    const waitMs = Number.isFinite(raSec) && raSec > 0
+      ? Math.min(8000, Math.ceil(raSec * 1000))
+      : Math.min(8000, 1000 * attempt + Math.floor(Math.random() * 500));
+    await new Promise((res) => setTimeout(res, waitMs));
     return tts(text, voiceId, attempt + 1);
   }
   if (!r.ok) {
@@ -411,10 +427,13 @@ Deno.serve(async (req: Request) => {
     console.log(`[livebook] starting ${sample.length} paragraphs (${listing_id})`);
 
     // Bounded-concurrency TTS to keep total wall time well under the
-    // 200s edge-function ceiling. ElevenLabs handles ~5-10 concurrent
-    // requests cleanly on paid plans; we cap at 5 to avoid bumping into
-    // the 429 retry path, which would burn time.
-    const TTS_CONCURRENCY = 5;
+    // 200s edge-function ceiling. CEO-171 follow-up (2026-04-27):
+    // dropped from 5 → 3 after parallel regens of two listings burst
+    // ElevenLabs' per-minute bucket and triggered cascading 429s on
+    // the second listing. 3 leaves enough headroom that two parallel
+    // operators (writer publish + admin regen) can run simultaneously
+    // without colliding.
+    const TTS_CONCURRENCY = 3;
     const slots: (ParagraphRow | null)[] = new Array(sample.length).fill(null);
     let nextIdx = 0;
     let totalAudioBytes = 0;
