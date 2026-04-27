@@ -360,7 +360,44 @@ This runbook describes what we WILL be able to do, not what we CAN do today. Ope
 
 ## 10. Drill log (append-only, oldest first)
 
-_No drills run yet. First drill scheduled for the week before launch, dates TBC by Founder._
+### 2026-04-27 — Dev branch standup + PITR activation (CEO-184, CEO-172)
+
+Pre-drill state, in production:
+- PITR was NOT actually active. Pro plan retains 1 day of daily backups by
+  default; the documented "7 days of PITR" requires the paid `pitr_7`
+  add-on (~$100/mo) and the Small compute add-on as a prerequisite. The
+  runbook section 2 understates this. **CTO action this session:** upgraded
+  compute `ci_micro -> ci_small` (+$5/mo) and enabled `pitr_7` add-on
+  (+$100/mo). Verified `pitr_enabled: true` and `walg_enabled: true` via
+  `GET /v1/projects/lodupspxdvadamrqvkje/database/backups`. From now on,
+  every PITR-restore step in this runbook is genuinely available.
+
+Drill scope this session (limited; full timed restore drill still owed):
+- Stood up a persistent `dev` branch via `POST /v1/projects/{ref}/branches`
+  with body `{branch_name: "dev", persistent: true}`. Branch project ref
+  `cnlxhubcsoydlrmjmusz`, ACTIVE_HEALTHY, postgres-17.6.1.111. Connection
+  credentials retrievable from `GET /v1/branches/{branch_id}` (DB password
+  is rotatable independent of production).
+- Confirmed parent-level `MIGRATIONS_FAILED` flag is expected behaviour:
+  our schema is applied via `apply_migration` against the live DB, not
+  via `supabase/migrations/` files in the repo, so the branch's migration
+  replay step has nothing to apply. The branch project itself is healthy.
+
+What this drill did NOT test (deferred to scheduled window with founder):
+- A timed end-to-end restore from a PITR snapshot.
+- A `pg_dump` from production then `pg_restore` to the dev branch.
+- Verification that `auth.users` count and key table row counts match.
+- Whether storage bucket re-uploads land where the manifest expects them.
+
+Why deferred: the actual destructive-recovery dry run is a 90-minute
+exercise that needs the founder watching, both for the spend (the dev
+branch + restore burns compute hours) and to absorb any surprise like
+schema drift the runbook didn't anticipate.
+
+Carry-forward: CEO-183 stays open with explicit dependency on a founder-
+green-lit drill window. The runbook is now genuinely usable for real;
+this entry plus the existing Sections 1–9 are sufficient for "if prod
+goes down right now, what do we do."
 
 ---
 
