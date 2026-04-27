@@ -361,17 +361,51 @@ Deno.serve(async (req: Request) => {
     // PARAGRAPHS schema (consumed verbatim by livebook-manifest's regex
     // parser + player.html's run loop):
     //   { id: "p<idx>"; text: string; gap_ms: number; audio: string;
-    //     word_timings: unknown[] }
+    //     word_timings: { word: string; start_s: number; end_s: number }[] }
     // - audio is a `data:audio/mpeg;base64,...` URL
-    // - word_timings is left empty for now (player tolerates [] and
-    //   falls back to whole-paragraph caption fade)
+    //
+    // CEO-171 follow-up (audio cutoff bug): word_timings MUST be
+    // populated. The player's run loop awaits syncCaptionsToAudio, which
+    // resolves immediately when word_timings is empty — so the await
+    // pattern collapses, NARR.src is overwritten by the next paragraph,
+    // and only the first ~600ms of each paragraph plays. To make the
+    // player block until audio.ended, we synthesize linear timings
+    // (each word evenly spread across the paragraph's estimated audio
+    // duration). Word reveal won't be perfectly synced with phonemes,
+    // but every word IS visible long enough to read at this pace and
+    // — critically — audio plays to completion. Real per-word timings
+    // would require ElevenLabs' /with-timestamps endpoint, which is
+    // future work (heavier response, different route).
+    type WordTiming = { word: string; start_s: number; end_s: number };
     type ParagraphRow = {
       id: string;
       text: string;
       gap_ms: number;
       audio: string;
-      word_timings: unknown[];
+      duration_sec: number;
+      word_timings: WordTiming[];
     };
+
+    // mp3 @ 128 kbps = ~16,000 bytes per second of audio. This matches
+    // the formula used at the chapter level for total duration.
+    const BYTES_PER_SEC_128KBPS_MP3 = 16000;
+
+    function buildLinearTimings(text: string, audioBytes: number): {
+      duration_sec: number;
+      timings: WordTiming[];
+    } {
+      const words = text.split(/\s+/).filter((w) => w.length > 0);
+      // Floor at 1s so a tiny paragraph still has time to read its words.
+      const duration_sec = Math.max(1, audioBytes / BYTES_PER_SEC_128KBPS_MP3);
+      if (words.length === 0) return { duration_sec, timings: [] };
+      const per = duration_sec / words.length;
+      const timings: WordTiming[] = words.map((w, i) => ({
+        word: w,
+        start_s: i * per,
+        end_s: (i + 1) * per,
+      }));
+      return { duration_sec, timings };
+    }
 
     const t0 = Date.now();
     console.log(`[livebook] starting ${sample.length} paragraphs (${listing_id})`);
@@ -398,15 +432,17 @@ Deno.serve(async (req: Request) => {
         }
         const merged = concatBuffers(audioBufs);
         totalAudioBytes += merged.byteLength;
+        const { duration_sec, timings } = buildLinearTimings(text, merged.byteLength);
         slots[i] = {
           id: `p${i}`,
           text,
           gap_ms: gapForParagraph(text),
           audio: `data:audio/mpeg;base64,${encodeBase64(merged)}`,
-          word_timings: [],
+          duration_sec,
+          word_timings: timings,
         };
         console.log(
-          `[livebook] p${i} done in ${Date.now() - ts}ms (chunks=${ttsChunks.length}, bytes=${merged.byteLength})`,
+          `[livebook] p${i} done in ${Date.now() - ts}ms (chunks=${ttsChunks.length}, bytes=${merged.byteLength}, words=${timings.length}, dur=${duration_sec.toFixed(1)}s)`,
         );
       }
     }
