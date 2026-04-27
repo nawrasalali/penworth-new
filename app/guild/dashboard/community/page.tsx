@@ -8,8 +8,6 @@ export const metadata = {
   title: 'Community',
 };
 
-const UNLOCK_THRESHOLD = 10; // active or probation Guildmembers
-
 type Pillar = {
   label: string;
   title: string;
@@ -72,17 +70,6 @@ export default async function CommunityIndexPage() {
     .maybeSingle();
   if (!member) redirect('/guild/dashboard');
 
-  // Live progress toward unlock — count active + probation members
-  const { count: activeMembers } = await admin
-    .from('guild_members')
-    .select('*', { count: 'exact', head: true })
-    .in('status', ['active', 'probation']);
-
-  const memberCount = activeMembers ?? 0;
-  const remaining = Math.max(UNLOCK_THRESHOLD - memberCount, 0);
-  const pct = Math.min(Math.round((memberCount / UNLOCK_THRESHOLD) * 100), 100);
-  const unlocked = memberCount >= UNLOCK_THRESHOLD;
-
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
       <NavBreadcrumbs />
@@ -110,40 +97,11 @@ export default async function CommunityIndexPage() {
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-[#8a8370]">
           A community of one is a chat with the Founder. A community of three is a group text. A
-          real community needs enough Guildmembers that meeting someone new in here is normal.
-          We&apos;re intentionally holding the launch until the Guild reaches{' '}
-          <span className="text-[#e7e2d4]">{UNLOCK_THRESHOLD} active members</span> — that&apos;s
-          the threshold where the directory has signal, threads get answered, and town halls feel
-          like rooms instead of one-on-ones.
+          real community needs enough Guildmembers that meeting someone new in here is normal,
+          that threads get answered, and that town halls feel like rooms instead of one-on-ones.
+          We&apos;re intentionally holding the launch until the Guild is large enough for that
+          to be true. The pillars below are what goes live when it is.
         </p>
-
-        {/* Progress card */}
-        <div
-          className={`mt-6 rounded-xl border p-5 ${
-            unlocked ? 'border-[#d4af37]/40 bg-[#d4af37]/5' : 'border-[#2a3149] bg-[#0a0e1a]'
-          }`}
-        >
-          <div className="flex items-baseline justify-between">
-            <div className="text-xs font-semibold uppercase tracking-widest text-[#d4af37]">
-              Progress to launch
-            </div>
-            <div className="font-serif text-2xl tracking-tight text-[#e7e2d4]">
-              {memberCount}
-              <span className="text-sm text-[#8a8370]"> / {UNLOCK_THRESHOLD} members</span>
-            </div>
-          </div>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#1e2436]">
-            <div
-              className="h-full bg-gradient-to-r from-[#d4af37] to-[#e6c14a] transition-all"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <p className="mt-4 text-sm leading-relaxed text-[#8a8370]">
-            {unlocked
-              ? 'Threshold reached. Community features are unlocking now.'
-              : `${remaining} more active member${remaining === 1 ? '' : 's'} needed. Every Guildmember you bring in shortens that timeline — your referrals count toward your commission, but Guild applications you encourage from people you trust count toward the Community unlocking for everyone.`}
-          </p>
-        </div>
       </section>
 
       {/* What Community will be — the six pillars */}

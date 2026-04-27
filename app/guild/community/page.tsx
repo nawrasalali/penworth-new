@@ -1,14 +1,10 @@
 import Link from 'next/link';
-import { createServiceClient } from '@/lib/supabase/service';
 
-export const dynamic = 'force-dynamic';
 export const metadata = {
   title: 'The Community — More than a Referral Program',
   description:
     "The peer layer of the Penworth Guild: member directory, threaded discussions, town halls, referral showcase, the Guild Council, and the conduct standard that's in force from day one.",
 };
-
-const UNLOCK_THRESHOLD = 10;
 
 type Pillar = {
   label: string;
@@ -57,19 +53,6 @@ const PILLARS: Pillar[] = [
 ];
 
 export default async function CommunityMarketingPage() {
-  const admin = createServiceClient();
-
-  // Live progress toward unlock — count active + probation members
-  const { count: activeMembers } = await admin
-    .from('guild_members')
-    .select('*', { count: 'exact', head: true })
-    .in('status', ['active', 'probation']);
-
-  const memberCount = activeMembers ?? 0;
-  const remaining = Math.max(UNLOCK_THRESHOLD - memberCount, 0);
-  const pct = Math.min(Math.round((memberCount / UNLOCK_THRESHOLD) * 100), 100);
-  const unlocked = memberCount >= UNLOCK_THRESHOLD;
-
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       {/* Hero */}
@@ -114,38 +97,11 @@ export default async function CommunityMarketingPage() {
         <p className="mt-4 max-w-3xl text-sm leading-relaxed text-[#8a8370]">
           A community of one is a chat with the Founder. A community of three is a group
           text. A real community needs enough Guildmembers that meeting someone new in here
-          is normal, that threads get answered without us prompting them, that town halls
-          feel like rooms instead of one-on-ones. The threshold we&apos;re holding to is{' '}
-          <span className="text-[#e7e2d4]">{UNLOCK_THRESHOLD} active Guildmembers</span>.
+          is normal, that threads get answered without us prompting them, and that town halls
+          feel like rooms instead of one-on-ones. We&apos;re intentionally holding the launch
+          until the Guild is large enough for that to be true. The pillars below are what
+          goes live when it is.
         </p>
-
-        {/* Progress card */}
-        <div
-          className={`mt-6 rounded-xl border p-5 ${
-            unlocked ? 'border-[#d4af37]/40 bg-[#d4af37]/5' : 'border-[#2a3149] bg-[#0a0e1a]'
-          }`}
-        >
-          <div className="flex items-baseline justify-between">
-            <div className="text-xs font-semibold uppercase tracking-widest text-[#d4af37]">
-              Progress to launch
-            </div>
-            <div className="font-serif text-2xl tracking-tight text-[#e7e2d4]">
-              {memberCount}
-              <span className="text-sm text-[#8a8370]"> / {UNLOCK_THRESHOLD} members</span>
-            </div>
-          </div>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#1e2436]">
-            <div
-              className="h-full bg-gradient-to-r from-[#d4af37] to-[#e6c14a] transition-all"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <p className="mt-4 text-sm leading-relaxed text-[#8a8370]">
-            {unlocked
-              ? 'Threshold reached. Community features are unlocking now.'
-              : `${remaining} more active member${remaining === 1 ? '' : 's'} needed. The Guild is admission-by-application — there is no fast path.`}
-          </p>
-        </div>
       </section>
 
       {/* The six pillars */}
