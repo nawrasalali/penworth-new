@@ -1,4 +1,9 @@
 import { inngest } from '../client';
+import type {
+  TemplateMeta,
+  VoiceProfile,
+  ChapterCompletedEventData,
+} from '../client';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { buildSystemPrompt, getPromptById } from '@/lib/industry-prompts';
@@ -38,22 +43,6 @@ interface MatterSection {
   description: string;
   keyPoints?: string[];
   estimatedWords?: number;
-}
-
-interface TemplateMeta {
-  flavor: 'narrative' | 'instructional' | 'academic' | 'business' | 'legal' | 'technical' | 'reference' | 'short_form';
-  bodyLabelSingular: string;
-  bodyLabelPlural: string;
-  bodyIsVariable: boolean;
-  requiresCitations: boolean;
-  writingStyleGuide: string;
-  citationStyle?: string;
-}
-
-interface VoiceProfile {
-  tone: string;
-  style: string;
-  vocabulary: string;
 }
 
 /**
@@ -337,67 +326,190 @@ export const writeBook = inngest.createFunction(
     }
 
     // --- BODY (chapters / sections / clauses / recipes) ---
-    for (let i = 0; i < body.length; i++) {
-      const b = body[i];
-      const stepName = `body-${i + 1}`;
-      const result = await step.run(stepName, async () => {
-        await pulseHeartbeat(sessionId, { agent: 'writing' });
-        try {
-          return await writeSection({
-            kind: 'body',
+    //
+    // CEO-051: feature-flagged Inngest fan-out.
+    //
+    // When CHAPTER_FANOUT_ENABLED=true, the orchestrator emits one
+    // `chapter/write` event per body section and then awaits a matching
+    // `chapter/completed` signal for each. Each chapter therefore runs
+    // in its own Inngest function instance (see write-chapter.ts) with
+    // its own retry lane (3 attempts) and its own 15-minute timeout, so
+    // a slow or failing chapter no longer blocks every later chapter.
+    // Wall-clock for an N-chapter book collapses from sum-of-chapters
+    // to ~slowest-chapter time.
+    //
+    // Default: false. The sequential path below remains the production
+    // behaviour until the founder flips the flag.
+    //
+    // Idempotency: writeSection's existing project_id+order_index unique
+    // constraint (migration 023) is the hard guarantee — parallel
+    // invocations against the same slot are safe by construction. The
+    // worker either short-circuits via the existence check
+    // (write-book.ts ~line 553) or via the upsert's
+    // onConflict='project_id,order_index' ignoreDuplicates path.
+    //
+    // Known limitation in the fan-out path: the prior-chapter handoff
+    // (`written.map(w => w.title).join(', ')` from the sequential path)
+    // is dropped — chapters fan out concurrently, so there is no
+    // chronological "prior" to pass. Pre-computing chapter summaries
+    // before fan-out is scoped as a follow-up task (see
+    // docs/briefs/2026-04-26-ceo-051-chapter-fanout.md, Out of scope #2).
+    //
+    // Race-correctness note (deviation from the brief's serial loop):
+    // we register every chapter wait UP-FRONT via Promise.all rather
+    // than serially. Inngest's step.waitForEvent only matches events
+    // received AFTER the wait is registered; with a serial loop, a
+    // chapter that finished while we were still awaiting an earlier
+    // slot would have its completion event missed and the wait would
+    // hang to the 15-minute timeout. Parallel registration eliminates
+    // that race because all 9 (or however many) waits are in-flight
+    // before the first chapter can possibly complete.
+    const fanoutEnabled = process.env.CHAPTER_FANOUT_ENABLED === 'true';
+    if (fanoutEnabled && body.length > 0) {
+      const bodyStartOrderIndex = orderIndex;
+
+      // 1. Emit one chapter/write event per body section, in a single batch.
+      await step.sendEvent(
+        'fan-out-chapters',
+        body.map((b, i) => ({
+          name: 'chapter/write' as const,
+          data: {
+            projectId,
+            userId,
+            sessionId,
+            orderIndex: bodyStartOrderIndex + i,
+            bodyNumber: b.number,
             title: b.title,
             description: b.description,
             keyPoints: b.keyPoints || [],
             targetWords: b.estimatedWords || 3000,
-            bodyNumber: b.number,
-            projectId,
-            userId,
             docTitle: title,
-            orderIndex: orderIndex,
+            industry,
             meta,
             voiceProfile: effectiveVoiceProfile,
             projectCtx,
-            prior: written.map((w) => w.title).join(', '),
-            industry,
-            sessionId,
-          });
-        } catch (err) {
-          await logIncident({
-            sessionId,
-            userId,
-            agent: 'writing',
-            incidentType: classifyError(err),
-            severity: 'p3',
-            details: {
-              step: stepName,
-              sectionTitle: b.title,
-              bodyNumber: b.number,
-              message: err instanceof Error ? err.message : String(err),
-              stack: err instanceof Error ? err.stack?.slice(0, 2000) : undefined,
-            },
-          });
-          await bumpFailureCount(
-            sessionId,
-            `${stepName}: ${err instanceof Error ? err.message : String(err)}`,
-          );
-          throw err;
-        }
+            prior: '', // see header comment — fan-out drops the prior handoff
+          },
+        })),
+      );
+
+      // 2. Register every chapter wait in parallel (see race note above).
+      //    Each wait filters on projectId AND orderIndex via the Inngest
+      //    expression language: `async` is the awaited event, while
+      //    closure-captured projectId / expectedOrderIndex are interpolated
+      //    as literals. Both must match — projectId scopes to this run,
+      //    orderIndex identifies the slot.
+      const completionPromises = body.map((_, i) => {
+        const expectedOrderIndex = bodyStartOrderIndex + i;
+        return step.waitForEvent(`wait-chapter-${i}`, {
+          event: 'chapter/completed',
+          timeout: '15m',
+          if: `async.data.projectId == "${projectId}" && async.data.orderIndex == ${expectedOrderIndex}`,
+        });
       });
-      written.push(result);
-      orderIndex += 1;
+      const completions = await Promise.all(completionPromises);
 
+      // 3. Fold completions back into `written` in slot order so
+      //    finalize's reduce / ordering contract matches the sequential
+      //    path exactly.
+      for (let i = 0; i < body.length; i++) {
+        const completion = completions[i];
+        if (!completion) {
+          throw new Error(
+            `Chapter slot ${bodyStartOrderIndex + i} (body section ${i + 1} of ${body.length}) did not complete within 15m`,
+          );
+        }
+        const completionData = completion.data as ChapterCompletedEventData;
+        written.push({
+          chapterId: completionData.chapterId,
+          title: body[i].title,
+          wordCount: completionData.wordCount,
+        });
+      }
+
+      // 4. Single end-of-body-phase progress write + heartbeat. We skip
+      //    per-chapter projects.metadata writes from the orchestrator
+      //    here on purpose: the workers themselves keep
+      //    agent_heartbeat_at fresh via writeSection's
+      //    pulseHeartbeat / withHeartbeatKeepalive wrappers, and any
+      //    UI that wants live progress can count rows in `chapters`
+      //    directly (cheaper than fighting jsonb update races).
       await pulseHeartbeat(sessionId);
-
       await supabase
         .from('projects')
         .update({
           metadata: {
             totalChapters: totalSections,
-            completedChapters: orderIndex,
+            completedChapters: bodyStartOrderIndex + body.length,
             lastUpdatedAt: new Date().toISOString(),
           },
         })
         .eq('id', projectId);
+      orderIndex = bodyStartOrderIndex + body.length;
+    } else {
+      // Sequential body loop — production default until CHAPTER_FANOUT_ENABLED flips.
+      for (let i = 0; i < body.length; i++) {
+        const b = body[i];
+        const stepName = `body-${i + 1}`;
+        const result = await step.run(stepName, async () => {
+          await pulseHeartbeat(sessionId, { agent: 'writing' });
+          try {
+            return await writeSection({
+              kind: 'body',
+              title: b.title,
+              description: b.description,
+              keyPoints: b.keyPoints || [],
+              targetWords: b.estimatedWords || 3000,
+              bodyNumber: b.number,
+              projectId,
+              userId,
+              docTitle: title,
+              orderIndex: orderIndex,
+              meta,
+              voiceProfile: effectiveVoiceProfile,
+              projectCtx,
+              prior: written.map((w) => w.title).join(', '),
+              industry,
+              sessionId,
+            });
+          } catch (err) {
+            await logIncident({
+              sessionId,
+              userId,
+              agent: 'writing',
+              incidentType: classifyError(err),
+              severity: 'p3',
+              details: {
+                step: stepName,
+                sectionTitle: b.title,
+                bodyNumber: b.number,
+                message: err instanceof Error ? err.message : String(err),
+                stack: err instanceof Error ? err.stack?.slice(0, 2000) : undefined,
+              },
+            });
+            await bumpFailureCount(
+              sessionId,
+              `${stepName}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+            throw err;
+          }
+        });
+        written.push(result);
+        orderIndex += 1;
+
+        await pulseHeartbeat(sessionId);
+
+        await supabase
+          .from('projects')
+          .update({
+            metadata: {
+              totalChapters: totalSections,
+              completedChapters: orderIndex,
+              lastUpdatedAt: new Date().toISOString(),
+            },
+          })
+          .eq('id', projectId);
+      }
     }
 
     // --- BACK MATTER ---
@@ -502,7 +614,7 @@ export const writeBook = inngest.createFunction(
 // writeSection — generic prose generator, flavor-aware
 // ============================================================================
 
-interface WriteSectionInput {
+export interface WriteSectionInput {
   kind: 'front_matter' | 'body' | 'back_matter';
   title: string;
   description: string;
@@ -535,7 +647,7 @@ interface WriteSectionInput {
   sessionId?: string | null;
 }
 
-async function writeSection(inp: WriteSectionInput) {
+export async function writeSection(inp: WriteSectionInput) {
   const { kind, title, description, keyPoints, targetWords, bodyNumber, projectId, userId, docTitle, orderIndex, meta, voiceProfile, projectCtx, prior, industry, sessionId } = inp;
 
   // Retry-safety: if a prior run already wrote this chapter (same
@@ -712,7 +824,7 @@ async function writeSection(inp: WriteSectionInput) {
   return { chapterId: saved.id, title, wordCount };
 }
 
-function buildSectionPrompt(p: {
+export function buildSectionPrompt(p: {
   kind: 'front_matter' | 'body' | 'back_matter';
   docTitle: string;
   sectionTitle: string;
@@ -834,7 +946,7 @@ function buildSectionPrompt(p: {
   return parts.join('\n');
 }
 
-function buildFlavoredSystemPrompt(p: {
+export function buildFlavoredSystemPrompt(p: {
   industry: string;
   voiceProfile?: VoiceProfile;
   flavor: TemplateMeta['flavor'];
@@ -934,7 +1046,7 @@ async function triggerReferralCredits(userId: string, projectId: string, bookTit
  * enum values. Best-effort string matching — the Anthropic SDK tags
  * errors with status codes we can read.
  */
-function classifyError(err: unknown): 'api_rate_limit' | 'api_error' | 'token_budget_exhausted' | 'infrastructure_error' | 'unknown' {
+export function classifyError(err: unknown): 'api_rate_limit' | 'api_error' | 'token_budget_exhausted' | 'infrastructure_error' | 'unknown' {
   if (err instanceof Error) {
     const msg = err.message.toLowerCase();
     const status = (err as any)?.status ?? (err as any)?.statusCode;
