@@ -20,8 +20,8 @@ CLI was not available in the sandbox:
 
 ## What remains for Claude Code
 
-- **Defect 4 — Back cover full-bleed.** Needs investigation of where the back-cover *image* (not just the overlay) is drawn, and confirmation that the call uses `(0, 0, pageW, pageH)` cover-fit instead of a margined placement.
-- **Defect 6 — Embedded image width cap.** Needs to find (or add) the markdown-image rendering path in chapter content and cap rendered width at 4.5″ (324 pt).
+- ~~**Defect 4 — Back cover full-bleed.**~~ ✅ already shipped in CEO-092 (commit 689ed4e). Per code inspection 2026-04-27: `drawFullBleedImage(doc, backCover, 0, 0, pageW, pageH)` with `cover: [pageW, pageH]` is in place at line 1133, and the comment block at line 539 explicitly notes that the underlying image is edge-to-edge. The CEO-092 fix also addressed the 6% strip showing through under the overlay.
+- ~~**Defect 6 — Embedded image width cap.**~~ ✅ shipped 2026-04-27 by CEO Claude (this brief, second pass). Adds an `image` kind to ContentBlock, parses standalone `![alt](url)` lines, pre-fetches image buffers in parallel alongside the cover fetches, and renders centered in the body column with a 4.5″ (324 pt) hard cap. Fail-soft on fetch errors and on malformed image data.
 - **Three new acceptance-gate test files.** Not yet written. Spec preserved below.
 
 ---

@@ -377,8 +377,12 @@ function tokenizeInline(input: string): Span[] {
 }
 
 interface ContentBlock {
-  kind: 'h2' | 'para';
-  text: string;
+  kind: 'h2' | 'para' | 'image';
+  text?: string;
+  /** Set on kind='image' only. Source URL of the embedded image. */
+  url?: string;
+  /** Set on kind='image' only. Alt text from the markdown ![alt](url) syntax. */
+  alt?: string;
 }
 
 /**
@@ -421,6 +425,21 @@ function parseChapterContent(raw: string): ContentBlock[] {
     if (h) {
       flushPara();
       blocks.push({ kind: 'h2', text: h[2].trim() });
+      continue;
+    }
+
+    // Markdown image on its own line: ![alt](url). The url may be a
+    // public Supabase Storage URL, an https URL, or a relative path —
+    // we accept anything; rendering will fail-soft if fetch returns
+    // null. Inline images embedded in text are NOT supported (they
+    // would need a per-character renderer); only standalone image
+    // lines render. This matches every other Penworth surface
+    // (livebook, chapter_assets) which also treats images as block-
+    // level elements.
+    const img = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (img) {
+      flushPara();
+      blocks.push({ kind: 'image', url: img[2].trim(), alt: img[1].trim() });
       continue;
     }
 
@@ -950,6 +969,32 @@ async function generatePDF(
     fetchCoverBuffer(extras.authorPhotoUrl),
   ]);
 
+  // Pre-fetch every embedded image in chapter bodies. Walk the parsed
+  // blocks once, collect unique image URLs, fetch all in parallel.
+  // The resulting map lets the render pass treat image insertion as a
+  // synchronous lookup — no async fetches inside the page-laying loop
+  // (which would interleave async I/O with pdfkit cursor state and
+  // make page-break logic much harder to reason about). Failed fetches
+  // are silently skipped at render time.
+  const allParsedBlocks = new Map<string, ContentBlock[]>();
+  const imageUrlSet = new Set<string>();
+  for (const chapter of chapters) {
+    const parsed = parseChapterContent(chapter.content);
+    allParsedBlocks.set(chapter.id, parsed);
+    for (const b of parsed) {
+      if (b.kind === 'image' && b.url) imageUrlSet.add(b.url);
+    }
+  }
+  const imageBuffers = new Map<string, Buffer>();
+  if (imageUrlSet.size > 0) {
+    const urls = Array.from(imageUrlSet);
+    const results = await Promise.all(urls.map((u) => fetchCoverBuffer(u)));
+    urls.forEach((u, i) => {
+      const buf = results[i];
+      if (buf) imageBuffers.set(u, buf);
+    });
+  }
+
   return new Promise<Buffer>((resolve, reject) => {
     try {
       const doc = new PDFDocument({
@@ -1063,7 +1108,7 @@ async function generatePDF(
 
         tocEntries.push({ label, title: displayTitle, openerAbs });
 
-        const blocks = parseChapterContent(chapter.content);
+        const blocks = allParsedBlocks.get(chapter.id) ?? parseChapterContent(chapter.content);
         let firstParaOfChapter = true;
 
         doc.fillColor('#111').font(F_BODY).fontSize(BODY_SIZE);
@@ -1074,12 +1119,41 @@ async function generatePDF(
           if (block.kind === 'h2') {
             doc.moveDown(0.6);
             doc.font(F_HEAD).fontSize(14).fillColor('#000').text(
-              block.text, { paragraphGap: 6, align: 'left' },
+              block.text ?? '', { paragraphGap: 6, align: 'left' },
             );
             doc.moveDown(0.3);
             doc.font(F_BODY).fontSize(BODY_SIZE).fillColor('#111');
+          } else if (block.kind === 'image') {
+            // Defect 6 (CEO-090): cap embedded image width at 4.5″
+            // (324 pt) so chapter-body images cannot exceed the
+            // intended print column. pdfkit auto-scales height to
+            // preserve aspect ratio when only width is provided.
+            //
+            // Image is centered in the body column. If the fetch
+            // failed (URL unreachable, or non-image content type),
+            // imageBuffers.get returns undefined — we silently skip
+            // rather than rendering a broken-image placeholder
+            // (book PDFs are read offline; a broken-image icon
+            // would be a permanent print defect).
+            const buf = block.url ? imageBuffers.get(block.url) : undefined;
+            if (buf) {
+              const IMG_MAX_W = 324; // 4.5 inch
+              const colW = pageW - 96; // 48pt margins on both sides
+              const renderW = Math.min(IMG_MAX_W, colW);
+              doc.moveDown(0.5);
+              const x = (pageW - renderW) / 2;
+              try {
+                doc.image(buf, x, doc.y, { width: renderW });
+              } catch {
+                // pdfkit can throw on malformed image data — fail
+                // soft and continue the chapter rather than abort
+                // the entire PDF generation.
+              }
+              doc.moveDown(0.5);
+              doc.font(F_BODY).fontSize(BODY_SIZE).fillColor('#111');
+            }
           } else {
-            drawParagraph(doc, block.text, { firstOfChapter: firstParaOfChapter });
+            drawParagraph(doc, block.text ?? '', { firstOfChapter: firstParaOfChapter });
             firstParaOfChapter = false;
           }
 
