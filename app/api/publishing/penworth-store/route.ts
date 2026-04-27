@@ -3,6 +3,12 @@ import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { creditReferralIfEligible } from '@/lib/referrals';
 
+// CEO-043 Phase 0.5: publishing the listing involves chapter inserts, cover
+// mirror upload, livebook kickoff, referral credit, and the final session
+// writeback. For a 9-chapter book this measured 46s wall-clock — the Vercel
+// Pro 60s default leaves no headroom. Bump to match Phase 0 across app/api/ai/*.
+export const maxDuration = 300;
+
 // Inline slugify — used to be imported from lib/utils, but the repo has
 // both `lib/utils.ts` (which wins module resolution for '@/lib/utils')
 // and `lib/utils/index.ts` (which is where slugify actually lives).
@@ -680,6 +686,35 @@ export async function POST(request: NextRequest) {
         livebookImageMatchStarted = true;
       }
     }
+  }
+
+  // CEO-043: mark the pipeline complete. publishing is the terminal agent
+  // in agentOrder, so /api/interview-session?action=advance refuses to flip
+  // it (currentIndex >= agentOrder.length - 1). Without this writeback,
+  // pipeline_status stays 'active' and the editor UI shows "publishing in
+  // progress" forever even though the store listing is live. Patch is safe
+  // for re-publishes (jump-back-to-publishing): the row simply re-completes.
+  if (session?.id) {
+    const completedStatus: Record<string, string> = {
+      ...(session as { agent_status?: Record<string, string> }).agent_status || {},
+    };
+    // session was loaded with a narrow .select(...); fetch agent_status
+    // explicitly so we don't clobber upstream stages with an empty object.
+    const { data: full } = await supabase
+      .from('interview_sessions')
+      .select('agent_status')
+      .eq('id', session.id)
+      .single();
+    const merged = { ...(full?.agent_status || {}), ...completedStatus, publishing: 'completed' };
+    await supabase
+      .from('interview_sessions')
+      .update({
+        agent_status: merged,
+        pipeline_status: 'completed',
+        agent_heartbeat_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', session.id);
   }
 
   return NextResponse.json({
