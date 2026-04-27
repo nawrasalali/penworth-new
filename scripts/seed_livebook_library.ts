@@ -321,7 +321,8 @@ async function processOne(
   row: CsvRow,
   rowIdx: number,
   styleSlug: string,
-  supabase: ReturnType<typeof createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no generated Database types in this repo; runtime correctness comes from PostgREST, not TS.
+  supabase: any,
   flags: { dryRun: boolean; force: boolean },
 ): Promise<{ ok: boolean; reason?: string }> {
   // Idempotency check.
