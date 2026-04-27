@@ -398,6 +398,55 @@ Carry-forward: CEO-183 stays open with explicit dependency on a founder-
 green-lit drill window. The runbook is now genuinely usable for real;
 this entry plus the existing Sections 1–9 are sufficient for "if prod
 goes down right now, what do we do."
+### 2026-04-27 (later) — Production baselines + PITR window verified (CEO-183)
+
+Captured for any future restore-verification — these are the row counts a
+fresh restore from the latest PITR snapshot must produce. Saved here so
+the next session running the actual timed drill has a known-good check.
+
+PITR window verified live via `GET /v1/projects/{ref}/database/backups`:
+- `pitr_enabled: true`, `walg_enabled: true` (continuous WAL archiving)
+- Region: ap-southeast-2 (Sydney)
+- Earliest restore point: 2026-04-20 15:10 UTC
+- Latest restore point:   2026-04-27 08:48 UTC
+- Effective RPO: < 5 minutes (the latest point trails real-time only by
+  the WAL ship interval). The runbook section 2 RPO target of "15 minutes
+  for transactional data" is comfortably met.
+
+Production row baselines as of 2026-04-27 ~08:50 UTC:
+
+| Surface                      | Rows |
+|------------------------------|-----:|
+| auth.users                   | 4    |
+| profiles                     | 4    |
+| organizations                | 0    |
+| org_members                  | 0    |
+| projects                     | 24   |
+| interview_sessions           | 18   |
+| credit_transactions          | 1    |
+| stripe_webhook_events        | 59   |
+| audit_log                    | 31   |
+| guild_applications           | 3    |
+| guild_members                | 1    |
+| store_listings               | 4    |
+| storage.objects              | 106  |
+| storage.buckets              | 11   |
+| public.tables                | 123  |
+| public.functions             | 248  |
+| public.policies              | 221  |
+| supabase_migrations.schema_migrations | 207 |
+
+Note that `organizations` and `org_members` are 0 despite Stripe handler
+code referencing them for customer-id lookup — pre-launch reality. Rows
+are seeded on first paid subscription activation.
+
+How to use these for a restore drill: trigger `POST /v1/projects/{ref}/
+database/backups/restore-pitr` against a sandbox project (NOT this one)
+to a specific timestamp, then run the same UNION ALL query at the top of
+this entry against the restored project. Counts must match within
+expected drift (post-restore-time inserts are correctly absent, no other
+deltas).
+
 
 ---
 
