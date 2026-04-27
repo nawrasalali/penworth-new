@@ -625,6 +625,63 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // ---------- KICK OFF LIVEBOOK IMAGE MATCHING (fire-and-forget) ----------
+  // CEO-165 Phase 1. If the listing is enrolled in the Livebook image
+  // library (Phase 2 publish-modal toggle), call the image matcher to
+  // resolve a paragraph→image map. Same fire-and-forget pattern as the
+  // audio livebook above. Until Phase 2 ships the enrolment UI, the
+  // `livebook_enrolled` column remains false everywhere and this branch
+  // is dormant.
+  let livebookImageMatchStarted = false;
+  if (isFirstPublish) {
+    const svc = createServiceClient();
+    const { data: listingRow } = await svc
+      .from('store_listings')
+      .select('livebook_enrolled, livebook_style')
+      .eq('id', storeListingId)
+      .maybeSingle();
+    if (listingRow?.livebook_enrolled && listingRow?.livebook_style) {
+      const adminSecret = process.env.ADMIN_SECRET;
+      if (!adminSecret) {
+        console.error(
+          '[penworth-store/publish] ADMIN_SECRET not set — skipping livebook image match for listing',
+          storeListingId,
+        );
+      } else {
+        const matchUrl =
+          'https://lodupspxdvadamrqvkje.supabase.co/functions/v1/admin-match-livebook-images';
+        void fetch(matchUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-secret': adminSecret,
+          },
+          body: JSON.stringify({
+            listing_id: storeListingId,
+          }),
+        })
+          .then(async (res) => {
+            if (!res.ok) {
+              console.error(
+                '[penworth-store/publish] Livebook image match non-OK',
+                res.status,
+                (await res.text()).slice(0, 200),
+              );
+            } else {
+              console.log(
+                '[penworth-store/publish] Livebook image match kicked off for listing',
+                storeListingId,
+              );
+            }
+          })
+          .catch((err) => {
+            console.error('[penworth-store/publish] Livebook image match fetch failed:', err);
+          });
+        livebookImageMatchStarted = true;
+      }
+    }
+  }
+
   return NextResponse.json({
     success: true,
     storeUrl,
@@ -635,6 +692,7 @@ export async function POST(request: NextRequest) {
     slug,
     platform: 'penworth',
     livebookGenerationStarted,
+    livebookImageMatchStarted,
     stats: {
       totalWords,
       chapterCount,

@@ -1,6 +1,6 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-27 by CEO Claude session — CEO-163 Phase 0 schema + seeding pipeline shipped (3 commits); blocked on founder provisioning FAL_KEY + ANTHROPIC_API_KEY + VOYAGE_API_KEY. CEO-165 (Phase 1 retrieval) and CEO-165 (Phase 2 publish modal + reader) briefs authored ahead of need.
+**Last updated:** 2026-04-27 by CEO Claude session — CEO-163 Phase 0 schema + seeding pipeline shipped AND CEO-165 Phase 1 retrieval pipeline shipped (migration 037 + edge function deployed v1 ACTIVE + publish handler wired). All Phase 1 code is dormant until Founder provisions FAL_KEY + ANTHROPIC_API_KEY + VOYAGE_API_KEY (one-time, gates both Phase 0 seeding AND Phase 1 matching). CEO-166 (Phase 2 publish modal + reader) brief authored ahead of need.
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 

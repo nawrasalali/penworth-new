@@ -45,16 +45,18 @@ For each paragraph in the book:
 
 7. **Update progress** every 25 paragraphs: `UPDATE store_listings SET livebook_image_progress = ... WHERE id = $1`. The store listing UI polls this column.
 
-### The Inngest worker
+### Implementation pattern (revised after reconnaissance)
 
-New Inngest function: `livebook-image-match`. Triggered by a new event `livebook/image.match.requested` that the publish handler emits when a book is enrolled. The worker:
+The original brief drafted this as an Inngest worker. After inspecting the codebase, the convention here is **direct edge function invocation with fire-and-forget POST** — that's how the audio livebook (`admin-generate-livebook`) is triggered from the publish handler. Inngest is used only for the 7-agent writing pipeline.
 
-1. Loads the listing (`store_listings`) and verifies `livebook_enrolled = true` and `livebook_style IS NOT NULL`.
-2. Loads the manuscript content from `manuscripts` storage bucket — not from `chapters` table because we want the published, finalised text.
-3. Parses paragraphs (re-uses the existing `splitSentences` logic from `admin-generate-livebook` but at paragraph granularity, not sentence).
-4. Runs the matching algorithm above.
-5. Writes the map: `UPDATE store_listings SET livebook_image_map = $1, livebook_image_status = 'ready', livebook_image_progress = 100, livebook_image_ready_at = now()`.
-6. On failure: `livebook_image_status = 'failed'`, error stored in the corresponding `livebook_generation_jobs` row.
+To stay consistent with established patterns, Phase 1 ships as:
+
+- A new edge function `admin-match-livebook-images` (mirror of `admin-generate-livebook` for naming consistency)
+- Fired fire-and-forget from the publish handler when `livebook_enrolled = true`
+- Authenticated by the same `x-admin-secret` shared secret
+- Long-run note: a 600-paragraph book runs ~30 seconds end-to-end (Voyage embeddings batched 50/req, SQL match is HNSW-fast, Claude reranker invoked only on close-call paragraphs to save cost)
+
+The match function in SQL handles the diversity penalty in one round-trip per paragraph: HNSW ANN cut to top-50, then in-memory penalty re-rank within those candidates. This is `livebook_match_image_for_paragraph` in migration 037.
 
 ### Job lifecycle
 
