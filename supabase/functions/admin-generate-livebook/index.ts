@@ -103,6 +103,57 @@ function splitParagraphs(markdown: string): string[] {
     const t = b.replace(/\s+/g, " ").trim();
     if (t.length > 0) out.push(t);
   }
+
+  // Fallback for hard-wrapped markdown with no blank-line paragraph
+  // separators (e.g. PDF-extracted text where each visual line is a
+  // separate \n but the source uses no blank lines between paragraphs).
+  // Without this, a 9KB chapter collapses to a single "paragraph" — a
+  // single TTS call with a 9KB body — which (a) blows the
+  // TTS_CHAR_LIMIT split budget, (b) leaves nothing for the parallel
+  // worker pool to fan out across, and (c) ultimately blows the 200s
+  // edge-function wall-clock cap.
+  //
+  // Trigger condition: only one paragraph after blank-line splitting AND
+  // the content is non-trivial. We deliberately keep this conservative
+  // — books with clean blank-line paragraphing (e.g. The Rewired Self)
+  // never hit this branch and keep their alignment with chapter_assets
+  // intact. Books with broken paragraphing (e.g. The New Rich, where
+  // chapter_assets are typically absent anyway) get sentence-cluster
+  // synthetic paragraphs instead — the player renders them fine and
+  // alignment is moot when there are no assets to align to.
+  if (out.length <= 1 && cleaned.length > 1500) {
+    const single = out[0] ?? cleaned.replace(/\s+/g, " ").trim();
+    // Sentence boundary: terminal punctuation followed by whitespace and
+    // a capital/quote/paren — same regex shape as chunkForTts's splitter.
+    const sentences = single
+      .split(/(?<=[.!?])\s+(?=[A-Z"'\(\[])/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+    if (sentences.length >= 3) {
+      // Group ~3 sentences per synthetic paragraph; merge stragglers
+      // (very short fragments) into the previous paragraph so we never
+      // emit a 5-word paragraph by itself.
+      const SENTENCES_PER_PARAGRAPH = 3;
+      const synthetic: string[] = [];
+      let buf: string[] = [];
+      for (const s of sentences) {
+        buf.push(s);
+        if (buf.length >= SENTENCES_PER_PARAGRAPH) {
+          synthetic.push(buf.join(" "));
+          buf = [];
+        }
+      }
+      if (buf.length > 0) {
+        if (synthetic.length > 0 && buf.join(" ").length < 200) {
+          synthetic[synthetic.length - 1] += " " + buf.join(" ");
+        } else {
+          synthetic.push(buf.join(" "));
+        }
+      }
+      return synthetic;
+    }
+  }
+
   return out;
 }
 
