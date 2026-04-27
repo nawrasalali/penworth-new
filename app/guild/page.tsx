@@ -80,15 +80,16 @@ function HeroSection() {
 
         <h1 className="font-serif text-5xl leading-[1.05] tracking-tight md:text-7xl">
           A craft. A career.{' '}
-          <span className="italic text-[#d4af37]">A share of every book you help find its reader.</span>
+          <span className="italic text-[#d4af37]">A share of every book that started because you brought the writer.</span>
         </h1>
 
         <p className="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-[#c9c2b0] md:text-xl">
-          Some people were born to place a book in the right hand at the right moment. If that has
-          always been you — at dinner tables, in messages to friends, in the comments of a book you
-          loved — the Penworth Guild is where that instinct becomes a career. Bring a writer whose
-          book has been waiting. Lead a reader to the book that will move them. Earn — honestly,
-          transparently, for twelve months — every time you do.
+          Some people were born to spot a writer with a book inside them. If that has always
+          been you — at dinner tables, in messages to friends, in the comments under
+          someone&apos;s first draft — the Penworth Guild is where that instinct becomes a
+          career. Your craft is bringing writers to Penworth. Penworth helps them turn the
+          book in their head into a real one. Our Store carries it to readers. You earn —
+          honestly, transparently, for twelve months — every time a writer you brought stays.
         </p>
 
         <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -154,9 +155,10 @@ function WhatSection() {
             Apprentice to Fellow. A retreat for the Masters.
           </p>
           <p className="mt-6 text-lg leading-relaxed text-[#c9c2b0]">
-            A certified badge that means something, and that we will defend. You find the writer
-            who has been holding a book inside them — and you find the reader who has been waiting
-            for exactly that book. Two hats. One craft. One career.
+            A certified badge that means something, and that we will defend. Your craft is
+            finding the writer who has been holding a book inside them. Penworth turns that
+            into a real book — written, designed, narrated, published. The Store carries it
+            to readers who have been waiting for exactly that book. One craft. One career.
           </p>
         </div>
         <div className="rounded-xl border border-[#1e2436] bg-[#0f1424] p-8">
