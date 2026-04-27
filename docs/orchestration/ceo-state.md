@@ -1,12 +1,45 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-27 by CEO Claude session — CEO-163 Phase 0 schema + seeding pipeline shipped AND CEO-165 Phase 1 retrieval pipeline shipped (migration 037 + edge function deployed v1 ACTIVE + publish handler wired). All Phase 1 code is dormant until Founder provisions FAL_KEY + ANTHROPIC_API_KEY + VOYAGE_API_KEY (one-time, gates both Phase 0 seeding AND Phase 1 matching). CEO-166 (Phase 2 publish modal + reader) brief authored ahead of need.
+**Last updated:** 2026-04-27 by CEO Claude session — CEO-051 per-chapter Inngest fan-out shipped (PR #15 squash-merged at `3a3d16c`, prod deploy `dpl_6nCUht3P6Yzt97C1EWApMwR6T9u7` READY). Feature-flagged off via `CHAPTER_FANOUT_ENABLED`; production behaviour unchanged until Founder activates.
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-27 — CEO-163 Livebook image library: Phase 0 shipped, Phase 1+2 briefs authored)
+## Most recent session activity (2026-04-27 — CEO-051 chapter fan-out shipped)
+
+**Founder direction at session open:** "CEO-021 p0" → "Go" → "Approved". Quick redirect: CEO-021 already done (Apr 21, regression scare on Apr 25 retracted), so I surfaced the actual top of queue (CEO-051) and Founder confirmed.
+
+**What shipped this session:**
+
+`3a3d16c` — `feat(pipeline): per-chapter Inngest fan-out (CEO-051) (#15)` (squash-merge of feature commit `1756e4f`)
+- New file: `inngest/functions/write-chapter.ts` — per-chapter Inngest worker with retries:3, consumes `chapter/write`, calls `writeSection`, emits durable `chapter/completed` via `step.sendEvent`.
+- `inngest/client.ts` — moved `TemplateMeta` and `VoiceProfile` here (avoids circular import); added `ChapterWriteEventData` and `ChapterCompletedEventData`.
+- `inngest/functions/write-book.ts` — body loop wrapped in `if (CHAPTER_FANOUT_ENABLED) {...} else {...}`. Sequential branch byte-identical to prior loop. Fan-out branch emits N events via `step.sendEvent`, registers N waits in parallel via `Promise.all`, folds completions back into `written` in slot order. `writeSection` / `WriteSectionInput` / `buildSectionPrompt` / `buildFlavoredSystemPrompt` / `classifyError` promoted to `export`.
+- `inngest/functions/index.ts` — registers `writeChapter` in functions array.
+- +440 / −68 lines across 4 files.
+
+**Deviation from brief I authored (documented in commit + PR + task row):** brief specified serial `await step.waitForEvent` in a for-loop. Inngest only matches events received *after* a wait registers — with serial registration, a chapter completing before its wait registers would deadlock to the 15-min timeout. Switched to `Promise.all` parallel registration. Side effect: per-chapter `projects.metadata` progress writes are batched to one end-of-body-phase write in the fan-out path (workers keep `agent_heartbeat_at` fresh; UI can count `chapters` rows for live progress). Sequential path retains per-chapter writes unchanged.
+
+**Status:** Shipped, dormant in prod. `CHAPTER_FANOUT_ENABLED` unset → sequential path runs. Activation pending CEO-170 (Founder picks test book + says "activate fan-out"; CEO sets env var via Vercel API + redeploys).
+
+**Spawned tasks:**
+- **CEO-169** (p2 open, ceo): pre-fan-out chapter-summary handoff to restore prior-context in parallel writing. Out-of-scope item from original brief; not blocking activation.
+- **CEO-170** (p1 awaiting_founder): activate `CHAPTER_FANOUT_ENABLED=true` on a green test book.
+
+**Side observations (not actioned):**
+- `scripts/seed_livebook_library.ts` baseline TS errors fixed independently in commit `6f932ac` ("fix(seed): type supabase client as any") during this session — no follow-up needed.
+- Production deploy `5f3effe` (CEO-163 Phase 0 ship) went ERROR but main rolled forward and recovered via `431c332`/`6f932ac`. Same root cause as the seed script TS errors. Main is green now.
+- "IMMEDIATE QUEUE AT SESSION START" block in Penworth CEO project instructions still lists CEO-021/017/014/005/016/019/020 — stale. CEO-021 done; 017 + 014 blocked on end-to-end book pipeline (which CEO-051 unblocks once activated).
+
+**Verification:**
+- CEO-021 cutover still intact (Vercel API: penworth.ai apex → NEW project, OLD project zero custom domains, prod deploy READY).
+- Sandbox curl to `penworth.ai` apex returned the documented 18-byte 503 stub; `www.penworth.ai` and Vercel API both clean. Per memory rule, Vercel API is authoritative.
+- Production deploy `dpl_6nCUht3P6Yzt97C1EWApMwR6T9u7` of merge commit READY, `https://penworth.ai` returns HTTP 200.
+
+---
+
+## Prior session activity (2026-04-27 — CEO-163 Livebook image library: Phase 0 shipped, Phase 1+2 briefs authored)
 
 **Founder direction at session open:** Build a curated image library so each paragraph of a livebook gets a paragraph-paired image. Author opts in for 1000 credits at publish time, picks a visual style. Reference images shared (12 stills) showing two target aesthetics: 1950s European hand-painted illustration + cinematic photoreal stills.
 
