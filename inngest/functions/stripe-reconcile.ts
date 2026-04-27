@@ -61,8 +61,8 @@ export const stripeReconcile = inngest.createFunction(
     id: 'stripe-reconcile',
     name: 'Stripe ↔ DB reconciliation',
     retries: 2,
+    triggers: [{ cron: '0 */6 * * *' }],
   },
-  { cron: '0 */6 * * *' },
   async ({ step, logger }) => {
     // ─────────────────────────────────────────────────────────────────────
     // Step A: count the failed rows in our table
