@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { LANGUAGE_NAMES } from '@/lib/ai/user-language';
+import { LANGUAGE_NAMES } from '@/lib/i18n/language-names';
 import { Loader2 } from 'lucide-react';
 import { t, isSupportedLocale, type Locale } from '@/lib/i18n/strings';
 

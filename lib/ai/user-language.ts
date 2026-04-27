@@ -1,8 +1,16 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+import {
+  LANGUAGE_NAMES,
+  getLanguageName,
+} from '@/lib/i18n/language-names';
+
+// Re-export so existing server callers (api/ai/* routes) keep working.
+export { LANGUAGE_NAMES, getLanguageName };
 
 /**
- * Read the user's preferred language from profiles.preferred_language.
- * Defaults to 'en' if the profile row or column is missing.
+ * Read the user's preferred language from `profiles.preferred_language`.
+ * Defaults to `'en'` if the profile row or column is missing.
  */
 export async function getUserLanguage(
   supabase: SupabaseClient,
@@ -14,24 +22,6 @@ export async function getUserLanguage(
     .eq('id', userId)
     .single();
   return (data?.preferred_language || 'en').toLowerCase();
-}
-
-export const LANGUAGE_NAMES: Record<string, string> = {
-  en: 'English',
-  ar: 'Arabic (Modern Standard Arabic)',
-  es: 'Spanish',
-  pt: 'Portuguese (Brazilian)',
-  ru: 'Russian',
-  zh: 'Chinese (Simplified)',
-  bn: 'Bengali',
-  hi: 'Hindi',
-  id: 'Indonesian (Bahasa Indonesia)',
-  fr: 'French',
-  vi: 'Vietnamese',
-};
-
-export function getLanguageName(lang: string): string {
-  return LANGUAGE_NAMES[lang.toLowerCase()] || 'English';
 }
 
 /**
