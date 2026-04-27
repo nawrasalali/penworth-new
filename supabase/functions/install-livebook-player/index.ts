@@ -504,6 +504,32 @@ function findSegment(plan, id) { return plan?.segments?.find(s => s.id === id) |
 function findAssetForParagraph(assets, idx) { return (assets || []).find(a => a.paragraph_index === idx && a.image_url) || null; }
 function applyAsset(asset, plan) { const stage=document.getElementById('image-stage'); const img=document.getElementById('scene-img'); if (!asset||!asset.image_url) {stage.classList.remove('visible','dominant','parallax'); return;} const planAsset=plan?.assets?.find(a=>a.asset_id===asset.asset_id); const dominant=planAsset?.visual_priority==='dominant'; const entry=planAsset?.behavior?.entry||'fade'; img.src=asset.image_url; img.onload=()=>{stage.classList.add('visible'); if (dominant) stage.classList.add('dominant'); if (entry==='parallax') stage.classList.add('parallax');}; }
 function clearAsset() { document.getElementById('image-stage').classList.remove('visible', 'dominant', 'parallax'); }
+function deriveApproxPages(audio, text) {
+  return new Promise((resolve, reject) => {
+    const build = () => {
+      const dur = audio.duration;
+      if (!isFinite(dur) || dur <= 0) { reject(new Error('audio duration unavailable')); return; }
+      const tokens = text.match(/\S+/g) || [];
+      if (!tokens.length) { reject(new Error('no words in paragraph text')); return; }
+      // Weight each word by character count + extra weight for punctuation tails so
+      // sentence-final words get a longer dwell that approximates the natural pause.
+      const weights = tokens.map(t => Math.max(1, t.length) + (/[.!?,;:]$/.test(t) ? 3 : 0));
+      const totalWeight = weights.reduce((a,b) => a+b, 0);
+      const perWeight = dur / totalWeight;
+      const synthWords = []; let cursor = 0;
+      for (let i = 0; i < tokens.length; i++) {
+        const w_dur = weights[i] * perWeight;
+        synthWords.push({ word: tokens[i], start_s: cursor, end_s: cursor + w_dur });
+        cursor += w_dur;
+      }
+      resolve(paginate(synthWords));
+    };
+    if (audio.readyState >= 1 && isFinite(audio.duration) && audio.duration > 0) { build(); return; }
+    const onMeta = () => { audio.removeEventListener('loadedmetadata', onMeta); build(); };
+    audio.addEventListener('loadedmetadata', onMeta, { once: true });
+    setTimeout(() => { audio.removeEventListener('loadedmetadata', onMeta); reject(new Error('loadedmetadata timeout')); }, 5000);
+  });
+}
 function loadAndPlayParagraph(src) {
   return new Promise((resolve, reject) => {
     if (!src) return reject(new Error('no audio for paragraph'));
@@ -553,9 +579,16 @@ async function run() {
     }
     const asset = findAssetForParagraph(MANIFEST.assets, i);
     if (asset) applyAsset(asset, MANIFEST.plan); else clearAsset();
-    const pages = (p.word_timings && p.word_timings.length) ? paginate(p.word_timings) : [];
+    let pages = (p.word_timings && p.word_timings.length) ? paginate(p.word_timings) : [];
     try { await loadAndPlayParagraph(p.audio); }
     catch (e) { if (!firstFailureLogged) { showError('audio failed at paragraph ' + i + ': ' + e.message); firstFailureLogged = true; } continue; }
+    // Approximate word timings when /with-timestamps data is unavailable on this
+    // paragraph (legacy livebook.html). Once audio metadata is loaded, distribute
+    // words evenly across the paragraph's actual audio duration. Drifts slightly
+    // vs ElevenLabs char-precise timing, but produces watchable karaoke.
+    if (!pages.length && p.text && typeof p.text === 'string') {
+      try { pages = await deriveApproxPages(NARR, p.text); } catch { /* fall through to v18 await-ended */ }
+    }
     await syncCaptionsToAudio(NARR, pages);
     await wait(p.gap_ms || 600);
   }
