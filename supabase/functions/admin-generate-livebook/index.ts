@@ -214,14 +214,32 @@ function chunkForTts(paragraph: string, charLimit: number): string[] {
 
 // ---- ElevenLabs TTS ------------------------------------------------------
 
-async function tts(text: string, voiceId: string, attempt = 1): Promise<ArrayBuffer> {
+// CEO-171 follow-up (2026-04-27): switched from the audio-only TTS
+// endpoint (`/text-to-speech/{voice}`) to `/with-timestamps`. Same
+// character cost on ElevenLabs' side, but the response is JSON
+// containing both base64-encoded audio AND a per-character alignment
+// object (characters[], character_start_times_seconds[],
+// character_end_times_seconds[]). We need this because the player's
+// caption sync expects per-word start_s/end_s and the prior synthetic
+// linear timings produced visible drift between the spoken voice and
+// the text on screen — captions appearing after the words were
+// already spoken. Now we get authoritative timings from the model.
+type TtsResult = {
+  audio: Uint8Array;
+  characters: string[];
+  charStarts: number[]; // seconds, aligned to characters[]
+  charEnds: number[];
+};
+
+async function tts(text: string, voiceId: string, attempt = 1): Promise<TtsResult> {
   const r = await fetch(
-    `${ELEVENLABS_API}/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
+    `${ELEVENLABS_API}/text-to-speech/${voiceId}/with-timestamps?output_format=mp3_44100_128`,
     {
       method: "POST",
       headers: {
         "xi-api-key": ELEVENLABS_API_KEY!,
         "Content-Type": "application/json",
+        Accept: "application/json",
       },
       body: JSON.stringify({
         text,
@@ -230,18 +248,9 @@ async function tts(text: string, voiceId: string, attempt = 1): Promise<ArrayBuf
     },
   );
   // ElevenLabs uses 429 + Retry-After for rate limits and 408 for queue
-  // timeouts. CEO-171 follow-up (2026-04-27): the prior backoff of
-  // 2000ms × attempt could compound to >100s per call on attempt 10,
-  // which combined with 5 concurrent workers all retrying at once
-  // would burn the entire 200s edge-function budget and yield no
-  // output (this hit during The New Rich's 40-paragraph regen, where
-  // bursting after a previous 31-call run had exhausted the per-minute
-  // bucket). Now we (a) honor the Retry-After header when present, so
-  // backoff is the server-recommended interval rather than guessed,
-  // (b) cap any single wait at 8s so a single bad attempt can't blow
-  // the whole budget, and (c) drop max attempts from 10 to 5. The
-  // worker pool concurrency was also dropped from 5 to 3 elsewhere
-  // to lower 429 rate at the source.
+  // timeouts. Backoff strategy: honor Retry-After when present, cap any
+  // single wait at 8s, max 5 attempts. Worker concurrency is capped at
+  // 3 elsewhere to lower the 429 rate at the source.
   if ((r.status === 429 || r.status === 408) && attempt <= 5) {
     const ra = r.headers.get("retry-after");
     const raSec = ra ? parseFloat(ra) : NaN;
@@ -254,7 +263,40 @@ async function tts(text: string, voiceId: string, attempt = 1): Promise<ArrayBuf
   if (!r.ok) {
     throw new Error(`elevenlabs ${r.status}: ${(await r.text()).slice(0, 200)}`);
   }
-  return await r.arrayBuffer();
+  // The /with-timestamps endpoint returns:
+  //   {
+  //     audio_base64: string,
+  //     alignment: {
+  //       characters: string[],
+  //       character_start_times_seconds: number[],
+  //       character_end_times_seconds: number[],
+  //     },
+  //     normalized_alignment: { ... } // post-text-normalization, may differ
+  //   }
+  // We use `alignment` (the original, pre-normalization characters) so
+  // the timing index aligns with the input text we sent — the caller
+  // splits that text on whitespace to derive word boundaries.
+  const json = (await r.json()) as {
+    audio_base64?: string;
+    alignment?: {
+      characters: string[];
+      character_start_times_seconds: number[];
+      character_end_times_seconds: number[];
+    };
+  };
+  if (!json.audio_base64 || !json.alignment) {
+    throw new Error("elevenlabs response missing audio_base64 or alignment");
+  }
+  // base64 → Uint8Array (not ArrayBuffer — saves a copy)
+  const bin = atob(json.audio_base64);
+  const audio = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) audio[i] = bin.charCodeAt(i);
+  return {
+    audio,
+    characters: json.alignment.characters,
+    charStarts: json.alignment.character_start_times_seconds,
+    charEnds: json.alignment.character_end_times_seconds,
+  };
 }
 
 // Concatenate raw mp3 byte buffers. mp3 frames are self-delimiting so
@@ -380,18 +422,19 @@ Deno.serve(async (req: Request) => {
     //     word_timings: { word: string; start_s: number; end_s: number }[] }
     // - audio is a `data:audio/mpeg;base64,...` URL
     //
-    // CEO-171 follow-up (audio cutoff bug): word_timings MUST be
-    // populated. The player's run loop awaits syncCaptionsToAudio, which
-    // resolves immediately when word_timings is empty — so the await
-    // pattern collapses, NARR.src is overwritten by the next paragraph,
-    // and only the first ~600ms of each paragraph plays. To make the
-    // player block until audio.ended, we synthesize linear timings
-    // (each word evenly spread across the paragraph's estimated audio
-    // duration). Word reveal won't be perfectly synced with phonemes,
-    // but every word IS visible long enough to read at this pace and
-    // — critically — audio plays to completion. Real per-word timings
-    // would require ElevenLabs' /with-timestamps endpoint, which is
-    // future work (heavier response, different route).
+    // CEO-171 follow-up sequence:
+    //   1. (earlier today): word_timings was empty — player advanced
+    //      paragraphs after only ~600ms of audio because
+    //      syncCaptionsToAudio resolved immediately on empty pages.
+    //   2. (earlier today): synthesized linear word_timings (each word
+    //      gets equal share of paragraph audio duration). Fixed audio
+    //      cutoff but produced visible drift between voice and
+    //      captions — captions appeared after the words were spoken.
+    //   3. (now): switched the TTS endpoint to /with-timestamps which
+    //      returns authoritative per-character timing alongside the
+    //      audio. Convert character timing → word timing using
+    //      whitespace boundaries in the input text. Captions now
+    //      align with the actual phoneme rate.
     type WordTiming = { word: string; start_s: number; end_s: number };
     type ParagraphRow = {
       id: string;
@@ -402,37 +445,61 @@ Deno.serve(async (req: Request) => {
       word_timings: WordTiming[];
     };
 
-    // mp3 @ 128 kbps = ~16,000 bytes per second of audio. This matches
-    // the formula used at the chapter level for total duration.
-    const BYTES_PER_SEC_128KBPS_MP3 = 16000;
-
-    function buildLinearTimings(text: string, audioBytes: number): {
-      duration_sec: number;
-      timings: WordTiming[];
-    } {
-      const words = text.split(/\s+/).filter((w) => w.length > 0);
-      // Floor at 1s so a tiny paragraph still has time to read its words.
-      const duration_sec = Math.max(1, audioBytes / BYTES_PER_SEC_128KBPS_MP3);
-      if (words.length === 0) return { duration_sec, timings: [] };
-      const per = duration_sec / words.length;
-      const timings: WordTiming[] = words.map((w, i) => ({
-        word: w,
-        start_s: i * per,
-        end_s: (i + 1) * per,
-      }));
-      return { duration_sec, timings };
+    // Convert ElevenLabs' per-character alignment into per-word
+    // {word, start_s, end_s} entries. We walk the characters[] array,
+    // accumulating non-whitespace runs into a buffer; when whitespace
+    // is hit, that buffer becomes one word with start_s = first-char
+    // start time, end_s = last-char end time.
+    //
+    // The `timeOffset` parameter shifts all timestamps to account for
+    // earlier TTS chunks in a multi-chunk paragraph (long paragraphs
+    // are split at sentence boundary into multiple TTS calls; each
+    // returns timings starting at 0, so the second chunk needs to be
+    // offset by the duration of the first, etc.).
+    function charsToWordTimings(
+      chars: string[],
+      starts: number[],
+      ends: number[],
+      timeOffset: number,
+    ): WordTiming[] {
+      const out: WordTiming[] = [];
+      let bufWord = "";
+      let bufStart = -1;
+      let bufEnd = -1;
+      const flush = () => {
+        if (bufWord.length > 0 && bufStart >= 0 && bufEnd >= 0) {
+          out.push({
+            word: bufWord,
+            start_s: bufStart + timeOffset,
+            end_s: bufEnd + timeOffset,
+          });
+        }
+        bufWord = "";
+        bufStart = -1;
+        bufEnd = -1;
+      };
+      for (let i = 0; i < chars.length; i++) {
+        const c = chars[i];
+        if (/\s/.test(c)) {
+          flush();
+        } else {
+          if (bufWord.length === 0) bufStart = starts[i];
+          bufWord += c;
+          bufEnd = ends[i];
+        }
+      }
+      flush();
+      return out;
     }
 
     const t0 = Date.now();
     console.log(`[livebook] starting ${sample.length} paragraphs (${listing_id})`);
 
     // Bounded-concurrency TTS to keep total wall time well under the
-    // 200s edge-function ceiling. CEO-171 follow-up (2026-04-27):
-    // dropped from 5 → 3 after parallel regens of two listings burst
-    // ElevenLabs' per-minute bucket and triggered cascading 429s on
-    // the second listing. 3 leaves enough headroom that two parallel
-    // operators (writer publish + admin regen) can run simultaneously
-    // without colliding.
+    // 200s edge-function ceiling. 3 workers leaves enough headroom
+    // that two parallel operators (writer publish + admin regen) can
+    // run simultaneously without bursting ElevenLabs' per-minute
+    // bucket and cascading into 429 retries.
     const TTS_CONCURRENCY = 3;
     const slots: (ParagraphRow | null)[] = new Array(sample.length).fill(null);
     let nextIdx = 0;
@@ -445,23 +512,46 @@ Deno.serve(async (req: Request) => {
         const text = sample[i];
         const ttsChunks = chunkForTts(text, TTS_CHAR_LIMIT);
         const ts = Date.now();
-        const audioBufs: ArrayBuffer[] = [];
+        const audioParts: Uint8Array[] = [];
+        const allTimings: WordTiming[] = [];
+        let cumulativeOffset = 0;
         for (const c of ttsChunks) {
-          audioBufs.push(await tts(c, voice.id));
+          const result = await tts(c, voice.id);
+          audioParts.push(result.audio);
+          // Convert this chunk's character alignment to words, offset
+          // by the cumulative duration of all prior chunks.
+          const chunkTimings = charsToWordTimings(
+            result.characters,
+            result.charStarts,
+            result.charEnds,
+            cumulativeOffset,
+          );
+          allTimings.push(...chunkTimings);
+          // The chunk's total duration is the last character's end
+          // time. Add that to cumulativeOffset so the next chunk's
+          // timings line up correctly when concatenated.
+          if (result.charEnds.length > 0) {
+            cumulativeOffset += result.charEnds[result.charEnds.length - 1];
+          }
         }
-        const merged = concatBuffers(audioBufs);
+        // concatBuffers expects ArrayBuffers; Uint8Arrays have a
+        // .buffer property but slicing/typing matters. Rebuild as
+        // ArrayBuffers to keep concatBuffers' signature unchanged.
+        const merged = concatBuffers(audioParts.map((u) => u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength)));
         totalAudioBytes += merged.byteLength;
-        const { duration_sec, timings } = buildLinearTimings(text, merged.byteLength);
+        // Total paragraph duration: sum of chunk durations (which is
+        // exactly cumulativeOffset after the loop).
+        const duration_sec = Math.max(1, cumulativeOffset || merged.byteLength / 16000);
         slots[i] = {
           id: `p${i}`,
           text,
           gap_ms: gapForParagraph(text),
           audio: `data:audio/mpeg;base64,${encodeBase64(merged)}`,
           duration_sec,
-          word_timings: timings,
+          word_timings: allTimings,
         };
         console.log(
-          `[livebook] p${i} done in ${Date.now() - ts}ms (chunks=${ttsChunks.length}, bytes=${merged.byteLength}, words=${timings.length}, dur=${duration_sec.toFixed(1)}s)`,
+          `[livebook] p${i} done in ${Date.now() - ts}ms (chunks=${ttsChunks.length}, bytes=${merged.byteLength}, words=${allTimings.length}, dur=${duration_sec.toFixed(1)}s)`,
         );
       }
     }
