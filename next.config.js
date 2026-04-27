@@ -59,6 +59,43 @@ const nextConfig = {
       { source: '/marketplace/:path*', destination: '/publish/store/:path*', permanent: false },
     ];
   },
+  // CTO security pass (2026-04-27): baseline browser security headers.
+  // CSP is intentionally in REPORT-ONLY mode for the first deploy so we can
+  // observe what the writer app actually loads (Inngest, Stripe, Supabase,
+  // Anthropic-via-server, ElevenLabs, Cartesia, Voyage, fal.ai assets via
+  // server proxy, computer-use UI streams) without breaking the editor or
+  // the 7-agent pipeline. After 1-2 weeks of clean reports we flip to
+  // enforcing Content-Security-Policy.
+  async headers() {
+    const securityHeaders = [
+      { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+      { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=(), payment=(self)' },
+      {
+        key: 'Content-Security-Policy-Report-Only',
+        value: [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.vercel-insights.com https://va.vercel-scripts.com",
+          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+          "img-src 'self' data: blob: https://*.supabase.co https://imagedelivery.net",
+          "font-src 'self' data: https://fonts.gstatic.com",
+          "media-src 'self' blob: data: https://*.supabase.co https://*.elevenlabs.io",
+          "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://*.elevenlabs.io https://*.inngest.com https://*.vercel-insights.com",
+          "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
+          "frame-ancestors 'self'",
+          "form-action 'self' https://checkout.stripe.com",
+          "base-uri 'self'",
+          "object-src 'none'",
+          "upgrade-insecure-requests",
+        ].join('; '),
+      },
+    ];
+    return [
+      { source: '/:path*', headers: securityHeaders },
+    ];
+  },
 }
 
 module.exports = nextConfig

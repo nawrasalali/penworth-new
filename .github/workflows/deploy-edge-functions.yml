@@ -1,0 +1,135 @@
+# Auto-deploy Supabase edge functions
+#
+# Purpose:
+#   Closes the gap that burned us in CEO-134 — `supabase/functions/**` source
+#   on `main` could be hours/days ahead of what was actually running in the
+#   Supabase project. The Management API push was a manual step.
+#
+# How:
+#   On every push to main that touches `supabase/functions/**`, this workflow
+#   identifies the changed function directories, then deploys each via the
+#   Supabase CLI. The CLI pushes via the same Management API endpoint we
+#   used manually, but with proper version bookkeeping.
+#
+# Setup (one-time, founder action):
+#   Repo Settings → Secrets and variables → Actions → New repository secret
+#     SUPABASE_ACCESS_TOKEN  = <Supabase Management PAT>
+#     SUPABASE_PROJECT_REF   = lodupspxdvadamrqvkje
+#
+# Behaviour on first run after merge:
+#   - If only one function changed, only that function is deployed.
+#   - If multiple changed (e.g. shared-deno-update across functions), each is
+#     deployed in turn; failures on one don't block the others.
+#   - If only the shared `_shared/` directory changed, all functions are
+#     redeployed (safer than guessing which import the change affected).
+
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch:
+    inputs:
+      function_name:
+        description: 'Optional: deploy only this function (slug). Leave blank to deploy all changed.'
+        required: false
+        type: string
+
+concurrency:
+  group: deploy-edge-functions
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Verify required secrets are set
+        env:
+          ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -e
+          missing=0
+          if [ -z "$ACCESS_TOKEN" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN is not set in repo Actions secrets"
+            missing=1
+          fi
+          if [ -z "$PROJECT_REF" ]; then
+            echo "::error::SUPABASE_PROJECT_REF is not set in repo Actions secrets"
+            missing=1
+          fi
+          if [ "$missing" = "1" ]; then exit 1; fi
+
+      - name: Checkout (with full history for diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Determine which functions changed
+        id: changed
+        run: |
+          set -e
+          # Manual override path
+          if [ -n "${{ github.event.inputs.function_name }}" ]; then
+            echo "functions=${{ github.event.inputs.function_name }}" >> "$GITHUB_OUTPUT"
+            echo "Manual override: deploying ${{ github.event.inputs.function_name }} only"
+            exit 0
+          fi
+          # Diff against the previous commit on main
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+          # Default branch case where before is all-zeros (first push)
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            BEFORE=$(git rev-parse "$AFTER^") || BEFORE="$AFTER"
+          fi
+          CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- 'supabase/functions/**' || true)
+          # If anything under _shared/ changed, redeploy everything.
+          if echo "$CHANGED" | grep -q '^supabase/functions/_shared/'; then
+            FUNCTIONS=$(ls -1 supabase/functions/ | grep -v '^_shared$' | tr '\n' ' ')
+            echo "Shared change detected; redeploying all: $FUNCTIONS"
+          else
+            FUNCTIONS=$(echo "$CHANGED" | awk -F/ '/^supabase\/functions\// {print $3}' | sort -u | tr '\n' ' ')
+            echo "Changed functions: $FUNCTIONS"
+          fi
+          echo "functions=$FUNCTIONS" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy each changed function
+        if: steps.changed.outputs.functions != ''
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set +e  # don't abort the loop on a single failure
+          FAILED=()
+          for fn in ${{ steps.changed.outputs.functions }}; do
+            if [ ! -d "supabase/functions/$fn" ]; then
+              echo "::warning::supabase/functions/$fn does not exist locally — skipping"
+              continue
+            fi
+            echo "::group::Deploy $fn"
+            supabase functions deploy "$fn" --project-ref "$PROJECT_REF"
+            rc=$?
+            if [ $rc -ne 0 ]; then
+              echo "::error::Deploy of $fn exited with status $rc"
+              FAILED+=("$fn")
+            fi
+            echo "::endgroup::"
+          done
+          if [ ${#FAILED[@]} -ne 0 ]; then
+            echo "::error::Failed deploys: ${FAILED[*]}"
+            exit 1
+          fi
+          echo "All deploys succeeded."
+
+      - name: No changes detected (info only)
+        if: steps.changed.outputs.functions == ''
+        run: echo "No changed functions found between commits — nothing to deploy."
