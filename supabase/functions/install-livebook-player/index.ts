@@ -445,7 +445,16 @@ function swapCaptionPage(pageWords) {
 function clearCaptions() { document.getElementById('cap-a').classList.remove('visible'); document.getElementById('cap-b').classList.remove('visible'); }
 function syncCaptionsToAudio(audio, pages) {
   return new Promise((resolve) => {
-    if (!pages.length) { resolve(); return; }
+    if (!pages.length) {
+      // No word_timings available (legacy livebook.html generated pre /with-timestamps).
+      // Render no captions, but still await audio.ended so the outer playback loop
+      // doesn't clobber NARR.src after the gap_ms wait and truncate paragraphs to ~600ms.
+      if (audio.ended || audio.duration === 0) { resolve(); return; }
+      const onEnded = () => { clearTimeout(safety); resolve(); };
+      const safety = setTimeout(() => { audio.removeEventListener('ended', onEnded); resolve(); }, 600000);
+      audio.addEventListener('ended', onEnded, { once: true });
+      return;
+    }
     let pageIdx = -1, currentEl = null, lastActive = -1;
     const tick = () => {
       if (!playing) { resolve(); return; }
