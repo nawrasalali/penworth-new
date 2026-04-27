@@ -38,6 +38,12 @@
 //          function has already pointed it at the v7 player UI. Legacy
 //          listings whose livebook_asset_path is still null on first
 //          regen will be backfilled here.
+//       5. Runs TTS calls with bounded concurrency (5 parallel) so a
+//          ~30-paragraph chapter completes well under the 200s edge
+//          function wall-time limit. Serial sentence-by-sentence v12
+//          worked but only because individual TTS calls were small;
+//          paragraph-sized calls take longer each, so serial execution
+//          blew the 200s budget on first attempt.
 //
 // REQUEST
 //   POST /functions/v1/admin-generate-livebook
@@ -316,27 +322,52 @@ Deno.serve(async (req: Request) => {
       word_timings: unknown[];
     };
 
-    const paragraphs: ParagraphRow[] = [];
-    let totalAudioBytes = 0;
     const t0 = Date.now();
+    console.log(`[livebook] starting ${sample.length} paragraphs (${listing_id})`);
 
-    for (let i = 0; i < sample.length; i++) {
-      const text = sample[i];
-      const ttsChunks = chunkForTts(text, TTS_CHAR_LIMIT);
-      const audioBufs: ArrayBuffer[] = [];
-      for (const c of ttsChunks) {
-        audioBufs.push(await tts(c, voice.id));
+    // Bounded-concurrency TTS to keep total wall time well under the
+    // 200s edge-function ceiling. ElevenLabs handles ~5-10 concurrent
+    // requests cleanly on paid plans; we cap at 5 to avoid bumping into
+    // the 429 retry path, which would burn time.
+    const TTS_CONCURRENCY = 5;
+    const slots: (ParagraphRow | null)[] = new Array(sample.length).fill(null);
+    let nextIdx = 0;
+    let totalAudioBytes = 0;
+
+    async function worker(): Promise<void> {
+      while (true) {
+        const i = nextIdx++;
+        if (i >= sample.length) return;
+        const text = sample[i];
+        const ttsChunks = chunkForTts(text, TTS_CHAR_LIMIT);
+        const ts = Date.now();
+        const audioBufs: ArrayBuffer[] = [];
+        for (const c of ttsChunks) {
+          audioBufs.push(await tts(c, voice.id));
+        }
+        const merged = concatBuffers(audioBufs);
+        totalAudioBytes += merged.byteLength;
+        slots[i] = {
+          id: `p${i}`,
+          text,
+          gap_ms: gapForParagraph(text),
+          audio: `data:audio/mpeg;base64,${encodeBase64(merged)}`,
+          word_timings: [],
+        };
+        console.log(
+          `[livebook] p${i} done in ${Date.now() - ts}ms (chunks=${ttsChunks.length}, bytes=${merged.byteLength})`,
+        );
       }
-      const merged = concatBuffers(audioBufs);
-      totalAudioBytes += merged.byteLength;
-      paragraphs.push({
-        id: `p${i}`,
-        text,
-        gap_ms: gapForParagraph(text),
-        audio: `data:audio/mpeg;base64,${encodeBase64(merged)}`,
-        word_timings: [],
-      });
     }
+    await Promise.all(
+      Array.from({ length: Math.min(TTS_CONCURRENCY, sample.length) }, () => worker()),
+    );
+    const paragraphs: ParagraphRow[] = slots.filter(
+      (p): p is ParagraphRow => p !== null,
+    );
+    console.log(
+      `[livebook] all paragraphs done in ${Date.now() - t0}ms (n=${paragraphs.length}, totalAudioBytes=${totalAudioBytes})`,
+    );
 
     // 16 kB/s ~= 128 kbps mp3, matches the output_format we requested.
     const durationSec = Math.max(1, Math.round(totalAudioBytes / 16000));
