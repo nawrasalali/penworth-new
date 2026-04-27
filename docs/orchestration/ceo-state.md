@@ -1,6 +1,6 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-27 by CEO Claude session — CEO-051 per-chapter Inngest fan-out shipped (PR #15 squash-merged at `3a3d16c`, prod deploy `dpl_6nCUht3P6Yzt97C1EWApMwR6T9u7` READY). Feature-flagged off via `CHAPTER_FANOUT_ENABLED`; production behaviour unchanged until Founder activates.
+**Last updated:** 2026-04-27 by CEO Claude session — TWO parallel ships today: (1) CEO-051 per-chapter Inngest fan-out shipped (PR #15 `3a3d16c`, prod deploy `dpl_6nCUht3P6Yzt97C1EWApMwR6T9u7` READY, feature-flagged off via `CHAPTER_FANOUT_ENABLED`); (2) Livebook image library Phases 0+1+2-backend shipped — CEO-163 (schema + seeding pipeline + GHA workflow), CEO-165 (retrieval pipeline + edge function ACTIVE + publish handler wired), CEO-166 (atomic enrolment SQL + API endpoint + 18 i18n keys × 11 locales). Phase 2 frontend (PublishToStoreModal + style picker + reader 3-mode rendering) is the only remaining build. All livebook code dormant until Founder provisions FAL_KEY + ANTHROPIC_API_KEY + VOYAGE_API_KEY (one-time, gates seeding AND matching).
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
