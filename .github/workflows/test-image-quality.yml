@@ -1,0 +1,92 @@
+name: Test Image Quality (one-shot)
+
+# Standalone visual quality probe — generates a small image set across
+# multiple styles for the first N paragraphs of one book, then uploads
+# an HTML gallery as a workflow artifact for the founder to download
+# and eyeball. NOT integrated with the Livebook image library or any
+# production tables. Pure quality test.
+#
+# Founder workflow:
+#   1. Add FAL_KEY + ANTHROPIC_API_KEY to repo Actions secrets (one-time)
+#   2. GitHub UI → Actions → "Test Image Quality" → Run workflow
+#   3. Defaults: The New Rich, 12 paragraphs, 3 styles → 36 images, ~$1.44
+#   4. When done, download "quality-test-gallery" artifact from the run
+#   5. Open the HTML file in a browser — see paragraph + scene + 3 styles side by side
+
+on:
+  workflow_dispatch:
+    inputs:
+      listing_id:
+        description: 'store_listings.id of the book to test'
+        required: true
+        default: '5c63f175-ce4b-4446-8771-3107fc8ab5c9'
+        type: string
+      paragraphs:
+        description: 'How many paragraphs from the start (each gets one image per style)'
+        required: true
+        default: '12'
+        type: string
+      styles:
+        description: 'Comma-separated style slugs to test'
+        required: true
+        default: 'minimalist_editorial,pencil_sketch,conceptual_abstract'
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: Verify required secrets
+        env:
+          FAL_KEY: ${{ secrets.FAL_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          missing=""
+          [ -z "$FAL_KEY" ] && missing="$missing FAL_KEY"
+          [ -z "$ANTHROPIC_API_KEY" ] && missing="$missing ANTHROPIC_API_KEY"
+          [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] && missing="$missing NEXT_PUBLIC_SUPABASE_URL"
+          [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] && missing="$missing SUPABASE_SERVICE_ROLE_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required Actions secrets:$missing"
+            exit 1
+          fi
+          echo "All required secrets present."
+
+      - name: Prepare output dir
+        run: mkdir -p /home/runner/output
+
+      - name: Run quality test script
+        env:
+          FAL_KEY: ${{ secrets.FAL_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          npx tsx scripts/test_image_quality.ts \
+            --listing-id "${{ inputs.listing_id }}" \
+            --paragraphs "${{ inputs.paragraphs }}" \
+            --styles "${{ inputs.styles }}" \
+            --out /home/runner/output/quality_test.html
+
+      - name: Upload gallery artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-test-gallery
+          path: /home/runner/output/quality_test.html
+          retention-days: 30
