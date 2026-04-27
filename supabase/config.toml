@@ -1,0 +1,37 @@
+# Supabase config — function deployment overrides.
+#
+# Purpose:
+#   Two functions are protected by a shared admin secret (x-admin-secret
+#   header) rather than a Supabase JWT, so they MUST be deployed with
+#   `verify_jwt = false`. Without this declaration, the CI's
+#   `supabase functions deploy` command (workflow:
+#   .github/workflows/deploy-edge-functions.yml) defaults to
+#   `verify_jwt = true`, which causes the gateway to reject every
+#   call with HTTP 401 / UNAUTHORIZED_NO_AUTH_HEADER before the function
+#   ever sees its own auth check.
+#
+# History:
+#   - admin-generate-livebook (CEO-105 rotation kept it at false)
+#   - install-livebook-player (deployed manually as false since CEO-167)
+#   - 2026-04-27: CEO-171 chain pushed both to repo for the first time.
+#     The first CI deploy after each commit silently flipped them to
+#     verify_jwt=true (the CLI default), breaking gateway auth and
+#     blocking the entire livebook regen path. This config file is the
+#     fix-forward — the CLI honors these per-function blocks and the CI
+#     workflow no longer needs to know about per-function flags.
+#
+# Note:
+#   livebook-manifest, livebook-player, auto-fill-pending-assets,
+#   admin-match-livebook-images, academy-generate-audio all run
+#   with verify_jwt=false too but were deployed via Management API
+#   (not via this CI workflow) and are not yet in the repo. When/if
+#   any of those gets added under supabase/functions/, they will need
+#   their own block below.
+
+project_id = "lodupspxdvadamrqvkje"
+
+[functions.admin-generate-livebook]
+verify_jwt = false
+
+[functions.install-livebook-player]
+verify_jwt = false
