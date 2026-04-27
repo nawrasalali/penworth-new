@@ -1,12 +1,52 @@
 # CEO State Snapshot
 
-**Last updated:** 2026-04-27 ~00:00 UTC by CEO Claude session (CEO-151 shipped — academy-generate-audio edge function deployed v3 ACTIVE; all 30 audio targets generated for the 3 mandatory Foundations courses).
+**Last updated:** 2026-04-27 by CEO Claude session — CEO-163 Phase 0 schema + seeding pipeline shipped (3 commits); blocked on founder provisioning FAL_KEY + ANTHROPIC_API_KEY + VOYAGE_API_KEY. CEO-165 (Phase 1 retrieval) and CEO-165 (Phase 2 publish modal + reader) briefs authored ahead of need.
 **Update frequency:** End of every CEO session.
 **Purpose:** The CEO Claude's persistent memory between sessions. Read at start of every session.
 
 ---
 
-## Most recent session activity (2026-04-26 23:30–24:00 UTC — CEO-151 academy audio pipeline shipped end-to-end)
+## Most recent session activity (2026-04-27 — CEO-163 Livebook image library: Phase 0 shipped, Phase 1+2 briefs authored)
+
+**Founder direction at session open:** Build a curated image library so each paragraph of a livebook gets a paragraph-paired image. Author opts in for 1000 credits at publish time, picks a visual style. Reference images shared (12 stills) showing two target aesthetics: 1950s European hand-painted illustration + cinematic photoreal stills.
+
+**What shipped this session (3 commits, all on main):**
+
+`7d1add7` — `feat(livebook): image library schema foundation (CEO-163 Phase 0)`
+- Migration 035: pgvector extension; 3 tables (`livebook_styles`, `livebook_image_library`, `livebook_generation_jobs`); 7 new columns on `store_listings`; HNSW index on embedding column; updated_at triggers; RLS enabled; 2 styles seeded (`vintage_painting` + `cinematic_photoreal`).
+- Migration 036: 6 RLS policies (split from 035 per CEO-149 lesson — CREATE POLICY silently drops when batched with CREATE TABLE in same apply_migration call).
+- Both applied + verified live: pgvector 0.8.0 enabled, 6 policies in pg_policies, smoke insert + HNSW search returned 0.99 cosine similarity on near-identical 1024-dim vectors.
+
+`5f3effe` — `feat(livebook): seeding pipeline + 200 prompts (CEO-163 Phase 0)`
+- `scripts/seed_livebook_library.ts` — TypeScript pipeline: read CSV deck → fal.ai Flux Pro 1.1 generation → Claude vision caption + visible-tag extraction → Voyage-3 embedding → Supabase Storage upload → DB insert. Idempotent (skips already-seeded prompts), bounded concurrency (--concurrency, default 4 cap 8), --dry-run mode for plumbing tests, --force flag.
+- `scripts/livebook_prompts/vintage_painting.csv` — 100 hand-crafted prompts.
+- `scripts/livebook_prompts/cinematic_photoreal.csv` — 100 hand-crafted prompts.
+- Storage bucket `livebook-library` created (public, 5MB cap, jpeg/png/webp).
+- typecheck clean against the new script.
+
+(Pending commit) — GitHub Actions workflow + Phase 1+2 briefs:
+- `.github/workflows/seed-livebook-library.yml` — manual workflow_dispatch with style/count/dry_run/force inputs. Founder pastes 3 keys into repo Actions secrets (one-time, 2 min) then triggers via UI. Eliminates need for local Node setup.
+- `docs/briefs/2026-04-27-livebook-retrieval-pipeline.md` — Phase 1 brief (CEO-165): Inngest worker that embeds paragraphs, ANN searches the library filtered by book's chosen style, applies diversity penalty, re-ranks via Claude Haiku, writes paragraph→image map to `store_listings.livebook_image_map`.
+- `docs/briefs/2026-04-27-livebook-publish-and-reader.md` — Phase 2 brief (CEO-165): publish modal toggle + style picker, atomic credit deduction SQL function, 18 new locale keys × 11 bundles, reader rendering integration.
+- `docs/briefs/2026-04-27-livebook-image-library.md` — master Phase 0 brief (already shipped).
+- `docs/briefs/2026-04-27-livebook-seeding-keys.md` — keys provisioning brief.
+
+**Status of CEO-163 at session end:** `awaiting_founder`. Blocker: 3 API keys to provision (FAL_KEY, ANTHROPIC_API_KEY, VOYAGE_API_KEY). All other Phase 0 deliverables complete. Once keys are in repo Actions secrets, founder clicks "Run workflow" → 200-image smoke seed runs → ~$9 spend → eyeball samples → approve scaling to 1000 (~$80 incremental).
+
+**Architecture decisions ratified by founder:**
+1. Library-first beats per-book generation (cost amortises, quality curated upfront, latency drops to retrieval-time)
+2. Two starting styles: vintage_painting + cinematic_photoreal
+3. 1000 credits per book (revisit later if credit↔USD ratio shifts)
+4. Flux Pro 1.1 via fal.ai for generation
+5. Hybrid gen-on-demand fallback deferred to v2 — measure miss rate first
+6. Voyage-3 (1024-dim) for embeddings; matches schema vector type
+
+**Operational notes captured this session:**
+- pgvector 0.8.0 was not enabled prior to this session; `CREATE EXTENSION IF NOT EXISTS vector` in migration 035 brought it online without issue.
+- HNSW index `(m=16, ef_construction=64)` is the pgvector default; gives good recall/build tradeoff for libraries < 100k vectors. Style-filtered scans stay fast because the style pre-filter cuts candidate set ~10x before vector scan.
+- Seeding cost forecast confirmed: $0.045 per image (fal.ai $0.04 + Claude vision $0.005 + Voyage embedding $0.00005). 1000 imgs × 2 styles ≈ $90 total.
+
+
 
 **What shipped (PR #14, commit `af8d98f`):**
 - `supabase/functions/academy-generate-audio/index.ts` — new edge function; POST `{slug, target, force?}` with `x-admin-secret`; calls ElevenLabs `with-timestamps`; uploads mp3 + alignment.json + .srt to `guild-academy/audio/{slug}/{target}.{ext}`. Deployed v3 ACTIVE on project `lodupspxdvadamrqvkje`.
