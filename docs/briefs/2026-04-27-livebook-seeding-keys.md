@@ -1,85 +1,69 @@
-# Brief: API keys for Livebook seeding (CEO-163 Phase 0)
+# Brief: API keys for Livebook (CEO-163/165 activation)
 
-**Task code:** CEO-163 (sub)
-**Authored:** 2026-04-27 by CEO Claude
-**Owner:** Founder (provision keys); CEO Claude (run seeding once keys are in)
-**Why this exists:** The seeding script `scripts/seed_livebook_library.ts` is shipped and verified end-to-end against the live database. To actually populate the library it needs three external API keys that Penworth doesn't currently use. The Founder needs to acquire each one and add it to project secrets.
-
----
-
-## What I need
-
-Three new keys, in addition to the secrets that already live in the Penworth CEO project instructions.
-
-### 1. `FAL_KEY` — fal.ai (image generation)
-
-- **Why:** Flux Pro 1.1 is the current quality/cost sweet spot for the kind of imagery the Founder approved. fal.ai is the cheapest reliable host that exposes Flux Pro 1.1 via a stable HTTP API.
-- **Get one:** https://fal.ai/dashboard/keys → "Add new key" → copy the `Key XXXX...` string.
-- **Cost model:** Pay-as-you-go. Flux Pro 1.1 at 1344x768 is approximately $0.04 per image. Phase 0 spend at 100 images per style: ~$8. At 1000 images per style (full library): ~$80.
-- **Account funding:** fal.ai requires a prepaid balance. $50 deposit is enough for the Phase 0 100-image-per-style smoke generation.
-
-### 2. `ANTHROPIC_API_KEY` — Anthropic API (vision captioning)
-
-- **Why:** Each generated image gets captioned by Claude vision so the caption describes what's *visible* in language matching prose. The caption — not the source prompt — is what gets embedded for retrieval.
-- **Get one:** https://console.anthropic.com/settings/keys → "Create Key". Recommend creating a dedicated key named `penworth-livebook-seeding` with a $50 monthly cap so it can't surprise-spend.
-- **Cost model:** Claude Opus 4.7 at ~600 output tokens per call ≈ $0.005 per image. Phase 0 spend: ~$1 across both styles.
-- **Note:** This is the FIRST Anthropic API key Penworth needs as a paying customer — until now Claude has only been used through Claude.ai's CEO interface, which is a different product. Adding this key opens the door to other Anthropic-API integrations later (e.g. paragraph embedding via Voyage during the retrieval pipeline in Phase 1).
-
-### 3. `VOYAGE_API_KEY` — Voyage AI (text embeddings)
-
-- **Why:** Voyage-3 produces 1024-dim embeddings — this is the embedding the database schema is keyed to. It's the current best-in-class retrieval embedding model and is the model Anthropic recommends post-acquisition.
-- **Get one:** https://dash.voyageai.com → API Keys → Create. Free tier includes 50M tokens — more than enough to embed every caption in Phase 0 with room to spare.
-- **Cost model:** voyage-3 is $0.00006 per 1K tokens. A typical caption is ~80 tokens → $0.00005 per image. Phase 0 spend: $0.10 total. Free tier covers all of Phase 0 + Phase 1 retrieval.
+**Task code:** CEO-163 + CEO-165 (sub)
+**Authored:** 2026-04-27 by CEO Claude — supersedes earlier draft
+**Owner:** Founder (provision keys)
 
 ---
 
-## Total Phase 0 cost forecast
+## Current state (verified live this session via Management/Vercel APIs)
 
-| Stage | Per-image | 100 imgs × 2 styles | 1000 imgs × 2 styles |
+| Secret | Vercel writer | Supabase Edge Functions | GitHub Actions |
 |---|---|---|---|
-| fal.ai Flux Pro 1.1 | $0.040 | $8.00 | $80.00 |
-| Claude Opus vision caption | $0.005 | $1.00 | $10.00 |
-| Voyage-3 embedding | $0.00005 | $0.01 | $0.10 |
-| **Per image total** | **$0.045** | **$9.01** | **$90.10** |
+| `ADMIN_SECRET` | ✓ present | ✓ present | needs paste |
+| `ANTHROPIC_API_KEY` | ✓ present | ✓ present | needs paste |
+| `FAL_KEY` | not needed | not needed | **needs paste** |
+| `VOYAGE_API_KEY` | not needed | **needs paste** | **needs paste** |
+| `NEXT_PUBLIC_SUPABASE_URL` | ✓ present | auto-injected | needs paste |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✓ present | auto-injected | needs paste |
+| `SUPABASE_MANAGEMENT_PAT` | n/a | n/a | needs paste (smoke harness only) |
 
-Recommendation: smoke-seed 100 per style first (≈ $9), Founder eyeballs samples, approve scaling to 1000 (≈ $80 incremental).
+**Vercel env vars do NOT flow to Supabase Edge Functions or GitHub Actions.** Each store is independent. The same value has to be pasted into each location where it is needed.
 
----
+## Step 1 — Get a Voyage AI key (the only key not yet anywhere)
 
-## Where to put the keys
+https://dash.voyageai.com → API Keys → Create. Free tier: 50M tokens — covers all of Phase 0 + Phase 1 with room to spare. Voyage-3 at $0.00006 per 1K tokens; a typical caption is ~80 tokens.
 
-These are sensitive secrets. Two acceptable locations:
+## Step 2 — GitHub Actions secrets (for seeding workflow)
 
-1. **Penworth CEO project instructions** (Claude.ai → Penworth CEO project → Settings → Project instructions, in the existing SECRETS block). Add three lines:
-   ```
-   - FAL_KEY: {{KEY_VALUE_HERE}}
-   - ANTHROPIC_API_KEY: {{KEY_VALUE_HERE}}
-   - VOYAGE_API_KEY: {{KEY_VALUE_HERE}}
-   ```
-2. **`.env.local` on the founder's machine** if the founder runs the script locally rather than asking me to.
+URL: https://github.com/nawrasalali/penworth-new/settings/secrets/actions
 
-The keys must NEVER be committed to the repo. The script reads them via `process.env.*`.
+Click "New repository secret" once per row:
 
----
+```
+FAL_KEY                     ← from https://fal.ai/dashboard/keys (deposit ~$50 at fal.ai)
+ANTHROPIC_API_KEY           ← copy from Vercel env (writer project) — same value
+VOYAGE_API_KEY              ← from Voyage dashboard (Step 1)
+NEXT_PUBLIC_SUPABASE_URL    = https://lodupspxdvadamrqvkje.supabase.co
+SUPABASE_SERVICE_ROLE_KEY   ← copy from Vercel env (writer project) — same value
+ADMIN_SECRET                = pw_admin_2026_livebook_83kj  (rotate later via CEO-105)
+SUPABASE_MANAGEMENT_PAT     ← from Penworth CEO project secrets (sbp_…)
+```
 
-## How seeding runs
+## Step 3 — Supabase Edge Function secrets (for paragraph matcher)
 
-Once the three keys are in place, in the next session I:
+URL: https://supabase.com/dashboard/project/lodupspxdvadamrqvkje/functions/secrets
 
-1. Read the keys from project instructions into the sandbox env.
-2. Run a 5-image smoke test in the sandbox if fal.ai is reachable; if it returns the 18-byte stub (sandbox egress issue, see CEO ops note in memory), I'll:
-   - Author a one-shot Vercel cron or a one-time GitHub Actions workflow that runs the script with the keys as repository secrets, OR
-   - Hand the script + a copy-paste instruction to the Founder to run locally.
-3. Smoke seeds 100 prompts per style → ~9 USD spend.
-4. Founder reviews 6–10 sample images per style (random sample). Approves or refines the prompt deck.
-5. Scale to 1000 per style if approved.
-6. Trigger Phase 1 brief: retrieval pipeline.
+```
+VOYAGE_API_KEY              ← only key currently missing here; same Voyage key as Step 2
+```
 
----
+`ANTHROPIC_API_KEY` is already present (verified). `ADMIN_SECRET` already present.
 
-## Acceptance test
+## Step 4 — Run
 
-When this task is done:
-- All three secret names appear in the project instructions block.
-- The script `pnpm tsx scripts/seed_livebook_library.ts --style vintage_painting --count 1` runs to completion without an env-var error and inserts one row into `livebook_image_library`.
-- The inserted row has a non-null `embedding` of length 1024, a `caption` of >50 words, and a non-empty `image_url` resolving to a Supabase Storage public URL.
+Once Steps 1–3 are done:
+
+1. **Seed the library** — GitHub UI → Actions → "Seed Livebook Library" → Run workflow:
+   - First run: `style=vintage_painting`, `count=5`, `dry_run=false` — sanity check (~$0.25)
+   - Then: `count=100` per style — smoke seed (~$9 total)
+   - Founder eyeballs samples; if approved: `count=all` per style (~$80 incremental)
+
+2. **Verify the matcher** — GitHub UI → Actions → "Smoke Test Livebook Matcher" → Run workflow against a real published book (e.g. `The Sunflower Secret`, `id=425d873e-4950-49e0-8298-0ef2977c7ee9`). Workflow checks preconditions (Voyage key present, library populated), then triggers the edge function and prints the resolved paragraph→image map summary.
+
+## Cost forecast (unchanged)
+
+- Phase 0 image: $0.045 each
+- 100 imgs × 2 styles: ~$9
+- 1000 imgs × 2 styles: ~$90
+- Phase 1 matching per book: ~$0.05 (mostly Voyage embeddings; reranker only on close calls)

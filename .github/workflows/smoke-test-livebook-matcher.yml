@@ -1,0 +1,127 @@
+name: Smoke Test Livebook Matcher
+
+# CEO-165 Phase 1 acceptance harness. Invokes admin-match-livebook-images
+# against a real published book to verify the full retrieval pipeline:
+#   1. Listing has livebook_enrolled flipped manually for the test
+#   2. Matcher embeds paragraphs, runs ANN, applies diversity, reranks,
+#      writes paragraph→image map
+#   3. Test reads the resulting livebook_image_map and prints summary
+#      stats (total, matched, skipped, similarity distribution)
+#
+# PRECONDITIONS (in order):
+#   1. VOYAGE_API_KEY in Supabase Edge Function secrets (without this,
+#      the matcher fails immediately with "VOYAGE_API_KEY missing")
+#   2. livebook_image_library has rows for the chosen style — at least
+#      a few hundred so retrieval is meaningful
+#
+# To run: GitHub UI → Actions → "Smoke Test Livebook Matcher" → Run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      listing_id:
+        description: 'store_listings.id of the book to match'
+        required: true
+        default: '425d873e-4950-49e0-8298-0ef2977c7ee9'
+        type: string
+      style:
+        description: 'Visual style (must have images in library)'
+        required: true
+        default: 'vintage_painting'
+        type: choice
+        options:
+          - vintage_painting
+          - cinematic_photoreal
+      reset_first:
+        description: 'Reset listing flags + delete any prior livebook_image_map before running'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Verify Supabase Edge Function has VOYAGE_API_KEY
+        env:
+          SUPABASE_MGMT_PAT: ${{ secrets.SUPABASE_MANAGEMENT_PAT }}
+        run: |
+          if [ -z "$SUPABASE_MGMT_PAT" ]; then
+            echo "::error::SUPABASE_MANAGEMENT_PAT not set in repo Actions secrets"
+            exit 1
+          fi
+          KEYS=$(curl -s "https://api.supabase.com/v1/projects/lodupspxdvadamrqvkje/secrets" \
+            -H "Authorization: Bearer $SUPABASE_MGMT_PAT" \
+            | python3 -c "import sys,json; print(' '.join(s['name'] for s in json.load(sys.stdin)))")
+          echo "Edge Function secrets: $KEYS"
+          if ! echo "$KEYS" | grep -q VOYAGE_API_KEY; then
+            echo "::error::VOYAGE_API_KEY not in Supabase Edge Function secrets — paste it at https://supabase.com/dashboard/project/lodupspxdvadamrqvkje/functions/secrets first."
+            exit 1
+          fi
+
+      - name: Verify library has images for this style
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          COUNT=$(curl -s "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/livebook_image_library?style_slug=eq.${{ inputs.style }}&is_active=eq.true&select=id" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Prefer: count=exact" \
+            -H "Range: 0-0" \
+            -I 2>/dev/null | grep -i 'content-range' | sed 's/.*\///' | tr -d '\r ')
+          echo "Library size for ${{ inputs.style }}: $COUNT"
+          if [ "$COUNT" -lt 20 ]; then
+            echo "::error::Library has only $COUNT images for ${{ inputs.style }} — seed at least 20 before running the matcher (see seed-livebook-library workflow)."
+            exit 1
+          fi
+
+      - name: Reset listing flags (if requested)
+        if: ${{ inputs.reset_first }}
+        env:
+          SUPABASE_MGMT_PAT: ${{ secrets.SUPABASE_MANAGEMENT_PAT }}
+        run: |
+          curl -s -X POST "https://api.supabase.com/v1/projects/lodupspxdvadamrqvkje/database/query" \
+            -H "Authorization: Bearer $SUPABASE_MGMT_PAT" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"UPDATE store_listings SET livebook_enrolled=true, livebook_style='${{ inputs.style }}', livebook_image_status='queued', livebook_image_progress=0, livebook_image_map=NULL, livebook_image_ready_at=NULL WHERE id='${{ inputs.listing_id }}' RETURNING id, livebook_style\"}"
+
+      - name: Trigger matcher (synchronous)
+        env:
+          ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
+        run: |
+          if [ -z "$ADMIN_SECRET" ]; then
+            echo "::error::ADMIN_SECRET not in repo Actions secrets"
+            exit 1
+          fi
+          echo "Calling admin-match-livebook-images for listing ${{ inputs.listing_id }}…"
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}\n" \
+            --max-time 600 \
+            -X POST "https://lodupspxdvadamrqvkje.supabase.co/functions/v1/admin-match-livebook-images" \
+            -H "Content-Type: application/json" \
+            -H "x-admin-secret: $ADMIN_SECRET" \
+            -d '{"listing_id":"${{ inputs.listing_id }}"}')
+          echo "$RESPONSE"
+          STATUS=$(echo "$RESPONSE" | grep HTTP_STATUS | cut -d: -f2)
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Matcher returned HTTP $STATUS"
+            exit 1
+          fi
+
+      - name: Print resolved match map summary
+        env:
+          SUPABASE_MGMT_PAT: ${{ secrets.SUPABASE_MANAGEMENT_PAT }}
+        run: |
+          curl -s -X POST "https://api.supabase.com/v1/projects/lodupspxdvadamrqvkje/database/query" \
+            -H "Authorization: Bearer $SUPABASE_MGMT_PAT" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"SELECT livebook_image_status, livebook_image_progress, jsonb_array_length(COALESCE(livebook_image_map,'[]'::jsonb)) AS map_length, livebook_image_ready_at FROM store_listings WHERE id='${{ inputs.listing_id }}'\"}" \
+            | python3 -m json.tool
+          echo ""
+          echo "First 5 resolved paragraphs:"
+          curl -s -X POST "https://api.supabase.com/v1/projects/lodupspxdvadamrqvkje/database/query" \
+            -H "Authorization: Bearer $SUPABASE_MGMT_PAT" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"SELECT jsonb_pretty(jsonb_path_query_array(livebook_image_map, '$[0 to 4]')) AS first_5 FROM store_listings WHERE id='${{ inputs.listing_id }}'\"}" \
+            | python3 -m json.tool
